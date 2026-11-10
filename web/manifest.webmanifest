@@ -1,0 +1,27 @@
+{
+  "name": "No7 Personal AI Bot",
+  "short_name": "No7 AI",
+  "description": "Thai-first voice AI companion — Mobile + PC",
+  "lang": "th",
+  "dir": "ltr",
+  "theme_color": "#0b0f1a",
+  "background_color": "#0b0f1a",
+  "display": "standalone",
+  "orientation": "any",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
