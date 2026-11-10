@@ -1060,6 +1060,7 @@ function renderSettingsForm() {
   bargeSel.value = BARGE_MODES[settings.bargeIn] ? settings.bargeIn : 'keyword';
 
   renderMcp();
+  renderBots();
   renderMetrics();
   updateOutboxBadge();
 
@@ -1421,6 +1422,41 @@ $('#diag-download')?.addEventListener('click', async () => {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   $('#diag-status').textContent = `⬇️ ดาวน์โหลด ${a.download}`;
 });
+
+/* ---------------------------------------------------------------- bots UI */
+function botsBase() {
+  return String(settings.serverUrl || 'http://localhost:8787').replace(/\/$/, '');
+}
+
+async function renderBots() {
+  const status = $('#bots-status');
+  if (!status) return null;
+  try {
+    const res = await fetch(`${botsBase()}/api/bots/status`);
+    const data = await res.json();
+    const tg = data.telegram?.configured ? '✅ พร้อม' : '— ยังไม่ตั้ง TELEGRAM_BOT_TOKEN';
+    const line = data.line?.configured ? '✅ พร้อม' : '— ยังไม่ตั้ง LINE token/secret';
+    status.textContent = `สมองที่ใช้ตอบ: ${data.provider}${data.model ? ` (${data.model})` : ''} · Telegram: ${tg} · LINE: ${line}`
+      + (data.sessions ? ` · ห้องที่คุยอยู่ ${data.sessions}` : '');
+    return data;
+  } catch {
+    status.textContent = 'เชื่อม companion server ไม่ได้ — รัน `npm run server` ก่อน';
+    return null;
+  }
+}
+
+async function copyText(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+    $('#bots-status').textContent = `📋 คัดลอก ${label} แล้ว: ${text}`;
+  } catch {
+    $('#bots-status').textContent = `${label}: ${text}`;
+  }
+}
+
+$('#bots-refresh')?.addEventListener('click', () => { renderBots(); });
+$('#bots-copy-telegram')?.addEventListener('click', () => copyText(`${botsBase()}/api/telegram/webhook`, 'webhook Telegram'));
+$('#bots-copy-line')?.addEventListener('click', () => copyText(`${botsBase()}/api/line/webhook`, 'webhook LINE'));
 
 /* -------- MCP UI -------- */
 function mcpSlug(name, url) {

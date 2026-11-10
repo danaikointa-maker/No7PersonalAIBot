@@ -370,6 +370,15 @@
           <p class="hint" id="diag-status"></p>
           <pre id="diag-output" class="code diag"></pre>
 
+          <h3>บอทแชท (Telegram / LINE)</h3>
+          <p class="hint">ให้ No7 คุยได้จาก Telegram/LINE — ตั้ง token ที่ companion server (ดู <code>docs/BOTS.md</code>)</p>
+          <p class="hint" id="bots-status">กำลังตรวจสอบ…</p>
+          <div class="row">
+            <button id="bots-refresh">🔄 ตรวจสอบใหม่</button>
+            <button id="bots-copy-telegram">📋 webhook Telegram</button>
+            <button id="bots-copy-line">📋 webhook LINE</button>
+          </div>
+
           <h3>ปลั๊กอิน MCP</h3>
           <p class="hint">ต่อ No7 เข้ากับ MCP server ของคุณเอง (Gmail, ปฏิทิน, ไฟล์) — เรียกผ่าน companion server <code>POST /api/mcp</code></p>
           <div id="mcp-list" class="mcp-list"></div>

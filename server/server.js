@@ -13,6 +13,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
+import {
+  BotSessions, normalizeTelegramUpdate, normalizeLineEvents, verifyLineSignature,
+  handleBotMessage, sendTelegramMessage, replyLine,
+} from './bots.js';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -57,6 +61,83 @@ function writeSync(data) {
     return true;
   } catch { return false; }
 }
+/* ---------------- Chat bots: Telegram / LINE ---------------- */
+const BOTS = {
+  telegram: {
+    token: process.env.TELEGRAM_BOT_TOKEN || '',
+    secret: process.env.TELEGRAM_WEBHOOK_SECRET || '',
+    apiBase: process.env.TELEGRAM_API_BASE || 'https://api.telegram.org',
+  },
+  line: {
+    token: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
+    secret: process.env.LINE_CHANNEL_SECRET || '',
+    apiBase: process.env.LINE_API_BASE || 'https://api.line.me',
+  },
+  provider: process.env.NO7_BOT_PROVIDER || 'pollinations',
+  model: process.env.NO7_BOT_MODEL || '',
+};
+const botSessions = new BotSessions();
+const botLog = []; // {at, provider, chatId, ok, error}
+
+function noteBot(entry) {
+  botLog.push({ at: Date.now(), ...entry });
+  if (botLog.length > 50) botLog.shift();
+}
+
+async function botChat(messages) {
+  return proxyChat({ provider: BOTS.provider, model: BOTS.model || undefined, messages });
+}
+
+async function processTelegramUpdate(update) {
+  const msg = normalizeTelegramUpdate(update);
+  if (!msg) return;
+  try {
+    const parts = await handleBotMessage({
+      text: msg.text,
+      chatId: `tg:${msg.chatId}`,
+      provider: 'telegram',
+      sessions: botSessions,
+      chat: botChat,
+    });
+    for (const part of parts) {
+      await sendTelegramMessage({
+        token: BOTS.telegram.token,
+        chatId: msg.chatId,
+        text: part,
+        apiBase: BOTS.telegram.apiBase,
+      });
+    }
+    noteBot({ provider: 'telegram', chatId: msg.chatId, ok: true });
+  } catch (e) {
+    noteBot({ provider: 'telegram', chatId: msg.chatId, ok: false, error: e.message });
+    console.warn('[bot:telegram]', e.message);
+  }
+}
+
+async function processLineEvent(ev) {
+  try {
+    const parts = await handleBotMessage({
+      text: ev.text,
+      chatId: `line:${ev.chatId}`,
+      provider: 'line',
+      sessions: botSessions,
+      chat: botChat,
+    });
+    for (const part of parts) {
+      await replyLine({
+        token: BOTS.line.token,
+        replyToken: ev.replyToken,
+        text: part,
+        apiBase: BOTS.line.apiBase,
+      });
+    }
+    noteBot({ provider: 'line', chatId: ev.chatId, ok: true });
+  } catch (e) {
+    noteBot({ provider: 'line', chatId: ev.chatId, ok: false, error: e.message });
+    console.warn('[bot:line]', e.message);
+  }
+}
+
 /* ---------------- MCP stdio bridge ----------------
  * MCP servers แบบ process-local (stdio) ถูกประกาศผ่าน env เท่านั้น:
  *   MCP_STDIO_SERVERS='{"everything":{"command":"npx","args":["-y","@modelcontextprotocol/server-everything"]}}'
@@ -229,6 +310,20 @@ function readBody(req, limit = 1_000_000) {
   });
 }
 
+function readRawBody(req, limit = 1_000_000) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) { reject(new Error('payload too large')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
 function hmac(secret, payload) {
   return crypto.createHmac('sha256', secret).update(payload).digest('hex');
 }
@@ -256,7 +351,8 @@ async function handleApi(req, res, url) {
       sync: { enabled: true, requiresToken: !!SYNC_TOKEN, hasData: !!readSync() },
       endpoints: ['/api/health', '/api/chat', '/api/tools', '/api/tools/run', '/api/pair', '/api/sync', '/api/fetch',
         '/api/link/command', '/api/link/poll', '/api/link/status', '/api/link/results', '/api/tts', '/api/mcp',
-        '/api/mcp/stdio', '/api/oauth/token'],
+        '/api/mcp/stdio', '/api/oauth/token',
+        '/api/bots/status', '/api/telegram/webhook', '/api/line/webhook'],
       aiKeys: {
         gemini: !!process.env.GEMINI_API_KEY,
         openai: !!process.env.OPENAI_API_KEY,
@@ -324,6 +420,57 @@ async function handleApi(req, res, url) {
     } catch (e) {
       json(res, 502, { error: e.message });
     }
+    return;
+  }
+
+  // ---- Chat bots ----
+  if (url.pathname === '/api/bots/status' && req.method === 'GET') {
+    return json(res, 200, {
+      provider: BOTS.provider,
+      model: BOTS.model || null,
+      telegram: {
+        configured: !!BOTS.telegram.token,
+        requiresSecret: !!BOTS.telegram.secret,
+        webhookPath: '/api/telegram/webhook',
+      },
+      line: {
+        configured: !!(BOTS.line.token && BOTS.line.secret),
+        webhookPath: '/api/line/webhook',
+      },
+      sessions: botSessions.size(),
+      recent: botLog.slice(-10),
+    });
+  }
+
+  if (url.pathname === '/api/telegram/webhook' && req.method === 'POST') {
+    if (!BOTS.telegram.token) return json(res, 503, { error: 'ยังไม่ได้ตั้ง TELEGRAM_BOT_TOKEN ที่ server' });
+    if (BOTS.telegram.secret) {
+      const got = req.headers['x-telegram-bot-api-secret-token'] || '';
+      if (got !== BOTS.telegram.secret) return json(res, 401, { error: 'secret token ไม่ตรง' });
+    } else {
+      console.warn('[bot:telegram] ไม่ได้ตั้ง TELEGRAM_WEBHOOK_SECRET — ควรตั้งเพื่อกันคนอื่นยิง webhook ปลอม');
+    }
+    let update;
+    try { update = await readBody(req); } catch (e) { return json(res, 400, { error: e.message }); }
+    json(res, 200, { ok: true });
+    void processTelegramUpdate(update);
+    return;
+  }
+
+  if (url.pathname === '/api/line/webhook' && req.method === 'POST') {
+    if (!BOTS.line.token || !BOTS.line.secret) {
+      return json(res, 503, { error: 'ยังไม่ได้ตั้ง LINE_CHANNEL_ACCESS_TOKEN / LINE_CHANNEL_SECRET' });
+    }
+    let raw;
+    try { raw = await readRawBody(req); } catch (e) { return json(res, 400, { error: e.message }); }
+    const signature = req.headers['x-line-signature'] || '';
+    if (!verifyLineSignature({ secret: BOTS.line.secret, rawBody: raw, signature, cryptoImpl: crypto })) {
+      return json(res, 401, { error: 'signature ไม่ถูกต้อง' });
+    }
+    let body;
+    try { body = raw ? JSON.parse(raw) : {}; } catch { return json(res, 400, { error: 'invalid JSON' }); }
+    json(res, 200, { ok: true });
+    for (const ev of normalizeLineEvents(body)) void processLineEvent(ev);
     return;
   }
 

@@ -81,6 +81,9 @@ window.fetch = async (url, opts = {}) => {
     if (last.includes('เปิดเว็บ')) return reply('```tool\n{"tool":"open_url","args":{"url":"https://example.com"}}\n```');
     return reply('สวัสดีครับ ผมชื่อ No7');
   }
+  if (u.includes('/api/bots/status')) {
+    return { ok: true, json: async () => ({ provider: 'pollinations', model: null, telegram: { configured: true }, line: { configured: false }, sessions: 2, recent: [] }) };
+  }
   if (u.includes('/api/mcp/stdio')) {
     return { ok: true, json: async () => ({ servers: [{ id: 'fixture', command: 'node', args: ['fixture.mjs'], running: false }] }) };
   }
@@ -240,6 +243,8 @@ check('mcp: server listed', $('#mcp-list').textContent.includes('Demo'), $('#mcp
 check('mcp: tool count reported', $('#mcp-list').textContent.includes('1 เครื่องมือ'), $('#mcp-list').textContent.slice(0, 120));
 check('mcp: dynamic tool in tools grid', [...$('#tools-grid').children].some((b) => b.textContent.includes('send_email')));
 check('mcp: permission category listed', $('#perm-list').children.length === 6, String($('#perm-list').children.length));
+check('bots: status polled from server', $('#bots-status').textContent.includes('Telegram: ✅'), $('#bots-status').textContent);
+check('bots: line shown as not configured', $('#bots-status').textContent.includes('LINE: —'), $('#bots-status').textContent);
 check('mcp: transport offers stdio', [...$('#mcp-transport').options].some((o) => o.value === 'stdio'));
 $('#mcp-transport').value = 'stdio';
 $('#mcp-transport').dispatchEvent(new window.Event('change'));
