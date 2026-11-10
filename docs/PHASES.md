@@ -7,7 +7,7 @@
 | 1 | ความจำอัจฉริยะ (Memory 2.0) | 1.1–1.4 | ✅ ปิดเฟส |
 | 2 | เสียงไว + ปลุกด้วยชื่อ (Voice 2.0) | 2.1–2.5 | ✅ ปิดเฟส |
 | 3 | Persona Studio | 3.1–3.4 | ✅ ปิดเฟส |
-| 4 | Connectors & Sync | 4.1–4.4 | ⬜ |
+| 4 | Connectors & Sync | 4.1–4.4 | ✅ ปิดเฟส |
 | 5 | Device Hub (Phone-Link ครบวงจร) | 5.1–5.4 | ⬜ |
 | 6 | Ship 1.0 (คุณภาพ + แจกจ่าย) | 6.1–6.4 | ⬜ |
 
@@ -35,10 +35,10 @@
 
 ## เฟส 4 — Connectors & Sync
 
-- 4.1 ปฏิทิน: นำเข้า .ics, รายการนัด, `calendar_add` / `calendar_list`
-- 4.2 อ่านฟีด RSS + สรุปหน้าเว็บ (`rss_read`, `summarize_url`)
-- 4.3 ซิงก์ข้ามเครื่องผ่าน server `/api/sync` (token) + UI
-- 4.4 Tests
+- [x] 4.1 ปฏิทิน: นำเข้า/ส่งออก .ics, รายการนัด, `calendar_add` / `calendar_list`, UI ตารางนัด
+- [x] 4.2 อ่านฟีด RSS + สรุปหน้าเว็บ (`rss_read`, `summarize_url`) + server `/api/fetch` proxy
+- [x] 4.3 ซิงก์ข้ามเครื่องผ่าน server `/api/sync` (token) + UI + merge แบบ additive
+- [x] 4.4 Tests (10 calendar + 10 connectors) + docs/CONNECTORS.md
 
 ## เฟส 5 — Device Hub
 

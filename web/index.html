@@ -24,6 +24,7 @@
           <button data-view="chat" class="active">💬 แชท</button>
           <button data-view="tools">🧰 เครื่องมือ</button>
           <button data-view="memory">🧠 ความจำ</button>
+          <button data-view="calendar">📅 ตารางนัด</button>
           <button data-view="settings">⚙️ ตั้งค่า</button>
         </nav>
         <div class="sidebar-foot">
@@ -110,6 +111,24 @@
             ใช้ AI ช่วยสรุปความจำ (แม่นขึ้น แต่ใช้โควตา)
           </label>
           <p id="mem-status" class="hint"></p>
+        </section>
+
+        <section id="view-calendar" class="view">
+          <h2>📅 ตารางนัด</h2>
+          <p class="hint">เก็บในเครื่อง · นำเข้า/ส่งออก .ics ได้ · No7 เพิ่มนัดให้ได้เอง</p>
+          <div class="row">
+            <input id="cal-title" placeholder="หัวข้อ เช่น ประชุมทีม" />
+            <input id="cal-when" type="datetime-local" />
+            <button id="cal-add-btn">เพิ่ม</button>
+          </div>
+          <div class="row">
+            <button id="cal-import-btn">⬆️ นำเข้า .ics</button>
+            <input id="cal-import-file" type="file" accept=".ics,text/calendar" hidden />
+            <button id="cal-export-btn">⬇️ ส่งออก .ics</button>
+            <button id="cal-today-btn">วันนี้</button>
+          </div>
+          <p id="cal-status" class="hint"></p>
+          <div id="cal-list"></div>
         </section>
 
         <section id="view-settings" class="view">
@@ -249,6 +268,17 @@
             <button id="export-btn">ส่งออกข้อมูล</button>
             <button id="reset-btn">ล้างข้อมูลทั้งหมด</button>
           </div>
+
+          <h3>🔄 ซิงก์ข้ามเครื่อง</h3>
+          <p class="hint">ใช้ companion server ของคุณเอง (npm run server) — ไม่มีคลาวด์ ไม่มีบัญชี</p>
+          <label>ที่อยู่ server <input id="set-serverurl" placeholder="http://192.168.1.10:8787" /></label>
+          <label>Sync token <input id="set-synctoken" type="password" placeholder="NO7_SYNC_TOKEN ของ server" /></label>
+          <div class="row">
+            <button id="sync-push-btn">⬆️ อัปโหลดจากเครื่องนี้</button>
+            <button id="sync-pull-btn">⬇️ ดึง + ผสาน</button>
+            <button id="sync-test-btn">ทดสอบเชื่อมต่อ</button>
+          </div>
+          <p id="sync-status" class="hint"></p>
 
           <h3>เชื่อมต่อ (Phone-Link / ESP32)</h3>
           <p class="hint">โปรโตคอลจับคู่ HMAC — ดู <code>docs/PHONE_LINK.md</code></p>

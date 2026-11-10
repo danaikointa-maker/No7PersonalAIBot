@@ -103,7 +103,11 @@ export class Agent {
       // ---- run ----
       this.onEvent({ type: 'tool', step: steps, tool: call.name, label: tool.label, emoji: tool.emoji, args: call.args });
       try {
-        const res = await runTool(call.name, call.args, { memory: this.memory });
+        const res = await runTool(call.name, call.args, {
+          memory: this.memory,
+          chat: this.chat,
+          settings: this.settings,
+        });
         trace.push({ step: steps, ...res });
         this.onEvent({ type: 'result', step: steps, tool: res.tool, data: res.data });
         messages.push({ role: 'assistant', content: reply });

@@ -36,6 +36,26 @@ const MIME = {
 /** In-memory pairing registry: code -> { secret, createdAt } */
 const pairings = new Map();
 
+/** Sync store: เก็บล่าสุดในหน่วยความจำ + ไฟล์ .no7/sync.json (ถ้าเขียนได้) */
+const SYNC_DIR = path.join(ROOT, '.no7');
+const SYNC_FILE = path.join(SYNC_DIR, 'sync.json');
+const SYNC_TOKEN = process.env.NO7_SYNC_TOKEN || '';
+
+function readSync() {
+  try { return JSON.parse(fs.readFileSync(SYNC_FILE, 'utf8')); } catch { return null; }
+}
+function writeSync(data) {
+  try {
+    fs.mkdirSync(SYNC_DIR, { recursive: true });
+    fs.writeFileSync(SYNC_FILE, JSON.stringify(data, null, 2));
+    return true;
+  } catch { return false; }
+}
+function syncAuthorized(req) {
+  if (!SYNC_TOKEN) return true;                       // ไม่ตั้ง token = เปิดให้ใน LAN
+  return String(req.headers['x-no7-sync'] || '') === SYNC_TOKEN;
+}
+
 function json(res, code, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(code, {
@@ -89,6 +109,8 @@ async function handleApi(req, res, url) {
       ok: true, app: 'no7-personal-ai-bot', version: '0.2.0',
       platform: process.platform, node: process.version,
       hasDist: fs.existsSync(path.join(DIST, 'index.html')),
+      sync: { enabled: true, requiresToken: !!SYNC_TOKEN, hasData: !!readSync() },
+      endpoints: ['/api/health', '/api/chat', '/api/tools', '/api/tools/run', '/api/pair', '/api/sync', '/api/fetch'],
       aiKeys: {
         gemini: !!process.env.GEMINI_API_KEY,
         openai: !!process.env.OPENAI_API_KEY,
@@ -120,6 +142,42 @@ async function handleApi(req, res, url) {
     } catch (e) {
       return json(res, 502, { error: e.message });
     }
+  }
+
+  // ---- cross-device sync (opt-in, self-hosted) ----
+  if (url.pathname === '/api/sync') {
+    if (!syncAuthorized(req)) return json(res, 401, { error: 'bad sync token' });
+    if (req.method === 'GET') {
+      const data = readSync();
+      if (!data) return json(res, 404, { error: 'no sync data yet' });
+      return json(res, 200, data);
+    }
+    if (req.method === 'PUT') {
+      const body = await readBody(req, 5_000_000);
+      const saved = writeSync({ ...body, serverAt: new Date().toISOString() });
+      return json(res, 200, { ok: true, persisted: saved, updatedAt: body.updatedAt || null });
+    }
+    return json(res, 405, { error: 'use GET or PUT' });
+  }
+
+  // ---- fetch proxy: เลี่ยง CORS ให้ RSS/สรุปหน้าเว็บ ----
+  if (url.pathname === '/api/fetch' && req.method === 'GET') {
+    const target = url.searchParams.get('url') || '';
+    if (!/^https?:\/\//i.test(target)) return json(res, 400, { error: 'url ต้องขึ้นต้นด้วย http(s)' });
+    try {
+      const r = await fetch(target, { headers: { 'User-Agent': 'No7Bot/0.3 (+self-hosted)' } });
+      if (!r.ok) return json(res, 502, { error: `upstream ${r.status}` });
+      const text = (await r.text()).slice(0, 800_000);
+      res.writeHead(200, {
+        'Content-Type': r.headers.get('content-type') || 'text/plain; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(text);
+    } catch (e) {
+      json(res, 502, { error: e.message });
+    }
+    return;
   }
 
   // ---- tool catalog + execution for ESP32 / Phone-Link clients ----
@@ -293,7 +351,9 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`No7 companion server → http://localhost:${PORT}`);
   console.log(`  LAN: http://<your-ip>:${PORT}  (เปิดจากมือถือในวง Wi-Fi เดียวกัน)`);
-  console.log(`  health: /api/health · tools: /api/tools`);
+  console.log(`  health: /api/health · tools: /api/tools · sync: /api/sync`);
+  if (!SYNC_TOKEN) console.log('  ⚠️  ยังไม่ได้ตั้ง NO7_SYNC_TOKEN — /api/sync เปิดให้ทุกคนใน LAN อ่านได้');
+  else console.log('  🔐 sync protected by NO7_SYNC_TOKEN');
 });
 
 export { server, runServerTool, proxyChat, verifySignature, pairings };

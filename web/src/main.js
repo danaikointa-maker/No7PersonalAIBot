@@ -1,6 +1,8 @@
 import './styles.css';
 import { StateMachine, STATES } from './core/state.js';
-import { allPersonas, getPersona, createPersona, updatePersona, deletePersona, duplicatePersona, personaVoice } from './core/persona-store.js';
+import { allPersonas, customPersonas, getPersona, createPersona, updatePersona, deletePersona, duplicatePersona, personaVoice } from './core/persona-store.js';
+import { getCalendar, formatWhen } from './core/calendar.js';
+import { collectBundle, pushBundle, pullBundle, mergeBundle } from './core/sync.js';
 import { MemoryStore } from './core/memory.js';
 import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatWithFallbackStream } from './core/ai-providers.js';
 import { TOOLS, TOOL_IDS, runTool, toolMeta, restoreReminders } from './core/tools.js';
@@ -67,9 +69,10 @@ $('#device-info').textContent = `${platformLabel(platform)} · จอ ${window.i
 function showView(name) {
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${name}`));
   document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
-  $('#view-title').textContent = { chat: 'แชทกับ No7', tools: 'เครื่องมือ', memory: 'ความจำ', settings: 'ตั้งค่า' }[name] || name;
+  $('#view-title').textContent = { chat: 'แชทกับ No7', tools: 'เครื่องมือ', memory: 'ความจำ', calendar: 'ตารางนัด', settings: 'ตั้งค่า' }[name] || name;
   $('#sidebar').classList.remove('open');
   if (name === 'tools') renderToolsGrid();
+  if (name === 'calendar') renderCalendar();
   if (name === 'memory') {
     memQuery = '';                       // เข้าหน้าความจำ = ดูทั้งหมดก่อน
     const q = $('#mem-query');
@@ -606,6 +609,71 @@ function downloadJson(data, filename) {
   URL.revokeObjectURL(a.href);
 }
 
+/* ---------------------------------------------------------------- calendar */
+const calendar = getCalendar();
+
+function renderCalendar() {
+  const box = $('#cal-list');
+  if (!box) return;
+  const list = calendar.all().filter((e) => e.start >= Date.now() - 12 * 3600000);
+  box.innerHTML = list.length ? '' : '<p class="hint">ยังไม่มีนัด — เพิ่มด้านบน หรือบอก No7 ว่า "นัดประชุมพรุ่งนี้ 14:30"</p>';
+  for (const e of list) {
+    const row = document.createElement('div');
+    row.className = 'fact';
+    const when = document.createElement('span');
+    when.className = 'pill hot';
+    when.textContent = formatWhen(e.start);
+    const title = document.createElement('span');
+    title.className = 'fact-text';
+    title.textContent = `${e.title}${e.location ? ` · 📍 ${e.location}` : ''}`;
+    const del = document.createElement('button');
+    del.textContent = 'ลบ';
+    del.addEventListener('click', () => { calendar.remove(e.uid); renderCalendar(); });
+    row.append(when, title, del);
+    box.appendChild(row);
+  }
+}
+
+$('#cal-add-btn').addEventListener('click', () => {
+  const title = $('#cal-title').value.trim();
+  const when = $('#cal-when').value;
+  if (!title || !when) { $('#cal-status').textContent = 'ต้องใส่หัวข้อและเวลา'; return; }
+  calendar.add({ title, start: new Date(when).getTime() });
+  $('#cal-title').value = '';
+  $('#cal-when').value = '';
+  $('#cal-status').textContent = 'เพิ่มนัดแล้ว ✅';
+  renderCalendar();
+});
+
+$('#cal-import-btn').addEventListener('click', () => $('#cal-import-file').click());
+$('#cal-import-file').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    const res = calendar.importIcs(await file.text());
+    $('#cal-status').textContent = `นำเข้า ${res.added}/${res.total} รายการ`;
+    renderCalendar();
+  } catch (err) { $('#cal-status').textContent = `อ่านไฟล์ไม่สำเร็จ: ${err.message}`; }
+  e.target.value = '';
+});
+
+$('#cal-export-btn').addEventListener('click', () => {
+  const blob = new Blob([calendar.exportIcs()], { type: 'text/calendar' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `no7-calendar-${Date.now()}.ics`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  $('#cal-status').textContent = 'ส่งออกแล้ว';
+});
+
+$('#cal-today-btn').addEventListener('click', () => {
+  const list = calendar.upcoming({ days: 1, limit: 20 });
+  $('#cal-status').textContent = list.length
+    ? `วันนี้/พรุ่งนี้: ${list.map((e) => `${formatWhen(e.start)} ${e.title}`).join(' · ')}`
+    : 'ไม่มีนัดในช่วง 24 ชั่วโมง';
+});
+
 /* --------------------------------------------------------------- settings */
 let permDraft = null;
 
@@ -649,6 +717,8 @@ function renderSettingsForm() {
 
   $('#set-maxsteps').value = settings.maxSteps || 4;
   $('#set-costmode').value = settings.costMode || 'mixed';
+  $('#set-serverurl').value = settings.serverUrl || '';
+  $('#set-synctoken').value = settings.syncToken || '';
   renderPermList();
 
   $('#set-streaming').checked = settings.streaming !== false;
@@ -712,6 +782,8 @@ function collectSettings() {
     voiceRate: Number($('#set-rate').value) || 1,
     voicePitch: Number($('#set-pitch').value) || 1,
     voiceName: $('#set-voice').value,
+    serverUrl: $('#set-serverurl').value.trim() || 'http://localhost:8787',
+    syncToken: $('#set-synctoken').value.trim(),
   };
 }
 
@@ -850,6 +922,55 @@ $('#test-ai-btn').addEventListener('click', async () => {
 
 $('#set-rate').addEventListener('input', (e) => { $('#out-rate').textContent = Number(e.target.value).toFixed(2); });
 $('#set-pitch').addEventListener('input', (e) => { $('#out-pitch').textContent = Number(e.target.value).toFixed(2); });
+$('#sync-test-btn').addEventListener('click', async () => {
+  const url = ($('#set-serverurl').value || '').trim().replace(/\/$/, '');
+  $('#sync-status').textContent = 'กำลังทดสอบ…';
+  try {
+    const r = await fetch(`${url}/api/health`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const h = await r.json();
+    $('#sync-status').textContent = `✅ เชื่อมต่อได้ (v${h.version}) · sync ${h.sync?.requiresToken ? 'ต้องใช้ token' : 'เปิดอยู่'}`;
+  } catch (e) {
+    $('#sync-status').textContent = `❌ ${e.message} — เปิด npm run server แล้วหรือยัง?`;
+  }
+});
+
+function bundleNow() {
+  return collectBundle({
+    memory,
+    personas: customPersonas(),
+    calendar: calendar.all(),
+    settings,
+  });
+}
+
+$('#sync-push-btn').addEventListener('click', async () => {
+  settings = saveSettings({ serverUrl: $('#set-serverurl').value.trim(), syncToken: $('#set-synctoken').value.trim() });
+  $('#sync-status').textContent = 'กำลังอัปโหลด…';
+  try {
+    const res = await pushBundle(settings.serverUrl, settings.syncToken, bundleNow());
+    $('#sync-status').textContent = `✅ อัปโหลดแล้ว ${res.persisted ? '(บันทึกลงไฟล์)' : '(เก็บในหน่วยความจำ)'}`;
+  } catch (e) { $('#sync-status').textContent = `❌ ${e.message}`; }
+});
+
+$('#sync-pull-btn').addEventListener('click', async () => {
+  settings = saveSettings({ serverUrl: $('#set-serverurl').value.trim(), syncToken: $('#set-synctoken').value.trim() });
+  $('#sync-status').textContent = 'กำลังดาวน์โหลด…';
+  try {
+    const bundle = await pullBundle(settings.serverUrl, settings.syncToken);
+    if (!bundle) { $('#sync-status').textContent = 'ยังไม่มีข้อมูลบน server'; return; }
+    const res = mergeBundle(bundle, {
+      memory,
+      createPersona,
+      getPersona,
+      listPersonas: allPersonas,
+      calendar,
+    });
+    renderMemory(); renderCalendar(); renderPersonaList(); renderSettingsForm();
+    $('#sync-status').textContent = `✅ ผสานแล้ว: ความจำ +${res.facts} · persona +${res.personas} · นัด +${res.events}`;
+  } catch (e) { $('#sync-status').textContent = `❌ ${e.message}`; }
+});
+
 $('#test-voice-btn').addEventListener('click', async () => {
   $('#voice-status').textContent = 'กำลังพูดทดสอบ…';
   await voice.speak('สวัสดีครับ ผมคือ No7 ผู้ช่วยส่วนตัวของคุณ', {

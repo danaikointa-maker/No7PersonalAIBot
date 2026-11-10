@@ -103,7 +103,7 @@ const submit = (text) => {
 await wait(100);
 check('boot: initial state', ['IDLE', 'SETUP'].includes($('#state-label').textContent), $('#state-label').textContent);
 check('boot: welcome message', $('#messages').children.length >= 1);
-check('boot: 19 tools in auto mode', $('#tools-grid').children.length === 19, String($('#tools-grid').children.length));
+check('boot: 23 tools in auto mode', $('#tools-grid').children.length === 23, String($('#tools-grid').children.length));
 check('boot: 5 role modes', $('#mode-chips').children.length === 5, String($('#mode-chips').children.length));
 check('boot: persona header', $('#persona-name').textContent.length > 0);
 
@@ -113,10 +113,10 @@ check('nav: memory view', $('#view-memory').classList.contains('active'));
 // mode switching filters tools
 window.document.querySelector('#mode-chips button[data-mode="hub"]').click();
 await wait(20);
-check('mode: hub filters tools', $('#tools-grid').children.length === 14, String($('#tools-grid').children.length));
+check('mode: hub filters tools', $('#tools-grid').children.length === 17, String($('#tools-grid').children.length));
 window.document.querySelector('#mode-chips button[data-mode="auto"]').click();
 await wait(20);
-check('mode: back to auto', $('#tools-grid').children.length === 19);
+check('mode: back to auto', $('#tools-grid').children.length === 23);
 
 $('#set-provider').value = 'pollinations';
 $('#save-settings-btn').click();
@@ -157,7 +157,18 @@ await wait(300);
 $('#nav button[data-view="memory"]').click();
 check('memory: learned from chat', $('#mem-results').textContent.includes('มีโจ'), $('#mem-results').textContent.slice(0, 80));
 
+// calendar view
+$('#nav button[data-view="calendar"]').click();
+$('#cal-title').value = 'ประชุมทดสอบ';
+$('#cal-when').value = '2026-12-01T10:00';
+$('#cal-add-btn').click();
+await wait(20);
+check('calendar: event added', $('#cal-list').textContent.includes('ประชุมทดสอบ'), $('#cal-list').textContent.slice(0, 60));
+check('calendar: persisted', JSON.parse(window.localStorage.getItem('no7.calendar.v1') || '[]').length > 0);
+
 // memory 2.0: pin + consolidate run
+$('#nav button[data-view="memory"]').click();
+await wait(20);
 $('#mem-results').querySelector('.fact button')?.click();      // ปุ่ม 📍 ตัวแรก
 await wait(20);
 check('memory: pin toggles', $('#mem-results').textContent.includes('📌'), $('#mem-results').textContent.slice(0, 40));
@@ -172,6 +183,7 @@ check('pairing: handled (code or clear warning)', /รหัสจับคู�
 
 // Persona Studio
 $('#nav button[data-view="settings"]').click();
+check('sync: controls present', !!$('#sync-push-btn') && !!$('#set-serverurl'));
 check('persona: list rendered', $('#persona-list').children.length === 8, String($('#persona-list').children.length));
 $('#persona-new').click();
 $('#pf-name').value = 'น้องสโมค';

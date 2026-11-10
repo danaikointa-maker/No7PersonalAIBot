@@ -24,6 +24,8 @@ export const DEFAULT_SETTINGS = {
   voiceRate: 1,
   voicePitch: 1,
   voiceName: '',
+  serverUrl: 'http://localhost:8787',   // companion server (AI proxy / tools / sync)
+  syncToken: '',
 };
 
 const KEY = 'no7.settings.v1';
