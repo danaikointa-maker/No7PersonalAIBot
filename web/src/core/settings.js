@@ -41,7 +41,15 @@ export function loadSettings() {
 
 export function saveSettings(patch) {
   const next = { ...loadSettings(), ...patch };
-  try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
+  try {
+    localStorage.setItem(KEY, JSON.stringify(next));
+  } catch (err) {
+    try {
+      globalThis.dispatchEvent?.(new CustomEvent('no7:storage-error', {
+        detail: { key: KEY, message: `บันทึกตั้งค่าไม่สำเร็จ: ${err?.message || err}` },
+      }));
+    } catch {}
+  }
   return next;
 }
 

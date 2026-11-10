@@ -66,3 +66,52 @@
 | 6 | CI + a11y + docs + 1.0.0 | — |
 
 รวม: **112 unit tests · 40 e2e checks · 24 tools · 43 JS files**
+
+
+---
+
+# รอบที่ 2 (v1.1 → v1.3)
+
+เป้าหมาย: ทำให้ "ใช้จริงบนมือถือ" แข็งแรงขึ้น, พูดคุยเป็นธรรมชาติขึ้น (ขัดจังหวะได้), เปิดให้ต่อโลกภายนอกด้วย MCP
+
+| เฟส | ชื่อ | งานย่อย | สถานะ |
+|---|---|---|---|
+| R1 | ความเสถียรบนมือถือ (Mobile hardening) | 1.1–1.4 | ✅ ปิดเฟส |
+| R2 | Barge-in + TTS ระดับพรีเมียม | 2.1–2.4 | ⬜ |
+| R3 | MCP / Integrations | 3.1–3.4 | ⬜ |
+| R4 | Reliability & Performance | 4.1–4.4 | ⬜ |
+| R5 | Release 1.3 | 5.1–5.3 | ⬜ |
+
+## R1 — ความเสถียรบนมือถือ
+
+- [x] 1.1 PWA: manifest shortcuts + เปิด view จาก query + แถบออฟไลน์
+- [x] 1.2 Capabilities: ตรวจ 15 ความสามารถ + ขอสิทธิ์ไมค์/แจ้งเตือน + แผงสถานะ
+- [x] 1.3 Storage: ขนาดต่อส่วน, โควตา, ขอพื้นที่ถาวร, จัดการ QuotaExceeded, ล้างรายกลุ่ม
+- [x] 1.4 Tests (9 capabilities + 9 storage) + docs/MOBILE.md
+
+## R2 — Barge-in + TTS
+
+- 2.1 Barge-in: พูดขัดจังหวะได้ (keyword หรือ any-speech) + กันเสียงสะท้อนของตัวเอง
+- 2.2 TTS provider router: system / OpenAI-compatible (ผ่าน server proxy) / ปิดเสียง
+- 2.3 ตั้งค่าเสียงต่อ persona + เลือก provider ใน UI
+- 2.4 Tests + อัปเดต docs/VOICE.md
+
+## R3 — MCP
+
+- 3.1 MCP client (JSON-RPC 2.0 over HTTP) + discovery (`initialize`, `tools/list`, `tools/call`)
+- 3.2 Dynamic tool registry: รวม tool จาก MCP เข้ากับ tools ในเครื่อง
+- 3.3 Permission หมวดใหม่ `mcp` (risk 2) + UI จัดการ server/tool
+- 3.4 Tests + docs/MCP.md
+
+## R4 — Reliability & Performance
+
+- 4.1 Retry/backoff สำหรับ transient error + offline queue
+- 4.2 Metrics: latency (first token / total / tool time) + หน้าดูสถิติ
+- 4.3 Diagnostics: รายงานปัญหาแบบปิดข้อมูลอ่อนไหว (redacted) + คัดลอก/ดาวน์โหลด
+- 4.4 Tests + docs/RELIABILITY.md
+
+## R5 — Release 1.3
+
+- 5.1 version 1.3.0 + CHANGELOG
+- 5.2 README + PHASES ปิดครบ
+- 5.3 ตรวจรับรวม + PR

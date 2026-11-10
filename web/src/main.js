@@ -4,6 +4,8 @@ import { allPersonas, customPersonas, getPersona, createPersona, updatePersona, 
 import { getCalendar, formatWhen } from './core/calendar.js';
 import { collectBundle, pushBundle, pullBundle, mergeBundle } from './core/sync.js';
 import { getDeviceRegistry, sendCommand, deviceStatus, testConnection, QUICK_COMMANDS } from './core/link.js';
+import { detectCapabilities, summarizeCapabilities, requestMicrophone, requestNotifications } from './core/capabilities.js';
+import { usageBreakdown, formatBytes, estimateQuota, isPersisted, requestPersistentStorage, clearGroup } from './core/storage.js';
 import { MemoryStore } from './core/memory.js';
 import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatWithFallbackStream } from './core/ai-providers.js';
 import { TOOLS, TOOL_IDS, runTool, toolMeta, restoreReminders } from './core/tools.js';
@@ -859,6 +861,8 @@ function renderSettingsForm() {
   $('#out-pitch').textContent = Number(settings.voicePitch || 1).toFixed(2);
   renderVoiceOptions();
   renderPersonaList();
+  renderCapabilities();
+  renderStorage();
   $('#set-language').value = settings.language;
   $('#set-polite').checked = settings.polite;
   $('#set-tts').checked = settings.tts;
@@ -915,6 +919,105 @@ function collectSettings() {
     syncToken: $('#set-synctoken').value.trim(),
   };
 }
+
+/* ------------------------------------------------ device capabilities */
+async function renderCapabilities() {
+  const box = $('#caps-list');
+  if (!box) return;
+  const caps = await detectCapabilities(window);
+  const sum = summarizeCapabilities(caps);
+  box.innerHTML = '';
+
+  const head = document.createElement('div');
+  head.className = 'hint';
+  head.textContent = `พร้อมใช้ ${sum.ok}/${sum.total} (${sum.score}%)`
+    + (sum.missing.length ? ` · ยังไม่มี: ${sum.missing.join(', ')}` : '');
+  box.appendChild(head);
+
+  for (const c of caps) {
+    const row = document.createElement('div');
+    row.className = `cap ${c.ok ? 'ok' : 'no'}`;
+    const label = document.createElement('span');
+    label.textContent = c.label;
+    const mark = document.createElement('span');
+    mark.className = 'mark';
+    mark.textContent = c.ok ? '✅' : '➖';
+    const extra = document.createElement('small');
+    extra.textContent = c.value ? String(c.value) : (c.ok ? '' : (c.hint || 'ไม่รองรับ'));
+    row.append(mark, label, extra);
+    box.appendChild(row);
+  }
+}
+
+async function renderStorage() {
+  const { rows, total } = usageBreakdown(window);
+  const est = await estimateQuota(window);
+  const persisted = await isPersisted(window);
+
+  $('#storage-summary').textContent = `ข้อมูล No7 ใช้ ${formatBytes(total)}`
+    + (est?.quota ? ` · เบราว์เซอร์ใช้ ${est.usageText}/${est.quotaText} (${est.percent}%)` : '')
+    + ` · พื้นที่ถาวร: ${persisted ? '✅ เปิดแล้ว' : '❌ ยังไม่เปิด'}`;
+
+  const box = $('#storage-rows');
+  box.innerHTML = '';
+  const max = Math.max(1, ...rows.map((r) => r.bytes));
+  for (const r of rows.filter((x) => x.bytes > 0).sort((a, b) => b.bytes - a.bytes)) {
+    const row = document.createElement('div');
+    row.className = 'storage-row';
+    row.innerHTML = `<span>${r.label}</span><span class="bar"><i style="width:${Math.round((r.bytes / max) * 100)}%"></i></span><span>${formatBytes(r.bytes)}</span>`;
+    box.appendChild(row);
+  }
+  if (!box.children.length) box.innerHTML = '<p class="hint">ยังไม่มีข้อมูลที่บันทึกไว้</p>';
+}
+
+$('#caps-refresh').addEventListener('click', () => renderCapabilities());
+$('#caps-mic').addEventListener('click', async () => {
+  $('#caps-status').textContent = 'กำลังขอสิทธิ์…';
+  try {
+    await requestMicrophone(window);
+    $('#caps-status').textContent = '✅ ได้สิทธิ์ไมโครโฟนแล้ว';
+    renderCapabilities();
+  } catch (e) {
+    $('#caps-status').textContent = `❌ ${e.message}`;
+  }
+});
+$('#caps-notify').addEventListener('click', async () => {
+  try {
+    const res = await requestNotifications(window);
+    $('#caps-status').textContent = res === 'granted' ? '✅ เปิดแจ้งเตือนแล้ว' : `ผล: ${res}`;
+    renderCapabilities();
+  } catch (e) {
+    $('#caps-status').textContent = `❌ ${e.message}`;
+  }
+});
+
+$('#storage-persist').addEventListener('click', async () => {
+  try {
+    const ok = await requestPersistentStorage(window);
+    $('#settings-status').textContent = ok ? '✅ ได้พื้นที่ถาวรแล้ว' : 'เบราว์เซอร์ยังไม่อนุญาต (อาจต้องติดตั้งเป็นแอปก่อน)';
+    renderStorage();
+  } catch (e) {
+    $('#settings-status').textContent = `❌ ${e.message}`;
+  }
+});
+$('#storage-clean-metrics').addEventListener('click', () => {
+  clearGroup('metrics', window);
+  renderStorage();
+  $('#settings-status').textContent = 'ล้างสถิติแล้ว';
+});
+$('#storage-clean-notes').addEventListener('click', () => {
+  if (!confirm('ล้างโน้ต/รายการงาน/เตือนความจำ?')) return;
+  clearGroup('notes', window);
+  renderStorage();
+  $('#settings-status').textContent = 'ล้างโน้ตและรายการงานแล้ว';
+});
+
+// แจ้งเตือนเมื่อพื้นที่เต็ม
+window.addEventListener('no7:storage-error', (e) => {
+  const msg = e.detail?.message || 'พื้นที่เก็บข้อมูลเต็ม';
+  $('#offline-banner').hidden = false;
+  $('#offline-banner').textContent = `⚠️ ${msg}`;
+});
 
 /* ------------------------------------------------------- Persona Studio */
 let editingPersonaId = null;
@@ -1276,6 +1379,24 @@ window.addEventListener('keydown', (e) => {
 
 /* -------------------------------------------------------------- startup */
 startDailyConsolidation(memory, () => consolidate(memory, { chat: llmChat, useLLM: !!settings.memoryLLM }));
+
+function syncOnlineState() {
+  const offline = !navigator.onLine;
+  const banner = $('#offline-banner');
+  if (offline) {
+    banner.hidden = false;
+    banner.textContent = '⚠️ ออฟไลน์อยู่ — ความจำ/โน้ต/ปฏิทินยังใช้ได้ แต่การคุยกับ AI ต้องรอเน็ต';
+  } else if (banner.textContent.startsWith('⚠️ ออฟไลน์')) {
+    banner.hidden = true;
+  }
+}
+window.addEventListener('online', syncOnlineState);
+window.addEventListener('offline', syncOnlineState);
+syncOnlineState();
+
+// PWA shortcut / deep link: ?view=memory
+const bootView = new URLSearchParams(location.search).get('view');
+if (bootView && document.getElementById(`view-${bootView}`)) showView(bootView);
 
 renderSettingsForm();
 renderModeChips();

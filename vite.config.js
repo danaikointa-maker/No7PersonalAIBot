@@ -33,8 +33,16 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'any',
         lang: 'th',
+        id: '/?app=no7',
         start_url: '.',
         scope: '.',
+        categories: ['productivity', 'utilities'],
+        shortcuts: [
+          { name: 'แชทใหม่', short_name: 'แชท', url: './?view=chat', description: 'เปิดหน้าคุยกับ No7' },
+          { name: 'ความจำ', short_name: 'ความจำ', url: './?view=memory', description: 'ดู/แก้ความจำระยะยาว' },
+          { name: 'ตารางนัด', short_name: 'นัด', url: './?view=calendar', description: 'ดูลำนัดหมาย' },
+          { name: 'อุปกรณ์', short_name: 'อุปกรณ์', url: './?view=devices', description: 'สั่งงาน PC/ESP32' },
+        ],
         icons: [
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },

@@ -50,6 +50,8 @@
           </div>
         </header>
 
+        <div id="offline-banner" hidden role="status">⚠️ ออฟไลน์อยู่ — ความจำ/โน้ต/ปฏิทินยังใช้ได้ แต่การคุยกับ AI ต้องรอเน็ต</div>
+
         <!-- Avatar strip -->
         <section id="avatar-strip">
           <canvas id="avatar" width="360" height="140" aria-label="อวาตาร์"></canvas>
@@ -303,6 +305,25 @@
             <button id="sync-test-btn">ทดสอบเชื่อมต่อ</button>
           </div>
           <p id="sync-status" class="hint"></p>
+
+          <h3>📱 ความสามารถของอุปกรณ์นี้</h3>
+          <p class="hint">ตรวจจาก API จริงของเครื่อง — ปุ่มที่ใช้ไม่ได้จะบอกเหตุผล</p>
+          <div id="caps-list"></div>
+          <div class="row">
+            <button id="caps-mic">ขอสิทธิ์ไมโครโฟน</button>
+            <button id="caps-notify">ขอสิทธิ์แจ้งเตือน</button>
+            <button id="caps-refresh">ตรวจใหม่</button>
+          </div>
+          <p id="caps-status" class="hint"></p>
+
+          <h3>💾 พื้นที่จัดเก็บ</h3>
+          <div id="storage-summary" class="hint"></div>
+          <div id="storage-rows"></div>
+          <div class="row">
+            <button id="storage-persist">ขอพื้นที่ถาวร</button>
+            <button id="storage-clean-metrics">ล้างสถิติ</button>
+            <button id="storage-clean-notes">ล้างโน้ต/งาน</button>
+          </div>
 
           <h3>⌨️ คีย์ลัด</h3>
           <ul class="hint shortcuts">

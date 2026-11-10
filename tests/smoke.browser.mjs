@@ -194,6 +194,14 @@ $('#dev-list').querySelector('.dev-actions button')?.click();
 await wait(150);
 check('devices: failure logged, no crash', $('#dev-log').hidden === false, $('#dev-log').textContent.slice(0, 80));
 
+// capabilities + storage panels (R1)
+check('caps: list rendered', $('#caps-list').children.length > 3, String($('#caps-list').children.length));
+check('caps: summary line', /พร้อมใช้/.test($('#caps-list').textContent), $('#caps-list').textContent.slice(0, 50));
+check('storage: summary rendered', $('#storage-summary').textContent.includes('พื้นที่'), $('#storage-summary').textContent.slice(0, 60));
+$('#storage-clean-metrics').click();
+check('storage: clean metrics works', $('#settings-status').textContent.includes('ล้างสถิติ'), $('#settings-status').textContent);
+check('offline banner hidden while online', $('#offline-banner').hidden === true);
+
 // Persona Studio
 $('#nav button[data-view="settings"]').click();
 check('sync: controls present', !!$('#sync-push-btn') && !!$('#set-serverurl'));
