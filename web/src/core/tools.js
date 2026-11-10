@@ -191,16 +191,192 @@ export const TOOLS = {
       };
     },
   },
+
+  calc: {
+    emoji: '🧮',
+    label: 'คำนวณ',
+    desc: 'คำนวณเลขหรือสูตร เช่น 18*7+3, (1200-350)/4',
+    params: { expression: 'string สูตรที่ต้องการคำนวณ (+, -, *, /, %, **, วงเล็บ)' },
+    local: true,
+    run({ expression = '' }) {
+      const clean = String(expression).replace(/[,\s]/g, '').replace(/×/g, '*').replace(/÷/g, '/').replace(/x/gi, '*');
+      if (!/^[-+*/%().0-9eE*]+$/.test(clean)) throw new Error('สูตรนี้คำนวณไม่ได้ (รับเฉพาะตัวเลขและ + - * / % ** วงเล็บ)');
+      // eslint-disable-next-line no-new-func
+      const value = Function(`"use strict"; return (${clean});`)();
+      if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error('ผลลัพธ์ไม่ใช่ตัวเลข');
+      return { title: 'ผลคำนวณ', big: String(Number(value.toFixed(8))), lines: [`${expression} = ${value}`] };
+    },
+  },
+
+  memory_save: {
+    emoji: '🧠',
+    label: 'จำ',
+    desc: 'บันทึกข้อเท็จจริงลงความจำระยะยาว',
+    params: { text: 'string ข้อเท็จจริง', importance: 'number 1-5 (ยิ่งสูงยิ่งถูกหยิบมาใช้)' },
+    local: true,
+    run({ text = '', importance = 2 }, ctx) {
+      if (!text) throw new Error('ต้องระบุข้อความที่จะจำ');
+      const fact = ctx?.memory?.addFact(text, Math.min(5, Math.max(1, Number(importance) || 2)));
+      return { title: 'จำไว้แล้ว', big: '', lines: [fact ? fact.text : text] };
+    },
+  },
+
+  memory_search: {
+    emoji: '🔎',
+    label: 'ค้นความจำ',
+    desc: 'ค้นสิ่งที่เคยจำไว้ (BM25)',
+    params: { query: 'string คำค้น' },
+    local: true,
+    run({ query = '' }, ctx) {
+      const hits = ctx?.memory?.search(query, 6) || [];
+      return { title: 'ความจำที่เกี่ยวข้อง', big: `${hits.length} รายการ`, lines: hits.length ? hits.map((h) => `• ${h.text}`) : ['ไม่พบ'] };
+    },
+  },
+
+  reminder: {
+    emoji: '⏰',
+    label: 'เตือนความจำ',
+    desc: 'ตั้งเตือนตามเวลาจริง เช่น "อีก 20 นาที" หรือ "15:30"',
+    params: { minutes: 'number นาทีจากนี้', at: 'string เวลา HH:MM (ใช้แทน minutes ได้)', label: 'string เรื่องที่จะเตือน' },
+    local: true,
+    run({ minutes, at, label = 'แจ้งเตือน' }) {
+      const KEY = 'no7.reminders.v1';
+      let when = Date.now() + (Number(minutes) || 0) * 60000;
+      if (at && /^\d{1,2}:\d{2}$/.test(at)) {
+        const [h, m] = at.split(':').map(Number);
+        const d = new Date();
+        d.setHours(h, m, 0, 0);
+        if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1);
+        when = d.getTime();
+      }
+      if (when <= Date.now()) when = Date.now() + 60000;
+      const list = JSON.parse(localStorage.getItem(KEY) || '[]');
+      list.push({ label, when });
+      localStorage.setItem(KEY, JSON.stringify(list));
+      scheduleReminder({ label, when });
+      const mins = Math.max(1, Math.round((when - Date.now()) / 60000));
+      return {
+        title: 'ตั้งเตือนแล้ว',
+        big: new Date(when).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+        lines: [label, `อีก ${mins} นาที`],
+      };
+    },
+  },
+
+  open_url: {
+    emoji: '🌐',
+    label: 'เปิดเว็บ',
+    desc: 'เปิดลิงก์ในเบราว์เซอร์',
+    params: { url: 'string ต้องขึ้นต้นด้วย http' },
+    run({ url = '' }) {
+      if (!/^https?:\/\//i.test(url)) throw new Error('ลิงก์ต้องขึ้นต้นด้วย http:// หรือ https://');
+      const opened = openExternal(url);
+      return { title: 'เปิดลิงก์', big: '', lines: [url, opened ? 'เปิดในแท็บใหม่แล้ว' : 'เบราว์เซอร์บล็อก — เปิดด้วยตัวเอง'], url };
+    },
+  },
+
+  clipboard_copy: {
+    emoji: '📋',
+    label: 'คัดลอก',
+    desc: 'คัดลอกข้อความไปยังคลิปบอร์ด',
+    params: { text: 'string ข้อความ' },
+    async run({ text = '' }) {
+      if (!text) throw new Error('ต้องระบุข้อความ');
+      await copyText(text);
+      return { title: 'คัดลอกแล้ว', big: `${text.length} ตัวอักษร`, lines: [text.slice(0, 120)] };
+    },
+  },
+
+  compose_message: {
+    emoji: '✉️',
+    label: 'ร่างข้อความ',
+    desc: 'เปิดหน้าต่างเขียนอีเมล/SMS/LINE พร้อมข้อความที่ร่างไว้ (ผู้ใช้กดส่งเองเสมอ)',
+    params: { to: 'string ผู้รับ (อีเมล/เบอร์)', subject: 'string หัวข้อ (อีเมล)', body: 'string เนื้อความ', channel: '"email" | "sms" | "line"' },
+    async run({ to = '', subject = '', body = '', channel = 'email' }) {
+      const enc = encodeURIComponent;
+      let url;
+      if (channel === 'sms') url = `sms:${to}?&body=${enc(body)}`;
+      else if (channel === 'line') url = `https://line.me/R/msg/text/?${enc(body)}`;
+      else url = `mailto:${to}?subject=${enc(subject)}&body=${enc(body)}`;
+      const opened = openExternal(url);
+      return {
+        title: 'ร่างข้อความพร้อมส่ง',
+        big: channel.toUpperCase(),
+        lines: [to ? `ถึง: ${to}` : 'ยังไม่ได้ระบุผู้รับ', body.slice(0, 120), opened ? 'เปิดแอปให้แล้ว — กดส่งเองเมื่อพร้อม' : 'เปิดไม่สำเร็จ กรุณาคัดลอกเอง'],
+        url: channel === 'line' ? url : undefined,
+      };
+    },
+  },
+
+  open_app: {
+    emoji: '🖥️',
+    label: 'เปิดโปรแกรม',
+    desc: 'เปิดแอป/ไฟล์บนเครื่อง (เดสก์ท็อปเท่านั้น)',
+    params: { target: 'string ชื่อแอปหรือ path' },
+    async run({ target = '' }) {
+      const bridge = globalThis.no7?.native;
+      if (!bridge?.openApp) throw new Error('ต้องเปิดในเดสก์ท็อปแอป (Electron) เท่านั้น');
+      await bridge.openApp(target);
+      return { title: 'เปิดโปรแกรม', big: target, lines: ['ส่งคำสั่งไปยังระบบแล้ว'] };
+    },
+  },
+
+  system_info: {
+    emoji: '📊',
+    label: 'ข้อมูลเครื่อง',
+    desc: 'แบตเตอรี่ เครือข่าย หน่วยความจำ',
+    params: {},
+    async run() {
+      const lines = [];
+      if (navigator.getBattery) {
+        const b = await navigator.getBattery();
+        lines.push(`แบตเตอรี่ ${Math.round(b.level * 100)}%${b.charging ? ' (กำลังชาร์จ)' : ''}`);
+      }
+      const conn = navigator.connection;
+      if (conn) lines.push(`เครือข่าย ${conn.effectiveType || '—'} ${conn.downlink ? `~${conn.downlink} Mbps` : ''}`);
+      if (navigator.deviceMemory) lines.push(`RAM ~${navigator.deviceMemory} GB`);
+      lines.push(`จอ ${window.innerWidth}×${window.innerHeight} · DPR ${window.devicePixelRatio}`);
+      return { title: 'ข้อมูลเครื่อง', big: navigator.onLine ? 'ออนไลน์' : 'ออฟไลน์', lines };
+    },
+  },
 };
 
 export const TOOL_IDS = Object.keys(TOOLS);
+
+/** category = what kind of access, risk = 0 read … 3 device control */
+export const TOOL_META = {
+  weather: { category: 'read', risk: 0 },
+  air: { category: 'read', risk: 0 },
+  crypto: { category: 'read', risk: 0 },
+  fx: { category: 'read', risk: 0 },
+  gold: { category: 'read', risk: 0 },
+  wiki: { category: 'read', risk: 0 },
+  news: { category: 'read', risk: 0 },
+  calc: { category: 'read', risk: 0 },
+  system_info: { category: 'read', risk: 0 },
+  memory_search: { category: 'memory', risk: 0 },
+  memory_save: { category: 'memory', risk: 0 },
+  note: { category: 'memory', risk: 0 },
+  todo: { category: 'memory', risk: 0 },
+  timer: { category: 'act', risk: 1 },
+  reminder: { category: 'act', risk: 1 },
+  clipboard_copy: { category: 'act', risk: 1 },
+  open_url: { category: 'act', risk: 1 },
+  compose_message: { category: 'message', risk: 2 },
+  open_app: { category: 'control', risk: 3 },
+};
+
+export function toolMeta(id) {
+  return TOOL_META[id] || { category: 'read', risk: 0 };
+}
 
 /** Compact tool list for the system prompt. */
 export function describeTools() {
   return TOOL_IDS.map((id) => {
     const t = TOOLS[id];
     const p = Object.keys(t.params || {}).join(', ') || 'ไม่มี';
-    return `- ${id}: ${t.desc} | params: ${p}`;
+    const m = toolMeta(id);
+    return `- ${id} [${m.category}/risk${m.risk}]: ${t.desc} | params: ${p}`;
   }).join('\n');
 }
 
@@ -210,7 +386,7 @@ export async function runTool(name, args = {}, ctx = {}) {
   if (!tool) throw new Error(`ไม่มีเครื่องมือชื่อ "${name}"`);
   ctx.onStart?.(name);
   try {
-    const data = await tool.run(args);
+    const data = await tool.run(args, ctx);
     return { tool: name, data };
   } finally {
     ctx.onEnd?.(name);
@@ -230,6 +406,44 @@ export function extractToolCall(text) {
 
 export function stripToolCalls(text) {
   return String(text || '').replace(/```(?:tool|json)\s*[\s\S]*?```/g, '').trim();
+}
+
+/** Open a URL in both browser and native hosts. */
+function openExternal(url) {
+  const bridge = globalThis.no7?.native;
+  if (bridge?.openExternal) { bridge.openExternal(url); return true; }
+  const w = globalThis.open?.(url, '_blank', 'noopener');
+  if (!w) globalThis.location?.assign(url);
+  return true;
+}
+
+async function copyText(text) {
+  const bridge = globalThis.no7?.native;
+  if (bridge?.copy) return bridge.copy(text);
+  if (globalThis.navigator?.clipboard?.writeText) return globalThis.navigator.clipboard.writeText(text);
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  ta.remove();
+}
+
+function scheduleReminder({ label, when }) {
+  const delay = Math.max(0, when - Date.now());
+  if (delay > 2 ** 31 - 1) return; // >24 days: ไม่ตั้งในรอบนี้
+  setTimeout(() => {
+    globalThis.dispatchEvent(new CustomEvent('no7:timer', { detail: { label } }));
+    if (globalThis.Notification?.permission === 'granted') new Notification('No7 AI', { body: label });
+  }, delay);
+}
+
+/** Re-arm reminders saved in a previous session. */
+export function restoreReminders() {
+  try {
+    const list = JSON.parse(localStorage.getItem('no7.reminders.v1') || '[]');
+    for (const r of list) if (r.when > Date.now()) scheduleReminder(r);
+  } catch {}
 }
 
 function fmt(n) {

@@ -31,7 +31,10 @@
 |---|---|---|
 | `state.js` | state machine ที่ **derive จากข้อเท็จจริง** (ไม่สะสม event) | ESP32 AgentController |
 | `memory.js` | BM25 GraphRAG-lite + episodic log, ตัดคำไทย bigram | ESP32 memory/ |
-| `tools.js` | registry + การ์ดผลลัพธ์ + parser บล็อก `tool` | ESP32 42 tools, Uncle MCP/computer-control |
+| `tools.js` | registry 19 tools + การ์ดผลลัพธ์ + parser บล็อก `tool` + TOOL_META หมวด/ความเสี่ยง | ESP32 42 tools, Uncle MCP/computer-control |
+| `agent.js` | agent loop หลายขั้น + ประตูอนุญาต + ร่องรอยขั้นตอน | ใหม่ (จาก Uncle computer-control 30 steps) |
+| `permissions.js` | หมวดสิทธิ์ 5 แบบ + ระดับอิสระ + กติกายืนยัน | ใหม่ (จำเป็นเมื่อให้ AI ลงมือทำ) |
+| `modes.js` | 5 บทบาท + การกรองเครื่องมือ + ตรวจจับเจตนา | รวมคอนเซ็บ "เลือกทั้งหมด" |
 | `ai-providers.js` | 5 ผู้ให้บริการ + fallback quota-aware | Uncle multi-brain, ESP32 ModelFallback |
 | `voice.js` | STT/TTS abstraction + native bridge | ESP32 audio pipeline, Uncle TTS/STT |
 | `personas.js` | 8 โปรไฟล์ + กฎ ค่ะ/ครับ | ESP32 personas, Uncle characters |
@@ -59,20 +62,53 @@ SETUP ──(มี provider)──► IDLE ◄───────────
 ทำไมต้อง derive: บน ESP32 มี task หลายตัว (audio, network, display) ถ้าเก็บ state เป็น event จะ drift
 วิธีนี้คำนวณใหม่จาก fact ทุกครั้ง → ไม่มีทางค้างสถานะผิด และมือถือที่สลับแอปบ่อยก็ไม่พัง
 
+## Permission gate (หัวใจของ "ให้ทำได้ทุกอย่าง" อย่างปลอดภัย)
+
+```
+tool ──► หมวดถูกปิดอยู่? ──ใช่──► บล็อก + บอกโมเดลให้บอกผู้ใช้ไปเปิดสิทธิ์
+             │ไม่
+             ▼
+        risk ≥ 1 ? ──ไม่──► รันเลย
+             │ใช่
+             ▼
+   autonomy = allow-all ? ──ใช่──► รันเลย
+             │ไม่
+             ▼
+   ขึ้นกล่องยืนยัน ──► อนุญาต / อนุญาตตลอด session / ไม่อนุญาต
+                          │ไม่อนุญาต ► หยุดทั้งงาน + ตอบกลับอย่างสุภาพ
+```
+
+- `risk 0` อ่านอย่างเดียว — ไม่ต้องถาม
+- `risk 1` เปลี่ยนแปลงเล็กน้อย (เตือน/คัดลอก/เปิดลิงก์) — ถามตามระดับอิสระ
+- `risk 2` ส่งข้อมูลออก (ร่างอีเมล/SMS/LINE) — ถามเสมอ ยกเว้น allow-all
+- `risk 3` ควบคุมเครื่อง (เปิดแอป) — ถามเสมอ ยกเว้น allow-all
+
 ## เส้นทางการคุยหนึ่งครั้ง
 
 ```
 ผู้ใช้ (พิมพ์/พูด)
   └► respond(text)
-       ├─ memory.search(text)        ← BM25 top-6
-       ├─ buildSystemPrompt(...)     ← persona + ความจำ + tool catalog
-       ├─ AIProvider.chat(...)       ← Pollinations/Gemini/OpenAI/Ollama
-       ├─ มี ```tool {...}``` ไหม?
-       │    ├─ มี → runTool() → provider.chat(สรุปผล) → การ์ด + เสียง
-       │    └─ ไม่มี → ข้อความปกติ
+       ├─ resolveProviderChain(settings)   ← free / quality / private / mixed
+       ├─ Agent.run(userText)              ← สูงสุด N ขั้น
+       │    ├─ chat()  → chatWithFallback  ← ไล่สมองตาม chain, 401 = หยุด
+       │    ├─ มี ```tool {...}``` ไหม?
+       │    │    ├─ ไม่มี → คำตอบสุดท้าย → จบ
+       │    │    └─ มี → ตรวจสิทธิ์ → ยืนยัน? → runTool() → ป้อนผลกลับ → วนต่อ
+       │    └─ คืน { text, trace, steps, blocked }
+       ├─ การ์ดผลลัพธ์ + ร่องรอยขั้นตอนในแชท
        ├─ memory.logTurn() + learnFrom()   ← สกัดข้อเท็จจริงแบบ heuristic
        └─ speak(answer)                     ← TTS ไทย + subtitle
 ```
+
+## บทบาท (modes) และการกรองเครื่องมือ
+
+| โหมด | หมวดเครื่องมือ | น้ำเสียง |
+|---|---|---|
+| ✨ ทั้งหมด (auto) | ทุกหมวด | สลับบทบาทตามเจตนา (detectMode) |
+| 💛 เพื่อนคุย | read, memory, act | ฟังก่อน ถามกลับ สั้น เป็นธรรมชาติ |
+| 💼 งาน | read, memory, act, message | กระชับ มีโครงสร้าง ระบุสมมติฐาน |
+| 📅 ชีวิตประจำวัน | read, memory, act, message | กระตือรือร้นเรื่องเวลา/นัด |
+| 🏠 อุปกรณ์ | read, memory, control | ตรวจสอบก่อนสั่ง ยืนยันเมื่อไม่ชัด |
 
 ## ทำไมเลือก Web Speech API แทน Gemini Live
 
@@ -89,9 +125,10 @@ ESP32 ใช้ Gemini Live (WebSocket PCM 16k/24k) เพราะบอร์�
 | todo / note | `no7.todos.v1` / `no7.notes.v1` | |
 | คู่มือ pairing | `no7.pairing.v1` | secret เก็บในเครื่องผู้สร้าง |
 
-## ข้อจำกัดที่รู้ตัว (v0.1)
+## ข้อจำกัดที่รู้ตัว (v0.2)
 
-- tool round-trip ทำได้ **1 ครั้งต่อคำถาม** (ยังไม่ใช่ agent loop หลายก้าว)
+- agent loop ยังไม่มี memory ของ trace ข้ามคำขอ (ทุกคำขอเริ่มใหม่)
+- ยังไม่มีการสตรีมคำตอบแบบ token ต่อ token (รอทั้งก้อนแล้วจึงพูด)
 - ความจำยังไม่มีการ consolidate ด้วย LLM (ใช้ heuristic + Jaccard dedupe) — คุมต้นทุนและทำให้ออฟไลน์ได้
 - `learnFrom()` เป็น regex ภาษาไทย/อังกฤษพื้นฐาน ไม่ได้เข้าใจบริบท
 - ยังไม่มี MCP client, computer-control, Telegram (อยู่ใน ROADMAP ระยะ 2)

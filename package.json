@@ -1,7 +1,7 @@
 {
   "name": "no7-personal-ai-bot",
-  "version": "0.1.0",
-  "description": "No7 Personal AI Bot — one codebase for Mobile + PC (PWA + Electron + Capacitor), Thai-first voice AI companion",
+  "version": "0.2.0",
+  "description": "No7 Personal AI Bot — one codebase for Mobile + PC (PWA + Electron + Capacitor), Thai-first voice AI companion with role modes, multi-step agent and permission gate",
   "type": "module",
   "private": true,
   "license": "MIT",

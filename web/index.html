@@ -56,6 +56,9 @@
           </div>
         </section>
 
+        <!-- Role modes: ทั้งหมด / เพื่อน / งาน / ชีวิตประจำวัน / อุปกรณ์ -->
+        <nav id="mode-chips" aria-label="บทบาทของ No7"></nav>
+
         <!-- Views -->
         <section id="view-chat" class="view active">
           <div id="messages" aria-live="polite"></div>
@@ -68,6 +71,7 @@
         <section id="view-tools" class="view">
           <h2>🧰 เครื่องมือ (Tools)</h2>
           <p class="hint">AI เรียกเครื่องมือเองได้ — หรือกดลองใช้ตรงนี้</p>
+          <div id="tools-note"></div>
           <div id="tools-grid"></div>
           <div id="tool-result"></div>
         </section>
@@ -106,7 +110,31 @@
           <label><input type="checkbox" id="set-tts" checked /> อ่านคำตอบออกเสียง (TTS)</label>
           <label><input type="checkbox" id="set-stt" checked /> เปิดไมค์พูด (STT)</label>
 
+          <h3>บทบาทและความอิสระ</h3>
+          <label>บทบาทหลัก
+            <select id="set-mode"></select>
+          </label>
+          <p class="hint">โหมด "ทั้งหมด" จะสลับบทบาทเองตามคำขอ — ใช้ได้ทุกด้านในที่เดียว</p>
+          <label>ระดับอิสระ (ต้องยืนยันก่อนทำอะไรไหม)
+            <select id="set-autonomy"></select>
+          </label>
+          <label>จำนวนขั้นสูงสุดต่อคำขอ (agent steps)
+            <input id="set-maxsteps" type="number" min="1" max="8" step="1" />
+          </label>
+
+          <h3>สิทธิ์การใช้งาน (permissions)</h3>
+          <p class="hint">ปิดหมวดที่ไม่ต้องการได้ — No7 จะไม่พยายามเรียกเครื่องมือในหมวดที่ปิด</p>
+          <div id="perm-list"></div>
+
           <h3>สมอง AI (Brain)</h3>
+          <label>โหมดค่าใช้จ่าย
+            <select id="set-costmode">
+              <option value="free">ฟรี 100% (Pollinations / Ollama)</option>
+              <option value="quality">คุณภาพสูงสุด (Gemini/OpenAI ถ้ามีคีย์)</option>
+              <option value="private">ส่วนตัวล้วน (Ollama ในเครื่องเท่านั้น)</option>
+              <option value="mixed">ผสม — ใช้ที่ตั้งไว้ แล้ว fallback ฟรี (แนะนำ)</option>
+            </select>
+          </label>
           <label>ผู้ให้บริการ
             <select id="set-provider">
               <option value="pollinations">Pollinations (ฟรี ไม่ต้องใช้คีย์)</option>
@@ -147,6 +175,20 @@
           <pre id="pair-output" class="code"></pre>
         </section>
       </main>
+
+      <!-- Permission gate: asks before risky actions -->
+      <div id="confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <div class="modal-card">
+          <h3 id="confirm-title">ขออนุญาตทำต่อ</h3>
+          <p id="confirm-desc" class="hint"></p>
+          <pre id="confirm-args" class="code"></pre>
+          <div class="row">
+            <button id="confirm-yes">อนุญาต</button>
+            <button id="confirm-always">อนุญาตตลอด session</button>
+            <button id="confirm-no">ไม่อนุญาต</button>
+          </div>
+        </div>
+      </div>
 
       <!-- Companion overlay (desktop) -->
       <div id="companion" hidden>

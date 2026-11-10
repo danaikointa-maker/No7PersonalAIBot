@@ -2,13 +2,15 @@ import './styles.css';
 import { StateMachine, STATES } from './core/state.js';
 import { PERSONAS, getPersona } from './core/personas.js';
 import { MemoryStore } from './core/memory.js';
-import { AIProvider, PROVIDERS, ModelFallback } from './core/ai-providers.js';
-import { TOOLS, TOOL_IDS, runTool, extractToolCall, stripToolCalls } from './core/tools.js';
-import { buildSystemPrompt, summarizeToolResult } from './core/prompt.js';
+import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback } from './core/ai-providers.js';
+import { TOOLS, TOOL_IDS, runTool, toolMeta, restoreReminders } from './core/tools.js';
+import { Agent } from './core/agent.js';
+import { MODES, MODE_IDS, getMode, toolsForMode } from './core/modes.js';
+import { CATEGORIES, AUTONOMY, DEFAULT_PERMISSIONS, normalizePermissions, riskLabel } from './core/permissions.js';
 import { Voice } from './core/voice.js';
 import { EyeAvatar } from './ui/avatar.js';
 import { renderCard, renderError } from './ui/cards.js';
-import { loadSettings, saveSettings, resetSettings, hasProviderConfigured } from './core/settings.js';
+import { loadSettings, saveSettings, resetSettings, hasProviderConfigured, loadPermissions } from './core/settings.js';
 import { detectPlatform, platformLabel, isDesktopHost } from './core/platform.js';
 
 /* ------------------------------------------------------------------ boot */
@@ -24,6 +26,10 @@ const platform = detectPlatform();
 let history = [];          // [{role, content}] short-term (last 12 turns)
 let busy = false;
 let deferredInstall = null;
+const sessionAllow = new Set();   // "อนุญาตตลอด session" ต่อเครื่องมือ
+let pendingConfirm = null;
+
+settings.permissions = loadPermissions(settings);
 
 sm.set({ hasProvider: hasProviderConfigured(settings) });
 sm.onChange((s) => {
@@ -66,6 +72,33 @@ function showView(name) {
 document.querySelectorAll('#nav button').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
 $('#menu-btn').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
 
+/* ------------------------------------------------------------------ modes */
+/** โหมดคือ "เลือกทั้งหมดได้" — auto สลับบทบาทเอง, หรือล็อกโหมดเดียวก็ได้ */
+function renderModeChips() {
+  const nav = $('#mode-chips');
+  nav.innerHTML = '';
+  for (const id of MODE_IDS) {
+    const m = MODES[id];
+    const b = document.createElement('button');
+    b.dataset.mode = id;
+    b.textContent = `${m.emoji} ${m.label}`;
+    b.title = m.desc;
+    b.classList.toggle('active', (settings.mode || 'auto') === id);
+    b.addEventListener('click', () => selectMode(id));
+    nav.appendChild(b);
+  }
+}
+
+function selectMode(id) {
+  settings = saveSettings({ mode: id });
+  renderModeChips();
+  const m = getMode(id);
+  setSubtitle(`${m.emoji} โหมด ${m.label} — ${m.desc}`);
+  renderToolsGrid();
+  const sel = $('#set-mode');
+  if (sel) sel.value = id;
+}
+
 /* ------------------------------------------------------------------- chat */
 function addMessage(role, text) {
   const el = document.createElement('div');
@@ -89,66 +122,105 @@ async function speak(text) {
   await voice.speak(text, { lang: settings.language === 'en' ? 'en-US' : 'th-TH' });
 }
 
-/** Retrieve memory → build prompt → AI → tool loop → answer. */
+/** Add one visible agent step (tool call / denial / error) into the chat. */
+function addStep(text, kind = '') {
+  const el = document.createElement('div');
+  el.className = `step ${kind}`;
+  const n = document.createElement('span');
+  n.className = 'step-num';
+  n.textContent = String($('#messages').querySelectorAll('.step').length + 1);
+  el.appendChild(n);
+  el.appendChild(document.createTextNode(text));
+  $('#messages').appendChild(el);
+  $('#messages').scrollTop = $('#messages').scrollHeight;
+}
+
+/** Permission gate UI: resolves true only when the user explicitly allows. */
+function askConfirm(req) {
+  if (sessionAllow.has(req.tool)) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const modal = $('#confirm-modal');
+    $('#confirm-title').textContent = `${req.emoji || '⚠️'} ให้ No7 ใช้ "${req.label || req.tool}" ไหม?`;
+    $('#confirm-desc').textContent = `${CATEGORIES[req.meta?.category]?.label || req.meta?.category} · ${riskLabel(req.meta?.risk ?? 1)}`;
+    $('#confirm-args').textContent = JSON.stringify(req.args || {}, null, 2);
+    modal.hidden = false;
+
+    const finish = (answer, always) => {
+      modal.hidden = true;
+      $('#confirm-yes').onclick = $('#confirm-no').onclick = $('#confirm-always').onclick = null;
+      if (always) sessionAllow.add(req.tool);
+      pendingConfirm = null;
+      resolve(answer);
+    };
+    pendingConfirm = () => finish(false, false);
+    $('#confirm-yes').onclick = () => finish(true, false);
+    $('#confirm-always').onclick = () => finish(true, true);
+    $('#confirm-no').onclick = () => finish(false, false);
+  });
+}
+
+/** One chat turn: Agent loop (multi-step) + fallback chain + memory + TTS. */
 async function respond(userText) {
   if (busy) return;
   busy = true;
   sm.set({ error: null, requestInFlight: true });
   memory.logTurn('user', userText);
-  history.push({ role: 'user', content: userText });
-  if (history.length > 24) history = history.slice(-24);
 
   const persona = getPersona(settings.persona);
-  const relevant = memory.search(userText, 6);
-  const systemPrompt = buildSystemPrompt({
-    persona,
-    memory: relevant.map((f) => ({ text: f.text })),
-    language: settings.language,
-    polite: settings.polite,
-    platform,
+  const chain = resolveProviderChain(settings);
+  const botEl = addMessage('bot', '…');
+  let botText = '';
+  const cards = [];
+
+  const agent = new Agent({
+    chat: (messages) => chatWithFallback(messages, chain, { fallback }),
+    memory,
+    settings,
+    confirm: askConfirm,
+    maxSteps: Number(settings.maxSteps) || 4,
+    onEvent: (e) => {
+      if (e.type === 'thinking') {
+        sm.set({ requestInFlight: true, toolRunning: false });
+        if (e.step > 1) botEl.textContent = 'กำลังคิดต่อ…';
+      }
+      if (e.type === 'tool') {
+        sm.set({ requestInFlight: false, toolRunning: true });
+        addStep(`เรียก ${e.emoji || '🧰'} ${e.label || e.tool}`);
+        setSubtitle(`กำลังใช้ ${e.label || e.tool}…`);
+      }
+      if (e.type === 'result') {
+        addStep(`${e.data?.title || e.tool} — เสร็จแล้ว`, 'ok');
+        cards.push(e);
+      }
+      if (e.type === 'denied') {
+        addStep(e.reason === 'user-declined' ? `ไม่อนุญาต ${e.tool}` : `ถูกบล็อก: หมวด ${CATEGORIES[e.category]?.label || e.category}`, 'deny');
+      }
+      if (e.type === 'error') addStep(`ผิดพลาด: ${e.message}`, 'deny');
+    },
   });
 
-  const provider = new AIProvider(settings);
-  const messages = [{ role: 'system', content: systemPrompt }, ...history];
-  const botEl = addMessage('bot', '…');
-
   try {
-    let answer = await provider.chat(messages);
+    const result = await agent.run(userText, {
+      history: history.slice(-20),
+      platform,
+      persona,
+      modeId: settings.mode,
+    });
 
-    // one tool round-trip is enough for this version
-    const call = extractToolCall(answer);
-    if (call) {
-      sm.set({ requestInFlight: false, toolRunning: true });
-      botEl.textContent = `กำลังใช้เครื่องมือ: ${TOOLS[call.name]?.label || call.name}…`;
-      try {
-        const res = await runTool(call.name, call.args, {});
-        const followUp = await provider.chat([
-          ...messages,
-          { role: 'assistant', content: answer },
-          { role: 'user', content: `ผลลัพธ์จากเครื่องมือ ${call.name}: ${JSON.stringify(res.data)}\n\nสรุปผลนี้ให้ผู้ใช้เป็นภาษาไทยสั้นๆ เป็นธรรมชาติ (ไม่ต้องมี JSON)` },
-        ]);
-        const spoken = stripToolCalls(followUp) || summarizeToolResult(call.name, res.data);
-        botEl.textContent = spoken;
-        renderCard(botEl, res.tool, res.data);
-        answer = spoken;
-      } catch (toolErr) {
-        renderError(botEl, toolErr.message);
-        answer = `เรียกเครื่องมือไม่สำเร็จ: ${toolErr.message}`;
-      }
-      sm.set({ toolRunning: false });
-    } else {
-      botEl.textContent = stripToolCalls(answer) || '(ไม่มีคำตอบ)';
-    }
+    botText = result.text || '(ไม่มีคำตอบ)';
+    botEl.textContent = botText;
+    for (const c of cards) renderCard(botEl, c.tool, c.data);
 
-    memory.logTurn('assistant', answer);
-    history.push({ role: 'assistant', content: answer });
+    memory.logTurn('assistant', botText);
+    history.push({ role: 'user', content: userText }, { role: 'assistant', content: botText });
+    if (history.length > 24) history = history.slice(-24);
     learnFrom(userText);
-    sm.set({ requestInFlight: false });
-    await speak(answer);
+
+    sm.set({ requestInFlight: false, toolRunning: false });
+    await speak(botText);
   } catch (err) {
-    fallback.recordError(settings.model, Number(/(\d{3})/.exec(err.message)?.[1] || 0));
     botEl.textContent = `⚠️ ${err.message}`;
-    sm.set({ error: err.message, requestInFlight: false });
+    sm.set({ error: err.message, requestInFlight: false, toolRunning: false });
     setSubtitle('มีปัญหาการเชื่อมต่อ ลองตรวจสอบการตั้งค่า');
     setTimeout(() => sm.set({ error: null }), 4000);
   } finally {
@@ -216,17 +288,29 @@ function stateEmotion(s) {
 /* ------------------------------------------------------------------ tools */
 function renderToolsGrid() {
   const grid = $('#tools-grid');
-  if (grid.dataset.ready) return;
-  for (const id of TOOL_IDS) {
+  const mode = getMode(settings.mode);
+  const modeId = settings.mode || 'auto';
+  if (grid.dataset.ready === modeId) return;
+  grid.innerHTML = '';
+  grid.dataset.ready = modeId;
+
+  const ids = toolsForMode(modeId);
+  for (const id of ids) {
     const t = TOOLS[id];
+    const meta = toolMeta(id);
     const btn = document.createElement('button');
     btn.className = 'tool-btn';
-    btn.innerHTML = `<strong>${t.emoji} ${t.label}</strong><small>${t.desc}</small>`;
+    btn.innerHTML = `<strong>${t.emoji} ${t.label}</strong><small>${t.desc}</small>`
+      + `<small style="display:block;opacity:.7;margin-top:4px">${CATEGORIES[meta.category]?.label || meta.category} · ${riskLabel(meta.risk)}</small>`;
     btn.addEventListener('click', async () => {
       const out = $('#tool-result');
       out.innerHTML = '';
       try {
-        const res = await runTool(id, {});
+        if (meta.risk >= 1 && settings.permissions?.autonomy !== 'allow-all') {
+          const ok = await askConfirm({ tool: id, label: t.label, emoji: t.emoji, args: {}, meta });
+          if (!ok) { out.textContent = 'ยกเลิกแล้ว'; return; }
+        }
+        const res = await runTool(id, {}, { memory });
         renderCard(out, res.tool, res.data);
       } catch (e) {
         renderError(out, e.message);
@@ -234,7 +318,12 @@ function renderToolsGrid() {
     });
     grid.appendChild(btn);
   }
-  grid.dataset.ready = '1';
+
+  const note = $('#tools-note');
+  if (note) {
+    note.textContent = `${mode.emoji} โหมด ${mode.label}: แสดง ${ids.length}/${TOOL_IDS.length} เครื่องมือ`
+      + (modeId === 'auto' ? ' — สลับโหมดเพื่อดูชุดอื่น' : '');
+  }
 }
 
 /* ----------------------------------------------------------------- memory */
@@ -277,6 +366,27 @@ $('#mem-add-btn').addEventListener('click', () => {
 });
 
 /* --------------------------------------------------------------- settings */
+let permDraft = null;
+
+function renderPermList() {
+  permDraft = normalizePermissions(settings.permissions);
+  const box = $('#perm-list');
+  box.innerHTML = '';
+  for (const [id, cat] of Object.entries(CATEGORIES)) {
+    const row = document.createElement('label');
+    row.className = 'perm-row';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = permDraft.allow[id] !== false;
+    cb.addEventListener('change', () => { permDraft.allow[id] = cb.checked; });
+    const text = document.createElement('div');
+    text.innerHTML = `<strong>${cat.emoji} ${cat.label}</strong><small>${cat.desc} · ความเสี่ยง: ${riskLabel(cat.risk)}</small>`;
+    row.appendChild(cb);
+    row.appendChild(text);
+    box.appendChild(row);
+  }
+}
+
 function renderSettingsForm() {
   const personaSel = $('#set-persona');
   personaSel.innerHTML = '';
@@ -287,6 +397,19 @@ function renderSettingsForm() {
     personaSel.appendChild(o);
   }
   personaSel.value = settings.persona;
+
+  const modeSel = $('#set-mode');
+  modeSel.innerHTML = MODE_IDS.map((id) => `<option value="${id}">${MODES[id].emoji} ${MODES[id].label} — ${MODES[id].desc}</option>`).join('');
+  modeSel.value = settings.mode || 'auto';
+
+  const autoSel = $('#set-autonomy');
+  autoSel.innerHTML = Object.entries(AUTONOMY).map(([id, a]) => `<option value="${id}">${a.label} — ${a.desc}</option>`).join('');
+  autoSel.value = normalizePermissions(settings.permissions).autonomy;
+
+  $('#set-maxsteps').value = settings.maxSteps || 4;
+  $('#set-costmode').value = settings.costMode || 'mixed';
+  renderPermList();
+
   $('#set-language').value = settings.language;
   $('#set-polite').checked = settings.polite;
   $('#set-tts').checked = settings.tts;
@@ -315,6 +438,13 @@ function collectSettings() {
     model: $('#set-model').value || PROVIDERS[$('#set-provider').value]?.defaultModel || '',
     apiKey: $('#set-apikey').value.trim(),
     baseUrl: $('#set-baseurl').value.trim(),
+    mode: $('#set-mode').value,
+    maxSteps: Math.min(8, Math.max(1, Number($('#set-maxsteps').value) || 4)),
+    costMode: $('#set-costmode').value,
+    permissions: {
+      autonomy: $('#set-autonomy').value,
+      allow: { ...(permDraft?.allow || DEFAULT_PERMISSIONS.allow) },
+    },
   };
 }
 
@@ -322,6 +452,8 @@ $('#save-settings-btn').addEventListener('click', () => {
   settings = saveSettings(collectSettings());
   sm.set({ hasProvider: hasProviderConfigured(settings), error: null });
   updatePersonaHeader();
+  renderModeChips();
+  renderToolsGrid();
   $('#settings-status').textContent = '✅ บันทึกแล้ว (เก็บในเครื่องนี้เท่านั้น)';
 });
 
@@ -329,12 +461,16 @@ $('#test-ai-btn').addEventListener('click', async () => {
   const draft = { ...settings, ...collectSettings() };
   $('#settings-status').textContent = 'กำลังทดสอบ…';
   try {
-    const p = new AIProvider(draft);
-    const reply = await p.chat([
-      { role: 'system', content: 'ตอบสั้นๆ' },
-      { role: 'user', content: 'พิมพ์คำว่า OK เท่านั้น' },
-    ]);
-    $('#settings-status').textContent = `✅ เชื่อมต่อได้: "${String(reply).slice(0, 60)}"`;
+    const chain = resolveProviderChain(draft);
+    const reply = await chatWithFallback(
+      [
+        { role: 'system', content: 'ตอบสั้นๆ' },
+        { role: 'user', content: 'พิมพ์คำว่า OK เท่านั้น' },
+      ],
+      chain,
+      { fallback },
+    );
+    $('#settings-status').textContent = `✅ เชื่อมต่อได้ (${chain.map((c) => c.provider).join(' → ')}): "${String(reply).slice(0, 60)}"`;
   } catch (e) {
     $('#settings-status').textContent = `❌ ${e.message}`;
   }
@@ -465,7 +601,9 @@ if ('Notification' in window && Notification.permission === 'default') {
 
 /* -------------------------------------------------------------- startup */
 renderSettingsForm();
+renderModeChips();
 renderToolsGrid();
+restoreReminders();
 addMessage('bot', 'สวัสดีครับ ผม No7 👋\nพิมพ์คุยได้เลย หรือกด 🎤 เพื่อพูด\n\nลองถาม: "อากาศกรุงเทพวันนี้", "ราคาบิทคอยน์", "ตั้งเวลา 5 นาที"');
 setSubtitle('สวัสดีครับ ผม No7 พร้อมช่วยแล้ว');
 if (!hasProviderConfigured(settings)) {

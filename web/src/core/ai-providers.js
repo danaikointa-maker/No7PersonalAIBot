@@ -108,6 +108,56 @@ export class AIProvider {
   }
 }
 
+/**
+ * Turn the chosen cost strategy into an ordered chain of brains.
+ * free    → Pollinations first (and Ollama if configured)
+ * quality → Gemini/OpenAI when keys exist, then free
+ * private → Ollama only, never falls back to a cloud provider
+ * mixed   → whatever the user configured, then free, then local
+ */
+export function resolveProviderChain(s) {
+  const ollama = s.baseUrl ? { provider: 'ollama', model: s.model || 'llama3.1', baseUrl: s.baseUrl } : null;
+  const free = { provider: 'pollinations', model: 'openai' };
+  const chosen = { provider: s.provider, model: s.model, apiKey: s.apiKey, baseUrl: s.baseUrl };
+  const configured = s.provider === 'pollinations' ? true
+    : s.provider === 'ollama' ? !!s.baseUrl
+      : s.provider === 'openai-compatible' ? !!s.baseUrl
+        : !!s.apiKey;
+
+  if (s.costMode === 'private') return ollama ? [ollama] : [];
+  if (s.costMode === 'free') return [free, ...(ollama ? [ollama] : [])];
+  if (s.costMode === 'quality') {
+    const paid = ['gemini', 'openai', 'openai-compatible'].includes(s.provider) && s.apiKey ? [chosen] : [];
+    return [...paid, free, ...(ollama ? [ollama] : [])];
+  }
+  // mixed
+  const chain = [];
+  if (configured && s.provider !== 'pollinations') chain.push(chosen);
+  chain.push(free);
+  if (ollama) chain.push(ollama);
+  return chain;
+}
+
+/** Try each brain in order. 401/403 stops immediately (wrong key ≠ quota problem). */
+export async function chatWithFallback(messages, chain, { fallback, onToken } = {}) {
+  if (!chain?.length) throw new Error('ยังไม่มีสมอง AI ที่ใช้ได้ — ไปที่ตั้งค่า > สมอง AI');
+  const errors = [];
+  for (const cfg of chain) {
+    try {
+      const provider = new AIProvider(cfg);
+      return await provider.chat(messages, { onToken });
+    } catch (err) {
+      const status = Number(/(\d{3})/.exec(err.message)?.[1] || 0);
+      fallback?.recordError(cfg.model, status);
+      errors.push(`${cfg.provider}: ${err.message}`);
+      if (status === 401 || status === 403) {
+        throw new Error(`คีย์/สิทธิ์ของ ${cfg.provider} ไม่ถูกต้อง — หยุดลองสมองอื่น\n${err.message}`);
+      }
+    }
+  }
+  throw new Error(`ทุกสมองใช้งานไม่ได้:\n${errors.join('\n')}`);
+}
+
 // Quota-aware fallback (from ESP32 ModelFallback):
 // quota → pause 10–120 min, unavailable → 5 min, not found → 24 h. Wrong key never falls back.
 export class ModelFallback {

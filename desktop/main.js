@@ -1,6 +1,6 @@
 // Electron entry — the PC host for the exact same web/ bundle used on mobile.
 // Desktop-only extras: tray, global push-to-talk hotkey, always-on-top companion overlay.
-import { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, globalShortcut } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, globalShortcut, clipboard, Notification } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -93,6 +93,24 @@ app.on('will-quit', () => globalShortcut.unregisterAll());
 /* ------------------------------------------------------------------ IPC */
 ipcMain.handle('no7:platform', () => 'desktop');
 ipcMain.handle('no7:open-external', (_e, url) => shell.openExternal(url));
+ipcMain.handle('no7:copy', (_e, text) => { clipboard.writeText(String(text ?? '')); return true; });
+ipcMain.handle('no7:open-app', async (_e, target) => {
+  // allowlist-ish guard: never let the model run shell commands, only open existing paths.
+  const { execFile } = await import('node:child_process');
+  const map = { calculator: 'calc', notepad: 'notepad', explorer: 'explorer', terminal: 'wt', settings: 'ms-settings:' };
+  const key = String(target || '').toLowerCase().trim();
+  if (map[key]) {
+    execFile('cmd', ['/c', 'start', '', map[key]], { windowsHide: true }, () => {});
+    return true;
+  }
+  const err = await shell.openPath(String(target || ''));
+  if (err) throw new Error(err);
+  return true;
+});
+ipcMain.handle('no7:notify', (_e, { title, body }) => {
+  if (Notification.isSupported()) new Notification({ title, body }).show();
+  return true;
+});
 ipcMain.handle('no7:toggle-overlay', () => {
   if (overlayWindow) { overlayWindow.close(); return false; }
   createOverlay();

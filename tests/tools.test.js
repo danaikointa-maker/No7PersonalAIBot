@@ -15,15 +15,16 @@ globalThis.dispatchEvent = globalThis.dispatchEvent || (() => true);
 
 const { TOOLS, TOOL_IDS, describeTools, extractToolCall, stripToolCalls, runTool } = await import('../web/src/core/tools.js');
 
-test('registry exposes weather, air, crypto, fx, wiki, news, timer, todo, note', () => {
-  for (const id of ['weather', 'air', 'crypto', 'fx', 'gold', 'wiki', 'news', 'timer', 'todo', 'note']) {
-    assert.ok(TOOL_IDS.includes(id), `missing ${id}`);
-  }
+test('registry exposes the v0.2 tool set', () => {
+  const expected = ['weather', 'air', 'crypto', 'fx', 'gold', 'wiki', 'news', 'calc',
+    'timer', 'reminder', 'todo', 'note', 'memory_save', 'memory_search',
+    'open_url', 'clipboard_copy', 'compose_message', 'open_app', 'system_info'];
+  for (const id of expected) assert.ok(TOOL_IDS.includes(id), `missing ${id}`);
 });
 
 test('describeTools lists every tool with params', () => {
   const text = describeTools();
-  for (const id of TOOL_IDS) assert.ok(text.includes(`- ${id}:`), `prompt missing ${id}`);
+  for (const id of TOOL_IDS) assert.ok(text.includes(`- ${id} [`), `prompt missing ${id}`);
 });
 
 test('extractToolCall parses a fenced tool block', () => {

@@ -46,6 +46,7 @@ const ctxStub = new Proxy({}, {
 });
 window.HTMLCanvasElement.prototype.getContext = () => ctxStub;
 window.URL.createObjectURL = () => 'blob:stub';
+window.open = () => ({ closed: false });
 window.SpeechSynthesisUtterance = class { constructor(t) { this.text = t; } };
 Object.defineProperty(window, 'speechSynthesis', {
   value: {
@@ -77,6 +78,7 @@ window.fetch = async (url, opts = {}) => {
     if (last.includes('ผลลัพธ์จากเครื่องมือ')) return reply('ราคาทองตอนนี้ 2,412 ดอลลาร์ต่อออนซ์ครับ');
     if (last.includes('พิมพ์คำว่า OK')) return reply('OK');
     if (last.includes('ราคาทอง')) return reply('```tool\n{"tool":"gold","args":{}}\n```');
+    if (last.includes('เปิดเว็บ')) return reply('```tool\n{"tool":"open_url","args":{"url":"https://example.com"}}\n```');
     return reply('สวัสดีครับ ผมชื่อ No7');
   }
   if (u.includes('gold-api')) return { ok: true, json: async () => ({ price: 2412.5, updatedAt: new Date().toISOString() }) };
@@ -101,11 +103,20 @@ const submit = (text) => {
 await wait(100);
 check('boot: initial state', ['IDLE', 'SETUP'].includes($('#state-label').textContent), $('#state-label').textContent);
 check('boot: welcome message', $('#messages').children.length >= 1);
-check('boot: 10 tools rendered', $('#tools-grid').children.length === 10, String($('#tools-grid').children.length));
+check('boot: 19 tools in auto mode', $('#tools-grid').children.length === 19, String($('#tools-grid').children.length));
+check('boot: 5 role modes', $('#mode-chips').children.length === 5, String($('#mode-chips').children.length));
 check('boot: persona header', $('#persona-name').textContent.length > 0);
 
 $('#nav button[data-view="memory"]').click();
 check('nav: memory view', $('#view-memory').classList.contains('active'));
+
+// mode switching filters tools
+window.document.querySelector('#mode-chips button[data-mode="hub"]').click();
+await wait(20);
+check('mode: hub filters tools', $('#tools-grid').children.length === 14, String($('#tools-grid').children.length));
+window.document.querySelector('#mode-chips button[data-mode="auto"]').click();
+await wait(20);
+check('mode: back to auto', $('#tools-grid').children.length === 19);
 
 $('#set-provider').value = 'pollinations';
 $('#save-settings-btn').click();
@@ -148,6 +159,20 @@ $('#nav button[data-view="settings"]').click();
 $('#pair-btn').click();
 await wait(50);
 check('pairing: handled (code or clear warning)', /รหัสจับคู่|ต้องเปิดผ่าน https|สร้างไม่สำเร็จ/.test($('#pair-output').textContent), $('#pair-output').textContent.slice(0, 60));
+
+// permission gate: risky tool must ask first
+submit('เปิดเว็บ example.com ให้หน่อย');
+await wait(150);
+check('permission: confirm modal shown', $('#confirm-modal').hidden === false, $('#confirm-title').textContent);
+$('#confirm-no').click();
+await wait(120);
+check('permission: denial respected', $('#messages').textContent.includes('ไม่อนุญาต') || $('#messages').textContent.includes('ไม่ได้ทำอะไรต่อ'), $('#messages').textContent.slice(-120));
+submit('เปิดเว็บ example.com อีกครั้ง');
+await wait(150);
+check('permission: asks again next time', $('#confirm-modal').hidden === false);
+$('#confirm-always').click();
+await wait(150);
+check('permission: approved run completed', $('#messages').textContent.includes('เปิดลิงก์') || $('#messages').textContent.includes('example.com'), $('#messages').textContent.slice(-160));
 
 $('#companion-btn').click();
 check('companion: overlay toggled', $('#companion').hidden === false);

@@ -63,8 +63,8 @@ npx cap open ios
 ## 4) ทดสอบ
 
 ```bash
-npm test           # 23 unit tests (memory BM25, state machine, tools, prompt)
-npm run test:browser  # 19 end-to-end checks: รัน bundle จริงใน jsdom (boot → แชท → tool → ไมค์ → pairing)
+npm test           # 34 unit tests (memory BM25, state, tools, prompt, agent, permissions)
+npm run test:browser  # 26 end-to-end checks: รัน bundle จริงใน jsdom (boot → แชท → tool → ไมค์ → pairing)
 npm run check      # syntax check ทุกไฟล์ .js + ตรวจไฟล์สำคัญ
 ```
 
