@@ -4,7 +4,9 @@
 export const SYNC_VERSION = 1;
 
 /** เก็บเฉพาะข้อมูลที่ย้ายข้ามเครื่องได้ (ตัด API key ออกเสมอ) */
-export function collectBundle({ memory, personas = [], calendar = [], settings = {} }) {
+import { TaskStore } from './tasks.js';
+
+export function collectBundle({ memory, personas = [], calendar = [], tasks = null, settings = {} }) {
   const safeSettings = { ...settings };
   delete safeSettings.apiKey;
   delete safeSettings.syncToken;
@@ -18,6 +20,7 @@ export function collectBundle({ memory, personas = [], calendar = [], settings =
     todos: safeJson('no7.todos.v1', []),
     notes: safeJson('no7.notes.v1', []),
     reminders: safeJson('no7.reminders.v1', []),
+    tasks: Array.isArray(tasks) ? tasks : new TaskStore().exportData().tasks,
   };
 }
 
@@ -51,10 +54,10 @@ export async function pullBundle(serverUrl, token) {
 
 /**
  * รวมข้อมูลจากอีกเครื่องเข้ามาแบบ additive
- * @returns {{facts:number, personas:number, events:number}}
+ * @returns {{facts:number, personas:number, events:number, tasks:number}}
  */
 export function mergeBundle(bundle, { memory, createPersona, getPersona, listPersonas, calendar }) {
-  const out = { facts: 0, personas: 0, events: 0 };
+  const out = { facts: 0, personas: 0, events: 0, tasks: 0 };
   if (!bundle) return out;
 
   if (bundle.memory?.facts?.length && memory) {
@@ -91,6 +94,10 @@ export function mergeBundle(bundle, { memory, createPersona, getPersona, listPer
     if (add.length) {
       try { globalThis.localStorage?.setItem(key, JSON.stringify([...local, ...add])); } catch {}
     }
+  }
+
+  if (Array.isArray(bundle.tasks) && bundle.tasks.length) {
+    out.tasks = new TaskStore().merge(bundle.tasks).changed;
   }
 
   return out;

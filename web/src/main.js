@@ -12,6 +12,7 @@ import { getTool, TOOL_IDS, runTool, toolMeta, restoreReminders, registerDynamic
 import { McpRegistry } from './core/mcp.js';
 import { createPkcePair, randomState, buildAuthorizeUrl, parseCallback } from './core/oauth.js';
 import { ControlAudit, normalizeControlPolicy, CONTROL_ACTION_META } from './core/control.js';
+import { TaskStore, TaskScheduler, PRIORITIES, parseDue, formatTaskTime, isOverdue } from './core/tasks.js';
 import { withRetry, classifyError, OfflineQueue } from './core/retry.js';
 import { Metrics, formatMs, METRIC_KINDS } from './core/metrics.js';
 import { buildDiagnosticsReport, diagnosticsFilename, redact } from './core/diagnostics.js';
@@ -834,6 +835,7 @@ function renderCalendar() {
     row.append(when, title, del);
     box.appendChild(row);
   }
+  renderTasks();
 }
 
 $('#cal-add-btn').addEventListener('click', () => {
@@ -1426,6 +1428,81 @@ $('#diag-download')?.addEventListener('click', async () => {
   $('#diag-status').textContent = `⬇️ ดาวน์โหลด ${a.download}`;
 });
 
+/* ------------------------------------------------------------------ tasks */
+const tasks = new TaskStore();
+
+function renderTasks() {
+  const box = $('#task-list');
+  if (!box) return;
+  const filter = $('#task-filter').value || 'open';
+  const now = Date.now();
+  const opts = filter === 'all' ? { done: null } : filter === 'done' ? { done: true } : filter === 'today' ? { done: false, dueWithinMs: 24 * 3600000 } : { done: false };
+  let list = tasks.list(opts);
+  if (filter === 'overdue') list = list.filter((t) => isOverdue(t, now));
+
+  const stats = tasks.stats(now);
+  $('#task-stats').textContent = `ค้าง ${stats.open} · วันนี้ ${stats.today} · เกินกำหนด ${stats.overdue} · เสร็จแล้ว ${stats.done}`;
+  box.innerHTML = list.length ? '' : '<p class="hint">ไม่มีงานในมุมมองนี้ 🎉</p>';
+
+  for (const t of list) {
+    const row = document.createElement('div');
+    row.className = 'fact';
+    const when = document.createElement('span');
+    when.className = `pill${isOverdue(t, now) ? ' hot' : ''}`;
+    when.textContent = formatTaskTime(t.due, now);
+    const title = document.createElement('span');
+    title.className = 'fact-text';
+    title.textContent = `${PRIORITIES[t.priority].emoji} ${t.title}`;
+    const done = document.createElement('button');
+    done.textContent = t.done ? '↩️' : '✅';
+    done.title = t.done ? 'เปิดใหม่' : 'ทำเสร็จแล้ว';
+    done.addEventListener('click', () => { tasks.complete(t.id, !t.done); renderTasks(); });
+    const del = document.createElement('button');
+    del.textContent = 'ลบ';
+    del.addEventListener('click', () => { tasks.remove(t.id); renderTasks(); });
+    row.append(when, title, done, del);
+    box.appendChild(row);
+  }
+}
+
+$('#task-add')?.addEventListener('click', () => {
+  const title = $('#task-title').value.trim();
+  if (!title) { $('#task-status').textContent = 'ต้องใส่ชื่องาน'; return; }
+  const rawWhen = $('#task-when').value;
+  const due = rawWhen ? parseDue(rawWhen) : null;
+  try {
+    tasks.add({ title, due, priority: Number($('#task-priority').value) || 0, device: platform });
+    $('#task-title').value = '';
+    $('#task-when').value = '';
+    $('#task-status').textContent = 'เพิ่มงานแล้ว ✅ (จะเตือนตามเวลา)';
+    renderTasks();
+  } catch (e) {
+    $('#task-status').textContent = e.message;
+  }
+});
+
+$('#task-filter')?.addEventListener('change', () => renderTasks());
+
+$('#task-clear-done')?.addEventListener('click', () => {
+  const done = tasks.list({ done: true });
+  for (const t of done) tasks.remove(t.id);
+  $('#task-status').textContent = done.length ? `ล้าง ${done.length} งานที่เสร็จแล้ว` : 'ไม่มีงานที่เสร็จให้ล้าง';
+  renderTasks();
+});
+
+/** เตือนเมื่อถึงเวลา — Notification + ข้อความในแชท + subtitle */
+const taskScheduler = new TaskScheduler({
+  store: tasks,
+  intervalMs: 30_000,
+  onDue: (task) => {
+    const text = `⏰ ถึงเวลา: ${task.title}`;
+    setSubtitle(text);
+    addMessage('bot', `${text}${task.notes ? `\n${task.notes}` : ''}${task.due ? `\n(${formatTaskTime(task.due)})` : ''}`);
+    try { new Notification('No7 — ถึงเวลางาน', { body: task.title }); } catch { /* ไม่ได้อนุญาตแจ้งเตือน */ }
+    renderTasks();
+  },
+});
+
 /* ------------------------------------------------------------- control UI */
 function renderControl() {
   const policy = normalizeControlPolicy(settings.controlPolicy);
@@ -1721,6 +1798,7 @@ function bundleNow() {
     memory,
     personas: customPersonas(),
     calendar: calendar.all(),
+    tasks: tasks.exportData().tasks,
     settings,
   });
 }
@@ -1748,7 +1826,8 @@ $('#sync-pull-btn').addEventListener('click', async () => {
       calendar,
     });
     renderMemory(); renderCalendar(); renderPersonaList(); renderSettingsForm();
-    $('#sync-status').textContent = `✅ ผสานแล้ว: ความจำ +${res.facts} · persona +${res.personas} · นัด +${res.events}`;
+    $('#sync-status').textContent = `✅ ผสานแล้ว: ความจำ +${res.facts} · persona +${res.personas} · นัด +${res.events} · งาน ${res.tasks || 0}`;
+    renderTasks();
   } catch (e) { $('#sync-status').textContent = `❌ ${e.message}`; }
 });
 
@@ -1949,6 +2028,9 @@ syncOnlineState();
 // PWA shortcut / deep link: ?view=memory
 const bootView = new URLSearchParams(location.search).get('view');
 if (bootView && document.getElementById(`view-${bootView}`)) showView(bootView);
+
+taskScheduler.start();
+renderTasks();
 
 mcp.hydrateFromCache();
 applyMcpTools();

@@ -160,7 +160,7 @@ test('modes partition the tool set', () => {
   assert.ok(!companion.includes('open_app'), 'companion ไม่ควรควบคุมเครื่อง');
   assert.ok(companion.includes('weather'), 'companion ยังอ่านข้อมูลได้');
   const all = toolsForMode('auto');
-  assert.equal(all.length, 25, 'auto ต้องได้ทุกเครื่องมือ');
+  assert.equal(all.length, 26, 'auto ต้องได้ทุกเครื่องมือ');
   assert.equal(detectMode('ช่วยเปิดโปรแกรม Lightroom ให้หน่อย'), 'hub');
   assert.equal(detectMode('วันนี้เครียดมากเลย'), 'companion');
 });

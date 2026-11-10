@@ -133,6 +133,33 @@
           </div>
           <p id="cal-status" class="hint"></p>
           <div id="cal-list"></div>
+
+          <h3>✅ งานที่ต้องทำ</h3>
+          <p class="hint">มีเวลาเตือน + ซิงก์ข้ามเครื่องผ่าน <code>/api/sync</code> (last-write-wins)</p>
+          <div id="task-stats" class="hint"></div>
+          <div class="row">
+            <input id="task-title" placeholder="งาน เช่น ส่งรายงาน" />
+            <input id="task-when" type="datetime-local" />
+            <button id="task-add">＋ เพิ่มงาน</button>
+          </div>
+          <div class="row">
+            <select id="task-priority">
+              <option value="0">⚪ ปกติ</option>
+              <option value="1">🔵 สำคัญ</option>
+              <option value="2">🟠 ด่วน</option>
+              <option value="3">🔴 ด่วนมาก</option>
+            </select>
+            <select id="task-filter">
+              <option value="open">ค้างอยู่</option>
+              <option value="today">วันนี้</option>
+              <option value="overdue">เกินกำหนด</option>
+              <option value="done">เสร็จแล้ว</option>
+              <option value="all">ทั้งหมด</option>
+            </select>
+            <button id="task-clear-done">ล้างงานที่เสร็จ</button>
+          </div>
+          <p id="task-status" class="hint"></p>
+          <div id="task-list"></div>
         </section>
 
         <section id="view-devices" class="view">

@@ -119,7 +119,7 @@ const submit = (text) => {
 await wait(100);
 check('boot: initial state', ['IDLE', 'SETUP'].includes($('#state-label').textContent), $('#state-label').textContent);
 check('boot: welcome message', $('#messages').children.length >= 1);
-check('boot: 25 tools in auto mode', $('#tools-grid').children.length === 25, String($('#tools-grid').children.length));
+check('boot: 26 tools in auto mode', $('#tools-grid').children.length === 26, String($('#tools-grid').children.length));
 check('boot: 5 role modes', $('#mode-chips').children.length === 5, String($('#mode-chips').children.length));
 check('boot: persona header', $('#persona-name').textContent.length > 0);
 
@@ -132,7 +132,7 @@ await wait(20);
 check('mode: hub filters tools', $('#tools-grid').children.length === 19, String($('#tools-grid').children.length));
 window.document.querySelector('#mode-chips button[data-mode="auto"]').click();
 await wait(20);
-check('mode: back to auto', $('#tools-grid').children.length === 25, String($('#tools-grid').children.length));
+check('mode: back to auto', $('#tools-grid').children.length === 26, String($('#tools-grid').children.length));
 
 $('#set-provider').value = 'pollinations';
 $('#save-settings-btn').click();
@@ -181,6 +181,23 @@ $('#cal-add-btn').click();
 await wait(20);
 check('calendar: event added', $('#cal-list').textContent.includes('ประชุมทดสอบ'), $('#cal-list').textContent.slice(0, 60));
 check('calendar: persisted', JSON.parse(window.localStorage.getItem('no7.calendar.v1') || '[]').length > 0);
+
+// tasks: add, list, complete
+$('#task-title').value = 'ทดสอบงาน';
+$('#task-when').value = '2026-12-01T09:00';
+$('#task-priority').value = '2';
+$('#task-add').click();
+await wait(30);
+check('tasks: task added', $('#task-list').textContent.includes('ทดสอบงาน'), $('#task-list').textContent.slice(0, 60));
+check('tasks: stats updated', $('#task-stats').textContent.includes('ค้าง 1'), $('#task-stats').textContent);
+check('tasks: persisted', JSON.parse(window.localStorage.getItem('no7.tasks.v1') || '[]').some((t) => t.title === 'ทดสอบงาน'));
+$('#task-list').querySelectorAll('.fact button')[0]?.click();  // ✅ ปิดงาน
+await wait(20);
+$('#task-filter').value = 'done';
+$('#task-filter').dispatchEvent(new window.Event('change'));
+check('tasks: completed task shown in done filter', $('#task-list').textContent.includes('ทดสอบงาน'), $('#task-list').textContent.slice(0, 60));
+$('#task-filter').value = 'open';
+$('#task-filter').dispatchEvent(new window.Event('change'));
 
 // memory 2.0: pin + consolidate run
 $('#nav button[data-view="memory"]').click();

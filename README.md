@@ -70,13 +70,13 @@ npm run check         # syntax + structure check
 - จัดการพื้นที่เก็บข้อมูล + ขอ persistent storage + ล้างข้อมูลเป็นกลุ่ม
 - เมนู/ปุ่มใหญ่/ปุ่มลัดคีย์บอร์ด (`Ctrl/Cmd+K`, `Ctrl/Cmd+M`, `Esc`, `Ctrl/Cmd+Enter`)
 
-### 🧰 25 tools (ไม่ต้องใช้คีย์)
+### 🧰 26 tools (ไม่ต้องใช้คีย์)
 | หมวด | tools |
 |---|---|
 | 📖 อ่าน | `weather` `air` `crypto` `fx` `gold` `wiki` `news` `calc` `rss_read` `summarize_url` |
 | 🧠 ความจำ | `memory_save` `memory_search` `todo` `note` |
 | 📅 ตาราง | `calendar_list` `calendar_add` (+ นำเข้า/ส่งออก `.ics`) |
-| ⚡ ทำงานในเครื่อง | `timer` `reminder` `clipboard_copy` `open_url` |
+| ⚡ ทำงานในเครื่อง | `timer` `reminder` `clipboard_copy` `open_url` `task` |
 | ✉️ ร่างข้อความ | `compose_message` (อีเมล/SMS/LINE — คุณกดส่งเอง) |
 | 🎛️ ควบคุม | `open_app` `control_run` `device_command` `system_info` |
 
@@ -86,6 +86,7 @@ npm run check         # syntax + structure check
 ### 🔗 อุปกรณ์ + 🔄 ซิงก์
 - Phone-Link: สั่งงาน PC/ESP32 ผ่าน HMAC-SHA256 (`/api/link/*`), มี ESP32 reference client ให้
 - ซิงก์มือถือ ↔ PC ผ่าน server ของคุณเอง (`/api/sync`, token) — ไม่มีคลาวด์ ไม่มีบัญชี
+- **งาน + เตือนข้ามเครื่อง**: เพิ่มงานด้วยเสียง/ข้อความ, เตือนตามเวลา, ซิงก์แบบ last-write-wins (tombstone สำหรับการลบ)
 
 ### 🖥️ เดสก์ท็อป
 tray · hotkey ระดับระบบ (`Ctrl/Cmd+Shift+Space`) · overlay always-on-top · clipboard/open-app/notify bridge
@@ -107,7 +108,7 @@ mobile/              ที่สำหรับ native project (Capacitor)
 server/              companion server (zero deps): static · AI proxy · tools · sync · phone-link
 devices/esp32/       reference client (no7_link.h) + คู่มือ
 tests/               unit tests + jsdom end-to-end
-docs/                เอกสาร 15 ไฟล์
+docs/                เอกสาร 18 ไฟล์
 ```
 
 ## เอกสาร
@@ -124,6 +125,9 @@ docs/                เอกสาร 15 ไฟล์
 | [docs/MCP.md](docs/MCP.md) | MCP client, proxy, สิทธิ์, ข้อจำกัด |
 | [docs/MOBILE.md](docs/MOBILE.md) | PWA, offline, capability, storage บนมือถือ |
 | [docs/RELIABILITY.md](docs/RELIABILITY.md) | retry/backoff, offline queue, metrics, diagnostics |
+| [docs/BOTS.md](docs/BOTS.md) | Telegram / LINE bot ผ่าน server |
+| [docs/CONTROL.md](docs/CONTROL.md) | computer control + allowlist + audit |
+| [docs/TASKS.md](docs/TASKS.md) | งาน, เตือนตามเวลา, ซิงก์ข้ามเครื่อง |
 | [docs/DEVICES.md](docs/DEVICES.md) | Phone-Link protocol + ESP32 |
 | [docs/PHONE_LINK.md](docs/PHONE_LINK.md) | HMAC canonical signing + ตัวอย่าง curl |
 | [docs/BUILD.md](docs/BUILD.md) | build ทั้ง 3 แพลตฟอร์ม |
