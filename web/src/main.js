@@ -176,9 +176,13 @@ function askConfirm(req) {
     $('#confirm-desc').textContent = `${CATEGORIES[req.meta?.category]?.label || req.meta?.category} · ${riskLabel(req.meta?.risk ?? 1)}`;
     $('#confirm-args').textContent = JSON.stringify(req.args || {}, null, 2);
     modal.hidden = false;
+    const previousFocus = document.activeElement;
+    // ค่าเริ่มต้นที่ปลอดภัย: โฟกัส "ไม่อนุญาต"
+    setTimeout(() => $('#confirm-no')?.focus(), 0);
 
     const finish = (answer, always) => {
       modal.hidden = true;
+      previousFocus?.focus?.();
       $('#confirm-yes').onclick = $('#confirm-no').onclick = $('#confirm-always').onclick = null;
       if (always) sessionAllow.add(req.tool);
       pendingConfirm = null;
@@ -1237,6 +1241,38 @@ globalThis.no7?.native?.onPushToTalk?.(() => $('#mic-btn').click());
 if ('Notification' in window && Notification.permission === 'default') {
   setTimeout(() => Notification.requestPermission().catch(() => {}), 5000);
 }
+
+/* ------------------------------------------------------- keyboard shortcuts */
+function isTyping(el) {
+  return !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+}
+
+window.addEventListener('keydown', (e) => {
+  const mod = e.ctrlKey || e.metaKey;
+
+  if (e.key === 'Escape') {
+    if (!$('#confirm-modal').hidden) { $('#confirm-no').click(); e.preventDefault(); return; }
+    if (!$('#stop-btn').hidden) { stopSpeaking(); e.preventDefault(); return; }
+    $('#sidebar').classList.remove('open');
+    return;
+  }
+
+  if (mod && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    showView('chat');
+    $('#input')?.focus();
+    return;
+  }
+  if (mod && e.key.toLowerCase() === 'm') {
+    e.preventDefault();
+    $('#mic-btn').click();
+    return;
+  }
+  if (mod && e.key === 'Enter' && !isTyping(document.activeElement)) {
+    e.preventDefault();
+    $('#composer').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  }
+});
 
 /* -------------------------------------------------------------- startup */
 startDailyConsolidation(memory, () => consolidate(memory, { chat: llmChat, useLLM: !!settings.memoryLLM }));

@@ -9,7 +9,7 @@
 | 3 | Persona Studio | 3.1–3.4 | ✅ ปิดเฟส |
 | 4 | Connectors & Sync | 4.1–4.4 | ✅ ปิดเฟส |
 | 5 | Device Hub (Phone-Link ครบวงจร) | 5.1–5.4 | ✅ ปิดเฟส |
-| 6 | Ship 1.0 (คุณภาพ + แจกจ่าย) | 6.1–6.4 | ⬜ |
+| 6 | Ship 1.0 (คุณภาพ + แจกจ่าย) | 6.1–6.4 | ✅ ปิดเฟส |
 
 ## เฟส 1 — ความจำอัจฉริยะ
 
@@ -49,7 +49,20 @@
 
 ## เฟส 6 — Ship 1.0
 
-- 6.1 CI (GitHub Actions) + version 1.0.0 + CHANGELOG
-- 6.2 Accessibility + คีย์ลัด + empty states
-- 6.3 เอกสาร final + อัปเดต README
-- 6.4 ตรวจรับรวม (test/build/check) + PR
+- [x] 6.1 CI (GitHub Actions, Node 20/22) + version 1.0.0 + CHANGELOG
+- [x] 6.2 Accessibility (focus ring, aria-live, โฟกัสในกล่องยืนยัน) + คีย์ลัด + reduced-motion
+- [x] 6.3 เอกสาร final + README v1.0
+- [x] 6.4 ตรวจรับรวม (check / unit / browser e2e / build)
+
+## สรุปการปิดเฟส
+
+| เฟส | ผลลัพธ์หลัก | Tests |
+|---|---|---|
+| 1 | Memory 2.0 + consolidation + UI | 13 + 11 |
+| 2 | Streaming + speak-while-generating + wake word | 7 + 7 + 7 |
+| 3 | Persona Studio | 9 |
+| 4 | Calendar + RSS + Sync | 10 + 10 |
+| 5 | Device Hub + ESP32 client | 10 |
+| 6 | CI + a11y + docs + 1.0.0 | — |
+
+รวม: **112 unit tests · 40 e2e checks · 24 tools · 43 JS files**

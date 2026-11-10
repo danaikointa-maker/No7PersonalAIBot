@@ -20,7 +20,7 @@
             <small>Mobile + PC · ไทยก่อน</small>
           </div>
         </div>
-        <nav id="nav">
+        <nav id="nav" aria-label="เมนูหลัก">
           <button data-view="chat" class="active">💬 แชท</button>
           <button data-view="tools">🧰 เครื่องมือ</button>
           <button data-view="memory">🧠 ความจำ</button>
@@ -56,7 +56,7 @@
           <div class="avatar-meta">
             <strong id="persona-name">No7</strong>
             <small id="persona-desc">เพื่อน AI ของคุณ</small>
-            <div id="subtitle" class="subtitle">สวัสดีครับ ผม No7 พร้อมช่วยแล้ว</div>
+            <div id="subtitle" class="subtitle" role="status" aria-live="polite">สวัสดีครับ ผม No7 พร้อมช่วยแล้ว</div>
           </div>
         </section>
 
@@ -304,6 +304,15 @@
           </div>
           <p id="sync-status" class="hint"></p>
 
+          <h3>⌨️ คีย์ลัด</h3>
+          <ul class="hint shortcuts">
+            <li><kbd>Ctrl</kbd>+<kbd>K</kbd> — โฟกัสช่องพิมพ์</li>
+            <li><kbd>Ctrl</kbd>+<kbd>M</kbd> — เริ่ม/หยุดฟัง</li>
+            <li><kbd>Esc</kbd> — ปิดกล่องยืนยัน / หยุดพูด</li>
+            <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> — ส่งข้อความ</li>
+            <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> — push-to-talk ระดับระบบ (เดสก์ท็อป)</li>
+          </ul>
+
           <h3>เชื่อมต่อ (Phone-Link / ESP32)</h3>
           <p class="hint">โปรโตคอลจับคู่ HMAC — ดู <code>docs/PHONE_LINK.md</code></p>
           <div class="row">
@@ -314,7 +323,7 @@
       </main>
 
       <!-- Permission gate: asks before risky actions -->
-      <div id="confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <div id="confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
         <div class="modal-card">
           <h3 id="confirm-title">ขออนุญาตทำต่อ</h3>
           <p id="confirm-desc" class="hint"></p>

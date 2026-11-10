@@ -134,7 +134,7 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === '/api/health') {
     return json(res, 200, {
-      ok: true, app: 'no7-personal-ai-bot', version: '0.2.0',
+      ok: true, app: 'no7-personal-ai-bot', version: '1.0.0',
       platform: process.platform, node: process.version,
       hasDist: fs.existsSync(path.join(DIST, 'index.html')),
       sync: { enabled: true, requiresToken: !!SYNC_TOKEN, hasData: !!readSync() },
