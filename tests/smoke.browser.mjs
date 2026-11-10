@@ -81,6 +81,12 @@ window.fetch = async (url, opts = {}) => {
     if (last.includes('เปิดเว็บ')) return reply('```tool\n{"tool":"open_url","args":{"url":"https://example.com"}}\n```');
     return reply('สวัสดีครับ ผมชื่อ No7');
   }
+  if (u.includes('/api/bots/status')) {
+    return { ok: true, json: async () => ({ provider: 'pollinations', model: null, telegram: { configured: true }, line: { configured: false }, sessions: 2, recent: [] }) };
+  }
+  if (u.includes('/api/mcp/stdio')) {
+    return { ok: true, json: async () => ({ servers: [{ id: 'fixture', command: 'node', args: ['fixture.mjs'], running: false }] }) };
+  }
   if (u.includes('/api/mcp')) {
     const payload = JSON.parse(opts.body || '{}').payload || {};
     const ok = (result) => ({ ok: true, json: async () => ({ status: 200, headers: {}, body: JSON.stringify({ jsonrpc: '2.0', id: payload.id, result }) }) });
@@ -113,7 +119,7 @@ const submit = (text) => {
 await wait(100);
 check('boot: initial state', ['IDLE', 'SETUP'].includes($('#state-label').textContent), $('#state-label').textContent);
 check('boot: welcome message', $('#messages').children.length >= 1);
-check('boot: 24 tools in auto mode', $('#tools-grid').children.length === 24, String($('#tools-grid').children.length));
+check('boot: 26 tools in auto mode', $('#tools-grid').children.length === 26, String($('#tools-grid').children.length));
 check('boot: 5 role modes', $('#mode-chips').children.length === 5, String($('#mode-chips').children.length));
 check('boot: persona header', $('#persona-name').textContent.length > 0);
 
@@ -123,10 +129,10 @@ check('nav: memory view', $('#view-memory').classList.contains('active'));
 // mode switching filters tools
 window.document.querySelector('#mode-chips button[data-mode="hub"]').click();
 await wait(20);
-check('mode: hub filters tools', $('#tools-grid').children.length === 18, String($('#tools-grid').children.length));
+check('mode: hub filters tools', $('#tools-grid').children.length === 19, String($('#tools-grid').children.length));
 window.document.querySelector('#mode-chips button[data-mode="auto"]').click();
 await wait(20);
-check('mode: back to auto', $('#tools-grid').children.length === 24);
+check('mode: back to auto', $('#tools-grid').children.length === 26, String($('#tools-grid').children.length));
 
 $('#set-provider').value = 'pollinations';
 $('#save-settings-btn').click();
@@ -175,6 +181,23 @@ $('#cal-add-btn').click();
 await wait(20);
 check('calendar: event added', $('#cal-list').textContent.includes('ประชุมทดสอบ'), $('#cal-list').textContent.slice(0, 60));
 check('calendar: persisted', JSON.parse(window.localStorage.getItem('no7.calendar.v1') || '[]').length > 0);
+
+// tasks: add, list, complete
+$('#task-title').value = 'ทดสอบงาน';
+$('#task-when').value = '2026-12-01T09:00';
+$('#task-priority').value = '2';
+$('#task-add').click();
+await wait(30);
+check('tasks: task added', $('#task-list').textContent.includes('ทดสอบงาน'), $('#task-list').textContent.slice(0, 60));
+check('tasks: stats updated', $('#task-stats').textContent.includes('ค้าง 1'), $('#task-stats').textContent);
+check('tasks: persisted', JSON.parse(window.localStorage.getItem('no7.tasks.v1') || '[]').some((t) => t.title === 'ทดสอบงาน'));
+$('#task-list').querySelectorAll('.fact button')[0]?.click();  // ✅ ปิดงาน
+await wait(20);
+$('#task-filter').value = 'done';
+$('#task-filter').dispatchEvent(new window.Event('change'));
+check('tasks: completed task shown in done filter', $('#task-list').textContent.includes('ทดสอบงาน'), $('#task-list').textContent.slice(0, 60));
+$('#task-filter').value = 'open';
+$('#task-filter').dispatchEvent(new window.Event('change'));
 
 // memory 2.0: pin + consolidate run
 $('#nav button[data-view="memory"]').click();
@@ -237,6 +260,19 @@ check('mcp: server listed', $('#mcp-list').textContent.includes('Demo'), $('#mcp
 check('mcp: tool count reported', $('#mcp-list').textContent.includes('1 เครื่องมือ'), $('#mcp-list').textContent.slice(0, 120));
 check('mcp: dynamic tool in tools grid', [...$('#tools-grid').children].some((b) => b.textContent.includes('send_email')));
 check('mcp: permission category listed', $('#perm-list').children.length === 6, String($('#perm-list').children.length));
+check('control: disabled by default', $('#set-control-enabled').checked === false);
+check('control: audit summary rendered', $('#control-audit-summary').textContent.length > 0, $('#control-audit-summary').textContent);
+check('control: allowlist fields present', !!$('#set-control-apps') && !!$('#set-control-commands'));
+check('bots: status polled from server', $('#bots-status').textContent.includes('Telegram: ✅'), $('#bots-status').textContent);
+check('bots: line shown as not configured', $('#bots-status').textContent.includes('LINE: —'), $('#bots-status').textContent);
+check('mcp: transport offers stdio', [...$('#mcp-transport').options].some((o) => o.value === 'stdio'));
+$('#mcp-transport').value = 'stdio';
+$('#mcp-transport').dispatchEvent(new window.Event('change'));
+await wait(80);
+check('mcp: stdio select reveals server list', $('#mcp-stdio-wrap').hidden === false && $('#mcp-stdio-id').value === 'fixture', $('#mcp-stdio-id').value);
+check('mcp: oauth section present', !!$('#mcp-oauth-token'));
+$('#mcp-transport').value = 'proxy';
+$('#mcp-transport').dispatchEvent(new window.Event('change'));
 
 // voice & streaming settings
 $('#nav button[data-view="settings"]').click();

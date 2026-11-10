@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>No7 · OAuth</title>
+  <style>
+    body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #14141b; color: #e8e8f0;
+           display: grid; place-items: center; min-height: 100vh; margin: 0; text-align: center; padding: 24px; }
+    .card { max-width: 380px; }
+    h1 { font-size: 18px; font-weight: 600; }
+    p { font-size: 13.5px; color: #9a9ab0; line-height: 1.6; }
+    code { background: #1f1f2b; padding: 2px 6px; border-radius: 6px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔑 กำลังส่งผลการล็อกอินกลับไปที่ No7…</h1>
+    <p id="msg">ถ้าหน้าต่างนี้ไม่ปิดเอง ให้กลับไปที่แท็บ No7 แล้วกด "เชื่อมต่อ" อีกครั้ง</p>
+  </div>
+  <script>
+    (function () {
+      var payload = { type: 'no7-oauth', url: location.href };
+      var msg = document.getElementById('msg');
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(payload, location.origin);
+          msg.textContent = 'ส่งผลแล้ว — ปิดหน้าต่างนี้ได้เลย';
+          setTimeout(function () { window.close(); }, 600);
+        } else {
+          msg.textContent = 'ไม่พบหน้าต่างหลักของ No7 — คัดลอก URL นี้ไปวางในช่องเชื่อมต่อ OAuth';
+        }
+      } catch (e) {
+        msg.textContent = 'ส่งผลไม่สำเร็จ: ' + e.message;
+      }
+    })();
+  </script>
+</body>
+</html>

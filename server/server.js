@@ -12,6 +12,11 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { spawn } from 'node:child_process';
+import {
+  BotSessions, normalizeTelegramUpdate, normalizeLineEvents, verifyLineSignature,
+  handleBotMessage, sendTelegramMessage, replyLine,
+} from './bots.js';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -56,6 +61,193 @@ function writeSync(data) {
     return true;
   } catch { return false; }
 }
+/* ---------------- Chat bots: Telegram / LINE ---------------- */
+const BOTS = {
+  telegram: {
+    token: process.env.TELEGRAM_BOT_TOKEN || '',
+    secret: process.env.TELEGRAM_WEBHOOK_SECRET || '',
+    apiBase: process.env.TELEGRAM_API_BASE || 'https://api.telegram.org',
+  },
+  line: {
+    token: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
+    secret: process.env.LINE_CHANNEL_SECRET || '',
+    apiBase: process.env.LINE_API_BASE || 'https://api.line.me',
+  },
+  provider: process.env.NO7_BOT_PROVIDER || 'pollinations',
+  model: process.env.NO7_BOT_MODEL || '',
+};
+const botSessions = new BotSessions();
+const botLog = []; // {at, provider, chatId, ok, error}
+
+function noteBot(entry) {
+  botLog.push({ at: Date.now(), ...entry });
+  if (botLog.length > 50) botLog.shift();
+}
+
+async function botChat(messages) {
+  return proxyChat({ provider: BOTS.provider, model: BOTS.model || undefined, messages });
+}
+
+async function processTelegramUpdate(update) {
+  const msg = normalizeTelegramUpdate(update);
+  if (!msg) return;
+  try {
+    const parts = await handleBotMessage({
+      text: msg.text,
+      chatId: `tg:${msg.chatId}`,
+      provider: 'telegram',
+      sessions: botSessions,
+      chat: botChat,
+    });
+    for (const part of parts) {
+      await sendTelegramMessage({
+        token: BOTS.telegram.token,
+        chatId: msg.chatId,
+        text: part,
+        apiBase: BOTS.telegram.apiBase,
+      });
+    }
+    noteBot({ provider: 'telegram', chatId: msg.chatId, ok: true });
+  } catch (e) {
+    noteBot({ provider: 'telegram', chatId: msg.chatId, ok: false, error: e.message });
+    console.warn('[bot:telegram]', e.message);
+  }
+}
+
+async function processLineEvent(ev) {
+  try {
+    const parts = await handleBotMessage({
+      text: ev.text,
+      chatId: `line:${ev.chatId}`,
+      provider: 'line',
+      sessions: botSessions,
+      chat: botChat,
+    });
+    for (const part of parts) {
+      await replyLine({
+        token: BOTS.line.token,
+        replyToken: ev.replyToken,
+        text: part,
+        apiBase: BOTS.line.apiBase,
+      });
+    }
+    noteBot({ provider: 'line', chatId: ev.chatId, ok: true });
+  } catch (e) {
+    noteBot({ provider: 'line', chatId: ev.chatId, ok: false, error: e.message });
+    console.warn('[bot:line]', e.message);
+  }
+}
+
+/* ---------------- MCP stdio bridge ----------------
+ * MCP servers แบบ process-local (stdio) ถูกประกาศผ่าน env เท่านั้น:
+ *   MCP_STDIO_SERVERS='{"everything":{"command":"npx","args":["-y","@modelcontextprotocol/server-everything"]}}'
+ * เบราว์เซอร์เลือกได้แค่ id ที่ประกาศไว้ — ห้ามสั่งรันคำสั่งอะไรก็ได้จากหน้าเว็บ
+ */
+const MCP_STDIO_SERVERS = (() => {
+  const raw = process.env.MCP_STDIO_SERVERS || '';
+  if (!raw.trim()) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    const out = {};
+    for (const [id, cfg] of Object.entries(parsed || {})) {
+      if (!cfg || typeof cfg.command !== 'string' || !cfg.command.trim()) continue;
+      out[id] = {
+        id,
+        command: cfg.command,
+        args: Array.isArray(cfg.args) ? cfg.args.map(String) : [],
+        env: cfg.env && typeof cfg.env === 'object' ? Object.fromEntries(
+          Object.entries(cfg.env).filter(([, v]) => typeof v === 'string')
+        ) : {},
+        cwd: typeof cfg.cwd === 'string' ? cfg.cwd : ROOT,
+      };
+    }
+    return out;
+  } catch (e) {
+    console.warn('[mcp] MCP_STDIO_SERVERS ไม่ใช่ JSON ที่ถูกต้อง:', e.message);
+    return {};
+  }
+})();
+
+const mcpStdio = new Map(); // id -> { child, pending: Map, buffer, stderr }
+
+function stdioEntry(id) {
+  const cfg = MCP_STDIO_SERVERS[id];
+  if (!cfg) throw new Error(`ไม่รู้จัก stdio MCP server "${id}"`);
+  let entry = mcpStdio.get(id);
+  if (entry && entry.child.exitCode === null) return entry;
+
+  const child = spawn(cfg.command, cfg.args, {
+    cwd: cfg.cwd,
+    env: { ...process.env, ...cfg.env },
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+  const fresh = { child, pending: new Map(), buffer: '', stderr: '' };
+  mcpStdio.set(id, fresh);
+
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (chunk) => {
+    fresh.buffer += chunk;
+    let idx;
+    while ((idx = fresh.buffer.indexOf('\n')) >= 0) {
+      const line = fresh.buffer.slice(0, idx).trim();
+      fresh.buffer = fresh.buffer.slice(idx + 1);
+      if (!line) continue;
+      let msg;
+      try { msg = JSON.parse(line); } catch { continue; }
+      const wait = msg && msg.id != null ? fresh.pending.get(msg.id) : null;
+      if (wait) {
+        clearTimeout(wait.timer);
+        fresh.pending.delete(msg.id);
+        wait.resolve(msg);
+      }
+    }
+  });
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', (chunk) => { fresh.stderr = (fresh.stderr + chunk).slice(-2000); });
+  child.on('exit', (code) => {
+    for (const [, wait] of fresh.pending) {
+      clearTimeout(wait.timer);
+      wait.reject(new Error(`MCP process exited (code ${code})${fresh.stderr ? `: ${fresh.stderr.slice(-200)}` : ''}`));
+    }
+    fresh.pending.clear();
+    mcpStdio.delete(id);
+  });
+  child.on('error', (err) => {
+    for (const [, wait] of fresh.pending) {
+      clearTimeout(wait.timer);
+      wait.reject(err);
+    }
+    fresh.pending.clear();
+    mcpStdio.delete(id);
+  });
+  return fresh;
+}
+
+function mcpStdioCall(id, payload, timeoutMs = 25000) {
+  return new Promise((resolve, reject) => {
+    let entry;
+    try { entry = stdioEntry(id); } catch (e) { reject(e); return; }
+    const timer = setTimeout(() => {
+      entry.pending.delete(payload.id);
+      reject(new Error(`MCP stdio timeout (${timeoutMs}ms)${entry.stderr ? `: ${entry.stderr.slice(-200)}` : ''}`));
+    }, timeoutMs);
+    if (payload.id == null) {
+      // notification: เขียนแล้วจบ
+      clearTimeout(timer);
+      try { entry.child.stdin.write(`${JSON.stringify(payload)}\n`); resolve(null); } catch (e) { reject(e); }
+      return;
+    }
+    entry.pending.set(payload.id, { resolve, reject, timer });
+    try {
+      entry.child.stdin.write(`${JSON.stringify(payload)}\n`);
+    } catch (e) {
+      clearTimeout(timer);
+      entry.pending.delete(payload.id);
+      reject(e);
+    }
+  });
+}
+
 /* ---------------- Phone-Link: command queue + results ---------------- */
 const linkState = {
   queues: new Map(),    // code -> [{id, command, args, ts, delivered}]
@@ -118,6 +310,20 @@ function readBody(req, limit = 1_000_000) {
   });
 }
 
+function readRawBody(req, limit = 1_000_000) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) { reject(new Error('payload too large')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
 function hmac(secret, payload) {
   return crypto.createHmac('sha256', secret).update(payload).digest('hex');
 }
@@ -144,7 +350,9 @@ async function handleApi(req, res, url) {
       hasDist: fs.existsSync(path.join(DIST, 'index.html')),
       sync: { enabled: true, requiresToken: !!SYNC_TOKEN, hasData: !!readSync() },
       endpoints: ['/api/health', '/api/chat', '/api/tools', '/api/tools/run', '/api/pair', '/api/sync', '/api/fetch',
-        '/api/link/command', '/api/link/poll', '/api/link/status', '/api/link/results', '/api/tts', '/api/mcp'],
+        '/api/link/command', '/api/link/poll', '/api/link/status', '/api/link/results', '/api/tts', '/api/mcp',
+        '/api/mcp/stdio', '/api/oauth/token',
+        '/api/bots/status', '/api/telegram/webhook', '/api/line/webhook'],
       aiKeys: {
         gemini: !!process.env.GEMINI_API_KEY,
         openai: !!process.env.OPENAI_API_KEY,
@@ -215,9 +423,120 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  // ---- Chat bots ----
+  if (url.pathname === '/api/bots/status' && req.method === 'GET') {
+    return json(res, 200, {
+      provider: BOTS.provider,
+      model: BOTS.model || null,
+      telegram: {
+        configured: !!BOTS.telegram.token,
+        requiresSecret: !!BOTS.telegram.secret,
+        webhookPath: '/api/telegram/webhook',
+      },
+      line: {
+        configured: !!(BOTS.line.token && BOTS.line.secret),
+        webhookPath: '/api/line/webhook',
+      },
+      sessions: botSessions.size(),
+      recent: botLog.slice(-10),
+    });
+  }
+
+  if (url.pathname === '/api/telegram/webhook' && req.method === 'POST') {
+    if (!BOTS.telegram.token) return json(res, 503, { error: 'ยังไม่ได้ตั้ง TELEGRAM_BOT_TOKEN ที่ server' });
+    if (BOTS.telegram.secret) {
+      const got = req.headers['x-telegram-bot-api-secret-token'] || '';
+      if (got !== BOTS.telegram.secret) return json(res, 401, { error: 'secret token ไม่ตรง' });
+    } else {
+      console.warn('[bot:telegram] ไม่ได้ตั้ง TELEGRAM_WEBHOOK_SECRET — ควรตั้งเพื่อกันคนอื่นยิง webhook ปลอม');
+    }
+    let update;
+    try { update = await readBody(req); } catch (e) { return json(res, 400, { error: e.message }); }
+    json(res, 200, { ok: true });
+    void processTelegramUpdate(update);
+    return;
+  }
+
+  if (url.pathname === '/api/line/webhook' && req.method === 'POST') {
+    if (!BOTS.line.token || !BOTS.line.secret) {
+      return json(res, 503, { error: 'ยังไม่ได้ตั้ง LINE_CHANNEL_ACCESS_TOKEN / LINE_CHANNEL_SECRET' });
+    }
+    let raw;
+    try { raw = await readRawBody(req); } catch (e) { return json(res, 400, { error: e.message }); }
+    const signature = req.headers['x-line-signature'] || '';
+    if (!verifyLineSignature({ secret: BOTS.line.secret, rawBody: raw, signature, cryptoImpl: crypto })) {
+      return json(res, 401, { error: 'signature ไม่ถูกต้อง' });
+    }
+    let body;
+    try { body = raw ? JSON.parse(raw) : {}; } catch { return json(res, 400, { error: 'invalid JSON' }); }
+    json(res, 200, { ok: true });
+    for (const ev of normalizeLineEvents(body)) void processLineEvent(ev);
+    return;
+  }
+
+  // ---- OAuth token proxy: แลก/ต่ออายุ token ให้เบราว์เซอร์ (เลี่ยง CORS) ----
+  if (url.pathname === '/api/oauth/token' && req.method === 'POST') {
+    const body = await readBody(req);
+    let target;
+    try { target = new URL(String(body.tokenUrl || '')); } catch { return json(res, 400, { error: 'tokenUrl ไม่ถูกต้อง' }); }
+    if (!/^https?:$/.test(target.protocol)) return json(res, 400, { error: 'รองรับเฉพาะ http/https' });
+    const form = new URLSearchParams();
+    for (const key of ['grant_type', 'code', 'redirect_uri', 'client_id', 'code_verifier', 'refresh_token', 'scope']) {
+      if (body[key] != null && body[key] !== '') form.set(key, String(body[key]));
+    }
+    if (!form.get('grant_type')) return json(res, 400, { error: 'ต้องมี grant_type' });
+    const headers = { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' };
+    if (body.clientSecret) {
+      headers.Authorization = `Basic ${Buffer.from(`${body.clientId || ''}:${body.clientSecret}`).toString('base64')}`;
+    }
+    try {
+      const r = await fetch(target, { method: 'POST', headers, body: form.toString() });
+      const text = await r.text();
+      return json(res, 200, {
+        status: r.status,
+        contentType: r.headers.get('content-type') || '',
+        body: text.slice(0, 100000),
+      });
+    } catch (e) {
+      return json(res, 502, { error: e.message, status: 0, body: '' });
+    }
+  }
+
+  // ---- MCP stdio servers ที่ประกาศไว้ (ไม่เปิดเผย env/secret) ----
+  if (url.pathname === '/api/mcp/stdio' && req.method === 'GET') {
+    return json(res, 200, {
+      servers: Object.values(MCP_STDIO_SERVERS).map((c) => ({
+        id: c.id,
+        command: c.command,
+        args: c.args,
+        running: mcpStdio.has(c.id),
+      })),
+    });
+  }
+
   // ---- MCP proxy: JSON-RPC 2.0 ไปยัง MCP server (เลี่ยง CORS) ----
   if (url.pathname === '/api/mcp' && req.method === 'POST') {
     const body = await readBody(req);
+
+    // stdio transport: ไม่มี URL — ใช้ id ที่ประกาศใน env
+    if (body.transport === 'stdio' || (!body.url && body.server)) {
+      const id = String(body.server || '');
+      if (!MCP_STDIO_SERVERS[id]) {
+        return json(res, 400, { error: `ไม่รู้จัก stdio MCP server "${id}" — ประกาศใน MCP_STDIO_SERVERS ก่อน` });
+      }
+      try {
+        const msg = await mcpStdioCall(id, body.payload || {}, Number(body.timeoutMs) || 25000);
+        return json(res, 200, {
+          status: 200,
+          contentType: 'application/json',
+          headers: {},
+          body: msg ? JSON.stringify(msg) : '',
+        });
+      } catch (e) {
+        return json(res, 502, { error: e.message, status: 0, body: '' });
+      }
+    }
+
     const target = String(body.url || '');
     let parsed;
     try { parsed = new URL(target); } catch { return json(res, 400, { error: 'url ไม่ถูกต้อง' }); }
@@ -229,7 +548,7 @@ async function handleApi(req, res, url) {
         Object.entries(body.headers).filter(([k, v]) => typeof k === 'string' && typeof v === 'string')
       ) : {}),
     };
-    const key = body.apiKey || '';
+    const key = body.apiKey || body.token || '';
     if (key) headers.Authorization = `Bearer ${key}`;
     if (body.sessionId) headers['mcp-session-id'] = String(body.sessionId);
     try {

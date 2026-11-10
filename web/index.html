@@ -133,6 +133,33 @@
           </div>
           <p id="cal-status" class="hint"></p>
           <div id="cal-list"></div>
+
+          <h3>✅ งานที่ต้องทำ</h3>
+          <p class="hint">มีเวลาเตือน + ซิงก์ข้ามเครื่องผ่าน <code>/api/sync</code> (last-write-wins)</p>
+          <div id="task-stats" class="hint"></div>
+          <div class="row">
+            <input id="task-title" placeholder="งาน เช่น ส่งรายงาน" />
+            <input id="task-when" type="datetime-local" />
+            <button id="task-add">＋ เพิ่มงาน</button>
+          </div>
+          <div class="row">
+            <select id="task-priority">
+              <option value="0">⚪ ปกติ</option>
+              <option value="1">🔵 สำคัญ</option>
+              <option value="2">🟠 ด่วน</option>
+              <option value="3">🔴 ด่วนมาก</option>
+            </select>
+            <select id="task-filter">
+              <option value="open">ค้างอยู่</option>
+              <option value="today">วันนี้</option>
+              <option value="overdue">เกินกำหนด</option>
+              <option value="done">เสร็จแล้ว</option>
+              <option value="all">ทั้งหมด</option>
+            </select>
+            <button id="task-clear-done">ล้างงานที่เสร็จ</button>
+          </div>
+          <p id="task-status" class="hint"></p>
+          <div id="task-list"></div>
         </section>
 
         <section id="view-devices" class="view">
@@ -370,6 +397,34 @@
           <p class="hint" id="diag-status"></p>
           <pre id="diag-output" class="code diag"></pre>
 
+          <h3>ควบคุมคอมพิวเตอร์</h3>
+          <p class="hint">เดสก์ท็อปแอป (Electron) เท่านั้น — ค่าเริ่มต้น <strong>ปิด</strong> และทุกคำสั่งต้องอยู่ใน allowlist (ดู <code>docs/CONTROL.md</code>)</p>
+          <label class="switch"><input type="checkbox" id="set-control-enabled" /> เปิดให้ No7 สั่งงานเครื่อง</label>
+          <div class="grid2">
+            <label>โปรแกรมที่อนุญาต (บรรทัดละชื่อ, ใช้ * ได้)
+              <textarea id="set-control-apps" rows="3" placeholder="code&#10;notepad&#10;chrome"></textarea>
+            </label>
+            <label>คำสั่งที่อนุญาต (บรรทัดละคำสั่ง)
+              <textarea id="set-control-commands" rows="3" placeholder="git&#10;node"></textarea>
+            </label>
+          </div>
+          <label>สูงสุดต่อนาที <input id="set-control-rate" type="number" min="1" max="60" /></label>
+          <p class="hint" id="control-audit-summary"></p>
+          <div id="control-audit" class="metric-list"></div>
+          <div class="row">
+            <button id="control-audit-refresh">🔄 ดู log ใหม่</button>
+            <button id="control-audit-clear">ล้าง log</button>
+          </div>
+
+          <h3>บอทแชท (Telegram / LINE)</h3>
+          <p class="hint">ให้ No7 คุยได้จาก Telegram/LINE — ตั้ง token ที่ companion server (ดู <code>docs/BOTS.md</code>)</p>
+          <p class="hint" id="bots-status">กำลังตรวจสอบ…</p>
+          <div class="row">
+            <button id="bots-refresh">🔄 ตรวจสอบใหม่</button>
+            <button id="bots-copy-telegram">📋 webhook Telegram</button>
+            <button id="bots-copy-line">📋 webhook LINE</button>
+          </div>
+
           <h3>ปลั๊กอิน MCP</h3>
           <p class="hint">ต่อ No7 เข้ากับ MCP server ของคุณเอง (Gmail, ปฏิทิน, ไฟล์) — เรียกผ่าน companion server <code>POST /api/mcp</code></p>
           <div id="mcp-list" class="mcp-list"></div>
@@ -384,9 +439,25 @@
               <select id="mcp-transport">
                 <option value="proxy">ผ่าน server (แนะนำ)</option>
                 <option value="direct">ตรงจากเบราว์เซอร์</option>
+                <option value="stdio">stdio (process ในเครื่อง server)</option>
               </select>
             </label>
           </div>
+          <label id="mcp-stdio-wrap" hidden>stdio server ที่ประกาศไว้ที่ server
+            <select id="mcp-stdio-id"></select>
+          </label>
+          <details id="mcp-oauth-wrap">
+            <summary>OAuth 2.0 (ถ้า server ต้องล็อกอิน)</summary>
+            <div class="grid2">
+              <label>Authorize URL <input id="mcp-oauth-authorize" placeholder="https://accounts.google.com/o/oauth2/v2/auth" /></label>
+              <label>Token URL <input id="mcp-oauth-token" placeholder="https://oauth2.googleapis.com/token" /></label>
+            </div>
+            <div class="grid2">
+              <label>Client ID <input id="mcp-oauth-client" /></label>
+              <label>Scopes (คั่นด้วยช่องว่าง) <input id="mcp-oauth-scopes" placeholder="https://www.googleapis.com/auth/gmail.readonly" /></label>
+            </div>
+            <p class="hint">ต้องเปิดผ่าน https:// หรือ localhost · token เก็บในเครื่องนี้เท่านั้น</p>
+          </details>
           <div class="row">
             <button id="mcp-add">➕ เพิ่ม server</button>
             <button id="mcp-refresh">🔄 ค้นหาเครื่องมือ</button>

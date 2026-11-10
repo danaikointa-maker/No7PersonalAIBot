@@ -166,3 +166,80 @@ test('dynamic MCP tools are visible to agent + permissions', () => {
     registerDynamicTools({});
   }
 });
+
+test('stdio transport talks through the server bridge', async () => {
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const body = JSON.parse(init.body || '{}');
+    calls.push({ url, body });
+    const reply = { jsonrpc: '2.0', id: body.payload?.id, result: { tools: [] } };
+    return { ok: true, json: async () => ({ status: 200, contentType: 'application/json', headers: {}, body: JSON.stringify(reply) }) };
+  };
+  const client = new McpClient({
+    id: 'everything', url: '', transport: 'stdio', serverUrl: () => 'http://srv', fetchImpl,
+  });
+  client.initialized = true;
+  const tools = await client.listTools();
+  assert.deepEqual(tools, []);
+  assert.equal(calls[0].url, 'http://srv/api/mcp');
+  assert.equal(calls[0].body.transport, 'stdio');
+  assert.equal(calls[0].body.server, 'everything');
+  assert.equal(calls[0].body.payload.method, 'tools/list');
+});
+
+test('stdio bridge errors surface as McpError', async () => {
+  const fetchImpl = async () => ({
+    ok: true,
+    json: async () => ({ error: 'ไม่รู้จัก stdio MCP server "nope"', status: 400, body: '' }),
+  });
+  const client = new McpClient({ id: 'nope', url: '', transport: 'stdio', serverUrl: () => 'http://srv', fetchImpl });
+  client.initialized = true;
+  await assert.rejects(() => client.listTools(), (err) => {
+    assert.ok(err instanceof McpError);
+    assert.match(err.message, /stdio/);
+    return true;
+  });
+});
+
+test('registry sends the stored OAuth token instead of an API key', async () => {
+  const store = new Map();
+  const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k) };
+  let seenToken = null;
+  const fetchImpl = async (url, init = {}) => {
+    const body = JSON.parse(init.body || '{}');
+    if (body.payload?.method === 'tools/list') {
+      seenToken = body.token;
+      return { ok: true, json: async () => ({ status: 200, headers: {}, body: JSON.stringify({ jsonrpc: '2.0', id: body.payload.id, result: { tools: [] } }) }) };
+    }
+    return { ok: true, json: async () => ({ status: 200, headers: {}, body: JSON.stringify({ jsonrpc: '2.0', id: body.payload?.id, result: {} }) }) };
+  };
+  const settings = {
+    mcpServers: [{
+      id: 'gmail', name: 'Gmail', url: 'http://mcp.local/mcp', enabled: true,
+      oauth: { authorizeUrl: 'https://auth/x', tokenUrl: 'https://auth/token', clientId: 'c1' },
+    }],
+  };
+  const reg = new McpRegistry({ settings: () => settings, serverUrl: () => 'http://srv', fetchImpl, storage });
+  reg.tokenStore.set('gmail', { accessToken: 'at-123', refreshToken: 'rt', expiresAt: Date.now() + 3600_000 });
+  const results = await reg.refresh();
+  assert.equal(results[0].ok, true);
+  assert.equal(seenToken, 'at-123', 'ต้องแนบ access token ที่เก็บไว้');
+});
+
+test('registry keeps stdio servers without a url', async () => {
+  const fetchImpl = async (url, init = {}) => {
+    const body = JSON.parse(init.body || '{}');
+    return { ok: true, json: async () => ({ status: 200, headers: {}, body: JSON.stringify({ jsonrpc: '2.0', id: body.payload?.id, result: { tools: [{ name: 'echo' }] } }) }) };
+  };
+  const storage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+  const reg = new McpRegistry({
+    settings: () => ({ mcpServers: [{ id: 'everything', name: 'Everything', transport: 'stdio', enabled: true }] }),
+    serverUrl: () => 'http://srv',
+    fetchImpl,
+    storage,
+  });
+  assert.equal(reg.configs().length, 1);
+  const results = await reg.refresh();
+  assert.equal(results[0].count, 1);
+  assert.ok(reg.toolDefs()['mcp__everything__echo']);
+});

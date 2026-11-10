@@ -1,6 +1,10 @@
 import { fetchText, stripHtml, pageMeta, parseRss, serverUrlFromSettings } from './net.js';
 import { getCalendar, formatWhen } from './calendar.js';
 import { getDeviceRegistry, sendCommand } from './link.js';
+import {
+  ControlAudit, normalizeControlPolicy, checkControl, runControlAction,
+} from './control.js';
+import { TaskStore, PRIORITIES, parseDue, formatTaskTime } from './tasks.js';
 
 // Tool registry — the ESP32 "42 tools with on-screen cards" principle, re-implemented
 // for web so the SAME code runs on mobile + PC. Only key-free public APIs by default,
@@ -397,6 +401,89 @@ export const TOOLS = {
     },
   },
 
+  task: {
+    emoji: '✅',
+    label: 'งาน / เตือน',
+    desc: 'เพิ่ม ดู ปิด หรือลบงานที่ต้องทำ (มีเวลาเตือนและซิงก์ข้ามเครื่องได้)',
+    params: {
+      action: 'string — add | list | done | remove (ไม่ใส่ = list)',
+      title: 'string ชื่องาน (ตอน add)',
+      when: 'string เวลา เช่น 2026-11-11T09:00, +30m, +2h, วันนี้ 18:00, พรุ่งนี้ 09:30',
+      priority: 'number 0=ปกติ 1=สำคัญ 2=ด่วน 3=ด่วนมาก',
+      id: 'string รหัสงาน (ตอน done/remove)',
+      filter: 'string all|open|done|today|overdue (ตอน list)',
+    },
+    async run({ action = 'list', title = '', when = '', priority = 0, id = '', filter = 'open' }) {
+      const store = new TaskStore();
+      if (action === 'add') {
+        if (!String(title).trim()) throw new Error('ต้องบอกว่าต้องทำงานอะไร');
+        const due = when ? parseDue(when) : null;
+        if (when && !due) throw new Error(`อ่านเวลา "${when}" ไม่ได้ — ลอง ISO หรือ +30m / พรุ่งนี้ 09:00`);
+        const task = store.add({ title, due, priority });
+        return {
+          title: 'เพิ่มงานแล้ว',
+          big: task.title,
+          lines: [
+            `${PRIORITIES[task.priority].emoji} ${PRIORITIES[task.priority].label} · ${formatTaskTime(task.due)}`,
+            `id: ${task.id}`,
+          ],
+        };
+      }
+      if (action === 'done') {
+        if (!id) throw new Error('ต้องระบุ id ของงาน (ดูก่อนด้วย action=list)');
+        const task = store.complete(id);
+        if (!task) throw new Error(`ไม่พบงาน id ${id}`);
+        return { title: 'ปิดงานแล้ว', big: task.title, lines: [formatTaskTime(task.due)] };
+      }
+      if (action === 'remove') {
+        if (!id) throw new Error('ต้องระบุ id ของงาน');
+        if (!store.remove(id)) throw new Error(`ไม่พบงาน id ${id}`);
+        return { title: 'ลบงานแล้ว', big: id, lines: ['จะหายไปทุกเครื่องเมื่อซิงก์รอบถัดไป'] };
+      }
+      const now = Date.now();
+      const opts = filter === 'all' ? { done: null } : filter === 'done' ? { done: true } : filter === 'today' ? { done: false, dueWithinMs: 24 * 60 * 60 * 1000 } : { done: false };
+      let list = store.list(opts);
+      if (filter === 'overdue') list = list.filter((t) => t.due && Date.parse(t.due) < now);
+      const stats = store.stats();
+      return {
+        title: 'งานที่ต้องทำ',
+        big: list.length ? `${list.length} งาน` : 'ไม่มีงานค้าง 🎉',
+        lines: [
+          `ค้าง ${stats.open} · วันนี้ ${stats.today} · เกินกำหนด ${stats.overdue} · เสร็จแล้ว ${stats.done}`,
+          ...list.slice(0, 6).map((t) => `${PRIORITIES[t.priority].emoji} ${t.title} — ${formatTaskTime(t.due)} (${t.id})`),
+        ],
+      };
+    },
+  },
+
+  control_run: {
+    emoji: '🖥️',
+    label: 'ควบคุมคอมพิวเตอร์',
+    desc: 'เปิดโปรแกรม/ลิงก์ คัดลอกข้อความ หรือรันคำสั่งที่อยู่ใน allowlist (เดสก์ท็อปเท่านั้น)',
+    params: {
+      action: 'string — open_app | open_url | clipboard | run_command',
+      target: 'string — ชื่อโปรแกรม / URL / คำสั่ง',
+      text: 'string — ข้อความสำหรับ clipboard',
+    },
+    async run({ action = 'open_app', target = '', text = '' }, ctx = {}) {
+      const policy = normalizeControlPolicy(ctx.settings?.controlPolicy);
+      const audit = new ControlAudit();
+      const check = checkControl({ action, target, text, policy });
+      if (!check.allowed) {
+        audit.record({ action, target, allowed: false, reason: check.reason });
+        throw new Error(check.reason);
+      }
+      if (audit.countAllowed() >= policy.maxPerMinute) {
+        const reason = `ทำเกิน ${policy.maxPerMinute} ครั้ง/นาทีแล้ว — รอสักครู่`;
+        audit.record({ action, target, allowed: false, reason });
+        throw new Error(reason);
+      }
+      const card = await runControlAction({ action, target, text, policy });
+      audit.record({ action, target, allowed: true, reason: check.reason });
+      return card;
+    },
+  },
+
   device_command: {
     emoji: '🔗',
     label: 'สั่งอุปกรณ์',
@@ -483,11 +570,13 @@ export const TOOL_META = {
   rss_read: { category: 'read', risk: 0 },
   summarize_url: { category: 'read', risk: 0 },
   timer: { category: 'act', risk: 1 },
+  task: { category: 'act', risk: 1 },
   reminder: { category: 'act', risk: 1 },
   clipboard_copy: { category: 'act', risk: 1 },
   open_url: { category: 'act', risk: 1 },
   compose_message: { category: 'message', risk: 2 },
   open_app: { category: 'control', risk: 3 },
+  control_run: { category: 'control', risk: 3 },
   device_command: { category: 'control', risk: 3 },
 };
 

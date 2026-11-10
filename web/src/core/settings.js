@@ -31,6 +31,12 @@ export const DEFAULT_SETTINGS = {
   ttsApiKey: '',
   bargeIn: 'keyword',      // off | keyword | any
   mcpServers: [],          // [{id, name, url, apiKey, transport, enabled}]
+  controlPolicy: {         // เดสก์ท็อปเท่านั้น — ค่าเริ่มต้นปิด
+    enabled: false,
+    allowApps: [],
+    allowCommands: [],
+    maxPerMinute: 6,
+  },
   serverUrl: 'http://localhost:8787',   // companion server (AI proxy / tools / sync)
   syncToken: '',
 };

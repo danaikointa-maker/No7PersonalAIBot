@@ -4,11 +4,14 @@
 // ทำงานได้ 2 ทาง:
 //   1) ผ่าน companion server `POST /api/mcp` (ค่าเริ่มต้น) — เลี่ยง CORS และซ่อน key
 //   2) ตรงจากเบราว์เซอร์ (`transport: 'direct'`) — สำหรับเซิร์ฟเวอร์ที่เปิด CORS
+//   3) stdio ผ่าน server (`transport: 'stdio'`) — MCP process local ที่ประกาศใน MCP_STDIO_SERVERS
 //
 // รองรับผลลัพธ์ทั้ง application/json และ text/event-stream (Streamable HTTP)
 
+import { TokenStore, OAuthSession } from './oauth.js';
+
 export const MCP_PROTOCOL_VERSION = '2024-11-05';
-export const MCP_CLIENT_INFO = { name: 'no7-personal-ai', version: '1.3.0' };
+export const MCP_CLIENT_INFO = { name: 'no7-personal-ai', version: '1.4.0' };
 export const MCP_CACHE_KEY = 'no7.mcp.tools.v1';
 
 export class McpError extends Error {
@@ -110,9 +113,9 @@ function schemaParams(schema) {
 
 export class McpClient {
   /**
-   * @param {{id?: string, name?: string, url: string, apiKey?: string, headers?: object,
-   *          transport?: 'proxy'|'direct', serverUrl?: string|(() => string),
-   *          fetchImpl?: Function, timeoutMs?: number}} opts
+   * @param {{id?: string, name?: string, url?: string, apiKey?: string, headers?: object,
+   *          transport?: 'proxy'|'direct'|'stdio', serverUrl?: string|(() => string),
+   *          getToken?: () => Promise<string|null>, fetchImpl?: Function, timeoutMs?: number}} opts
    */
   constructor(opts = {}) {
     this.id = opts.id || opts.name || 'mcp';
@@ -120,7 +123,8 @@ export class McpClient {
     this.url = String(opts.url || '').trim();
     this.apiKey = opts.apiKey || '';
     this.headers = opts.headers || {};
-    this.transport = opts.transport === 'direct' ? 'direct' : 'proxy';
+    this.transport = ['direct', 'stdio'].includes(opts.transport) ? opts.transport : 'proxy';
+    this.getToken = typeof opts.getToken === 'function' ? opts.getToken : null;
     this.serverUrl = typeof opts.serverUrl === 'function' ? opts.serverUrl : () => opts.serverUrl || '';
     this.fetchImpl = opts.fetchImpl || ((...a) => fetch(...a));
     this.timeoutMs = opts.timeoutMs ?? 20000;
@@ -136,8 +140,17 @@ export class McpClient {
   }
 
   /** ส่ง JSON-RPC ผ่าน proxy หรือตรง พร้อม fallback */
+  async _authToken() {
+    if (!this.getToken) return '';
+    try { return (await this.getToken()) || ''; } catch { return ''; }
+  }
+
   async _send(payload) {
     const base = String(this.serverUrl() || '').replace(/\/$/, '');
+    if (this.transport === 'stdio') {
+      if (!base) throw new McpError('stdio transport ต้องมี companion server (ตั้งค่า serverUrl)');
+      return this._sendStdio(base, payload);
+    }
     if (this.transport === 'proxy' && base) {
       try {
         return await this._sendProxy(base, payload);
@@ -152,13 +165,33 @@ export class McpClient {
     return this._sendDirect(payload);
   }
 
+  async _sendStdio(base, payload) {
+    const res = await this.fetchImpl(`${base}/api/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        transport: 'stdio',
+        server: this.stdioServer || this.id,
+        payload,
+        timeoutMs: this.timeoutMs,
+      }),
+      signal: this._timeoutSignal(),
+    });
+    if (!res.ok) throw new McpError(`stdio proxy HTTP ${res.status}`, { code: res.status });
+    const envelope = await res.json();
+    if (envelope.error) throw new McpError(envelope.error, { code: envelope.status || 0 });
+    return parseMcpBody(envelope.body, payload.id);
+  }
+
   async _sendProxy(base, payload) {
+    const token = this.apiKey ? '' : await this._authToken();
     const res = await this.fetchImpl(`${base}/api/mcp`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         url: this.url,
         apiKey: this.apiKey,
+        token: token || undefined,
         headers: this.headers,
         sessionId: this.sessionId,
         payload,
@@ -176,10 +209,12 @@ export class McpClient {
   }
 
   async _sendDirect(payload) {
+    const token = this.apiKey ? '' : await this._authToken();
     const headers = {
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
       ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}),
+      ...(!this.apiKey && token ? { authorization: `Bearer ${token}` } : {}),
       ...(this.sessionId ? { 'mcp-session-id': this.sessionId } : {}),
       ...this.headers,
     };
@@ -262,6 +297,8 @@ export class McpRegistry {
     this.fetchImpl = fetchImpl || ((...a) => fetch(...a));
     this.timeoutMs = timeoutMs;
     this.servers = new Map(); // id -> {client, tools, error, serverInfo}
+    this.tokenStore = new TokenStore({ storage: this.storage });
+    this.sessions = new Map();
     this.loadCache();
   }
 
@@ -283,22 +320,41 @@ export class McpRegistry {
     const list = this.getSettings()?.mcpServers;
     if (!Array.isArray(list)) return [];
     return list
-      .filter((s) => s && s.url && s.enabled !== false)
+      .filter((s) => s && s.enabled !== false && (s.url || s.transport === 'stdio'))
       .map((s) => ({
         id: String(s.id || s.name || s.url),
         name: String(s.name || s.id || 'MCP'),
-        url: String(s.url),
+        url: String(s.url || ''),
         apiKey: String(s.apiKey || ''),
-        transport: s.transport === 'direct' ? 'direct' : 'proxy',
+        transport: ['direct', 'stdio'].includes(s.transport) ? s.transport : 'proxy',
+        oauth: s.oauth && typeof s.oauth === 'object' && s.oauth.tokenUrl ? s.oauth : null,
       }));
   }
 
   clientFor(cfg) {
+    let getToken = null;
+    if (cfg.oauth?.tokenUrl) {
+      const session = new OAuthSession({
+        name: cfg.id,
+        tokenUrl: cfg.oauth.tokenUrl,
+        clientId: cfg.oauth.clientId || '',
+        clientSecret: cfg.oauth.clientSecret || '',
+        serverUrl: this.getServerUrl,
+        store: this.tokenStore,
+        fetchImpl: this.fetchImpl,
+      });
+      getToken = () => session.getAccessToken();
+      this.sessions.set(cfg.id, session);
+    } else if (this.sessions.has(cfg.id)) {
+      this.sessions.delete(cfg.id);
+    }
     return new McpClient({
       ...cfg,
       serverUrl: this.getServerUrl,
       fetchImpl: this.fetchImpl,
       timeoutMs: this.timeoutMs,
+      stdioServer: cfg.id,
+      getToken,
     });
   }
 
@@ -325,6 +381,19 @@ export class McpRegistry {
     for (const id of Object.keys(this.cache)) if (!live.has(id)) delete this.cache[id];
     this.saveCache();
     return results;
+  }
+
+  /** session OAuth ของ server (สร้างถ้ายังไม่มี) */
+  oauthSession(id) {
+    const cfg = this.configs().find((c) => c.id === id);
+    if (!cfg?.oauth) return null;
+    if (!this.sessions.has(id)) this.clientFor(cfg);
+    return this.sessions.get(id) || null;
+  }
+
+  /** server config ตาม id (ใช้กับ UI) */
+  configFor(id) {
+    return this.configs().find((c) => c.id === id) || null;
   }
 
   /** ใช้ cache ที่เคยดึงไว้ (ไม่ยิงเน็ต) — เรียกตอนบูตเพื่อให้ tool พร้อมทันที */

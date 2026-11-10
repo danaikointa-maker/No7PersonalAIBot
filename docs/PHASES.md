@@ -115,3 +115,25 @@
 - [x] 5.1 version 1.3.0 (`package.json`, `/api/health` อ่านจาก package.json) + CHANGELOG
 - [x] 5.2 README ปรับเป็น v1.3 + ตารางสรุป Round 2 ปิดครบ
 - [x] 5.3 ตรวจรับรวม: `npm run check` 59 ไฟล์ · `npm test` 177 · `npm run test:browser` 60/60 · `vite build` ผ่าน → เปิด PR
+
+---
+
+# รอบที่ 3 (v1.4)
+
+เป้าหมาย: ให้ No7 ออกไป "ทำงานนอกแอป" ได้จริง — MCP แบบ local process + OAuth, บอทแชท (Telegram/LINE),
+ควบคุมคอมพิวเตอร์แบบมี allowlist, และงาน/แจ้งเตือนที่ตามข้ามอุปกรณ์ได้
+
+| เฟส | ชื่อ | งานย่อย | สถานะ |
+|---|---|---|---|
+| R6 | MCP ลึกขึ้น (stdio + OAuth) | 6.1–6.4 | ✅ |
+| R7 | บอทแชท (Telegram / LINE) | 7.1–7.4 | ✅ |
+| R8 | Computer control + allowlist | 8.1–8.4 | ✅ |
+| R9 | งาน + แจ้งเตือนข้ามอุปกรณ์ | 9.1–9.4 | ✅ |
+| R10 | Release 1.4 | 10.1–10.3 | ✅ |
+
+## R6 — MCP ลึกขึ้น
+
+- [x] 6.1 stdio bridge ที่ server: `MCP_STDIO_SERVERS`, spawn/cache, newline JSON-RPC, timeout 25s + stderr tail, `GET /api/mcp/stdio`
+- [x] 6.2 client รองรับ `transport: 'stdio'` + UI เลือก server ที่ server ประกาศไว้
+- [x] 6.3 OAuth 2.0 + PKCE: `core/oauth.js`, `/api/oauth/token` proxy, `oauth-callback.html`, ปุ่ม 🔑 ในหน้าตั้งค่า
+- [x] 6.4 Tests (`oauth` 14, `mcp` +4, integration stdio 1) + `docs/MCP.md` + `docs/OAUTH.md`
