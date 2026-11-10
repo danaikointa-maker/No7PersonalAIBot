@@ -1,0 +1,189 @@
+// Optional browser smoke test — runs the REAL app bundle in jsdom and walks
+// through boot → nav → settings → memory → chat → tool call → mic → pairing.
+// Needs dev-only packages: npm i -D jsdom esbuild
+// Run: node tests/smoke.browser.mjs
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+const ROOT = path.resolve(import.meta.dirname, '..');
+
+let JSDOM;
+let esbuild;
+try {
+  ({ JSDOM } = await import('jsdom'));
+  esbuild = await import('esbuild');
+} catch {
+  console.log('⏭  skipped: ติดตั้ง dependency ก่อน → npm i -D jsdom esbuild');
+  process.exit(0);
+}
+
+// 1) bundle the app the same way vite would (CSS dropped, no DOM deps)
+const outfile = path.join(os.tmpdir(), `no7-smoke-${process.pid}.js`);
+await esbuild.build({
+  entryPoints: [path.join(ROOT, 'web/src/main.js')],
+  bundle: true,
+  format: 'iife',
+  loader: { '.css': 'empty' },
+  outfile,
+  logLevel: 'silent',
+});
+
+// 2) jsdom + minimal browser stubs
+const html = fs.readFileSync(path.join(ROOT, 'web/index.html'), 'utf8')
+  .replace('<script type="module" src="/src/main.js"></script>', '');
+
+const dom = new JSDOM(html, { url: 'http://localhost/', pretendToBeVisual: true, runScripts: 'dangerously' });
+const { window } = dom;
+
+const ctxStub = new Proxy({}, {
+  get: (_t, k) => {
+    if (k === 'createRadialGradient') return () => ({ addColorStop() {} });
+    if (k === 'canvas') return { width: 360, height: 140 };
+    return () => {};
+  },
+  set: () => true,
+});
+window.HTMLCanvasElement.prototype.getContext = () => ctxStub;
+window.URL.createObjectURL = () => 'blob:stub';
+window.open = () => ({ closed: false });
+window.SpeechSynthesisUtterance = class { constructor(t) { this.text = t; } };
+Object.defineProperty(window, 'speechSynthesis', {
+  value: {
+    speak(u) { spoken.push(u.text); setTimeout(() => u.onend?.(), 0); },
+    cancel() {},
+    getVoices: () => [{ name: 'TestThai', lang: 'th-TH' }],
+  },
+});
+const spoken = [];
+window.SpeechRecognition = class {
+  start() {
+    this.onstart?.();
+    setTimeout(() => {
+      this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: 'ทดสอบเสียง' }], { isFinal: true })] });
+      this.onend?.();
+    }, 5);
+  }
+  stop() {}
+};
+
+const calls = [];
+window.fetch = async (url, opts = {}) => {
+  calls.push({ url: String(url), body: opts.body });
+  const u = String(url);
+  if (u.includes('text.pollinations.ai')) {
+    const msgs = JSON.parse(opts.body).messages;
+    const last = msgs[msgs.length - 1].content;
+    const reply = (content) => ({ ok: true, json: async () => ({ choices: [{ message: { content } }] }) });
+    if (last.includes('ผลลัพธ์จากเครื่องมือ')) return reply('ราคาทองตอนนี้ 2,412 ดอลลาร์ต่อออนซ์ครับ');
+    if (last.includes('พิมพ์คำว่า OK')) return reply('OK');
+    if (last.includes('ราคาทอง')) return reply('```tool\n{"tool":"gold","args":{}}\n```');
+    if (last.includes('เปิดเว็บ')) return reply('```tool\n{"tool":"open_url","args":{"url":"https://example.com"}}\n```');
+    return reply('สวัสดีครับ ผมชื่อ No7');
+  }
+  if (u.includes('gold-api')) return { ok: true, json: async () => ({ price: 2412.5, updatedAt: new Date().toISOString() }) };
+  return { ok: true, json: async () => ({}) };
+};
+
+const script = window.document.createElement('script');
+script.textContent = fs.readFileSync(outfile, 'utf8');
+window.document.body.appendChild(script);
+fs.rmSync(outfile, { force: true });
+
+// 3) assertions
+const $ = (s) => window.document.querySelector(s);
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const results = [];
+const check = (name, cond, extra = '') => results.push({ name, ok: !!cond, extra });
+const submit = (text) => {
+  $('#input').value = text;
+  $('#composer').dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true }));
+};
+
+await wait(100);
+check('boot: initial state', ['IDLE', 'SETUP'].includes($('#state-label').textContent), $('#state-label').textContent);
+check('boot: welcome message', $('#messages').children.length >= 1);
+check('boot: 19 tools in auto mode', $('#tools-grid').children.length === 19, String($('#tools-grid').children.length));
+check('boot: 5 role modes', $('#mode-chips').children.length === 5, String($('#mode-chips').children.length));
+check('boot: persona header', $('#persona-name').textContent.length > 0);
+
+$('#nav button[data-view="memory"]').click();
+check('nav: memory view', $('#view-memory').classList.contains('active'));
+
+// mode switching filters tools
+window.document.querySelector('#mode-chips button[data-mode="hub"]').click();
+await wait(20);
+check('mode: hub filters tools', $('#tools-grid').children.length === 14, String($('#tools-grid').children.length));
+window.document.querySelector('#mode-chips button[data-mode="auto"]').click();
+await wait(20);
+check('mode: back to auto', $('#tools-grid').children.length === 19);
+
+$('#set-provider').value = 'pollinations';
+$('#save-settings-btn').click();
+check('settings: saved', $('#settings-status').textContent.includes('บันทึกแล้ว'));
+
+$('#test-ai-btn').click();
+await wait(80);
+check('settings: test AI', $('#settings-status').textContent.includes('OK'), $('#settings-status').textContent);
+
+$('#mem-new').value = 'ฉันชอบกาแฟดำ';
+$('#mem-add-btn').click();
+await wait(20);
+check('memory: fact added', $('#mem-facts').textContent.includes('กาแฟดำ'));
+$('#mem-query').value = 'กาแฟ';
+$('#mem-search-btn').click();
+check('memory: BM25 search', $('#mem-results').textContent.includes('กาแฟ'));
+
+submit('สวัสดี No7');
+await wait(120);
+check('chat: bot replied', [...$('#messages').querySelectorAll('.msg.bot')].some((m) => m.textContent.includes('No7')));
+check('chat: TTS spoke', spoken.length > 0, spoken.join(' | '));
+
+submit('ราคาทองวันนี้');
+await wait(220);
+const lastBot = [...$('#messages').querySelectorAll('.msg.bot')].at(-1);
+check('tool: card rendered', !!lastBot?.querySelector('.card'));
+check('tool: provider API called', calls.some((c) => c.url.includes('gold-api')));
+check('tool: spoken summary', lastBot?.textContent.includes('2,412'), lastBot?.textContent.slice(0, 60));
+
+$('#mic-btn').click();
+await wait(80);
+check('voice: transcript sent', [...$('#messages').querySelectorAll('.msg.user')].some((m) => m.textContent.includes('ทดสอบเสียง')));
+
+submit('จำไว้ว่า ฉันมีแมวชื่อมีโจ');
+await wait(120);
+$('#nav button[data-view="memory"]').click();
+check('memory: learned from chat', $('#mem-facts').textContent.includes('มีโจ'), $('#mem-facts').textContent.slice(0, 80));
+
+$('#nav button[data-view="settings"]').click();
+$('#pair-btn').click();
+await wait(50);
+check('pairing: handled (code or clear warning)', /รหัสจับคู่|ต้องเปิดผ่าน https|สร้างไม่สำเร็จ/.test($('#pair-output').textContent), $('#pair-output').textContent.slice(0, 60));
+
+// permission gate: risky tool must ask first
+submit('เปิดเว็บ example.com ให้หน่อย');
+await wait(150);
+check('permission: confirm modal shown', $('#confirm-modal').hidden === false, $('#confirm-title').textContent);
+$('#confirm-no').click();
+await wait(120);
+check('permission: denial respected', $('#messages').textContent.includes('ไม่อนุญาต') || $('#messages').textContent.includes('ไม่ได้ทำอะไรต่อ'), $('#messages').textContent.slice(-120));
+submit('เปิดเว็บ example.com อีกครั้ง');
+await wait(150);
+check('permission: asks again next time', $('#confirm-modal').hidden === false);
+$('#confirm-always').click();
+await wait(150);
+check('permission: approved run completed', $('#messages').textContent.includes('เปิดลิงก์') || $('#messages').textContent.includes('example.com'), $('#messages').textContent.slice(-160));
+
+$('#companion-btn').click();
+check('companion: overlay toggled', $('#companion').hidden === false);
+
+$('#nav button[data-view="tools"]').click();
+$('#tools-grid').children[4].click();
+await wait(80);
+check('tools view: direct run card', $('#tool-result').children.length > 0);
+
+const failed = results.filter((r) => !r.ok);
+for (const r of results) console.log(`${r.ok ? '✓' : '✗'} ${r.name}${r.ok ? '' : `  → ${r.extra}`}`);
+console.log(`\n${results.length - failed.length}/${results.length} passed`);
+window.close();
+process.exit(failed.length ? 1 : 0);

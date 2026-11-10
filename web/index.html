@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0f1a" />
+    <meta name="description" content="No7 Personal AI Bot — Thai-first voice AI companion for Mobile + PC" />
+    <title>No7 Personal AI Bot</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Sidebar (desktop) / Top bar (mobile) -->
+      <aside id="sidebar">
+        <div class="brand">
+          <span class="brand-emoji">🤖</span>
+          <div>
+            <strong>No7 AI</strong>
+            <small>Mobile + PC · ไทยก่อน</small>
+          </div>
+        </div>
+        <nav id="nav">
+          <button data-view="chat" class="active">💬 แชท</button>
+          <button data-view="tools">🧰 เครื่องมือ</button>
+          <button data-view="memory">🧠 ความจำ</button>
+          <button data-view="settings">⚙️ ตั้งค่า</button>
+        </nav>
+        <div class="sidebar-foot">
+          <div id="conn-badge" class="badge">● พร้อมใช้</div>
+          <small id="platform-badge">—</small>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main id="main">
+        <header id="topbar">
+          <button id="menu-btn" aria-label="เมนู">☰</button>
+          <div class="topbar-title">
+            <strong id="view-title">แชทกับ No7</strong>
+            <small id="state-label">IDLE</small>
+          </div>
+          <div class="topbar-actions">
+            <button id="companion-btn" title="โหมดเพื่อนบนจอ (Desktop)">🖥️</button>
+            <button id="mic-btn" title="พูด (Push to talk)">🎤</button>
+          </div>
+        </header>
+
+        <!-- Avatar strip -->
+        <section id="avatar-strip">
+          <canvas id="avatar" width="360" height="140" aria-label="อวาตาร์"></canvas>
+          <div class="avatar-meta">
+            <strong id="persona-name">No7</strong>
+            <small id="persona-desc">เพื่อน AI ของคุณ</small>
+            <div id="subtitle" class="subtitle">สวัสดีครับ ผม No7 พร้อมช่วยแล้ว</div>
+          </div>
+        </section>
+
+        <!-- Role modes: ทั้งหมด / เพื่อน / งาน / ชีวิตประจำวัน / อุปกรณ์ -->
+        <nav id="mode-chips" aria-label="บทบาทของ No7"></nav>
+
+        <!-- Views -->
+        <section id="view-chat" class="view active">
+          <div id="messages" aria-live="polite"></div>
+          <form id="composer">
+            <input id="input" type="text" placeholder="พิมพ์หรือพูดกับ No7…" autocomplete="off" />
+            <button type="submit" id="send-btn">ส่ง</button>
+          </form>
+        </section>
+
+        <section id="view-tools" class="view">
+          <h2>🧰 เครื่องมือ (Tools)</h2>
+          <p class="hint">AI เรียกเครื่องมือเองได้ — หรือกดลองใช้ตรงนี้</p>
+          <div id="tools-note"></div>
+          <div id="tools-grid"></div>
+          <div id="tool-result"></div>
+        </section>
+
+        <section id="view-memory" class="view">
+          <h2>🧠 ความจำระยะยาว</h2>
+          <p class="hint">GraphRAG-lite (BM25) + บันทึกบทสนทนา — เก็บในเครื่องเท่านั้น</p>
+          <div class="row">
+            <input id="mem-query" placeholder="ค้นหาความจำ…" />
+            <button id="mem-search-btn">ค้นหา</button>
+          </div>
+          <div id="mem-results"></div>
+          <h3>ข้อเท็จจริงที่จำได้</h3>
+          <div id="mem-facts"></div>
+          <div class="row">
+            <input id="mem-new" placeholder="สอนความจำใหม่ เช่น: ชื่อฉันคือ…" />
+            <button id="mem-add-btn">จำไว้</button>
+          </div>
+        </section>
+
+        <section id="view-settings" class="view">
+          <h2>⚙️ ตั้งค่า</h2>
+
+          <h3>ผู้ช่วย (Persona)</h3>
+          <label>โปรไฟล์
+            <select id="set-persona"></select>
+          </label>
+          <label>ภาษาที่ AI พูด
+            <select id="set-language">
+              <option value="th">ไทย (ล็อก)</option>
+              <option value="en">English</option>
+              <option value="auto">ตามผู้ใช้</option>
+            </select>
+          </label>
+          <label><input type="checkbox" id="set-polite" checked /> ใช้ ค่ะ/ครับ ตามเพศผู้ช่วย</label>
+          <label><input type="checkbox" id="set-tts" checked /> อ่านคำตอบออกเสียง (TTS)</label>
+          <label><input type="checkbox" id="set-stt" checked /> เปิดไมค์พูด (STT)</label>
+
+          <h3>บทบาทและความอิสระ</h3>
+          <label>บทบาทหลัก
+            <select id="set-mode"></select>
+          </label>
+          <p class="hint">โหมด "ทั้งหมด" จะสลับบทบาทเองตามคำขอ — ใช้ได้ทุกด้านในที่เดียว</p>
+          <label>ระดับอิสระ (ต้องยืนยันก่อนทำอะไรไหม)
+            <select id="set-autonomy"></select>
+          </label>
+          <label>จำนวนขั้นสูงสุดต่อคำขอ (agent steps)
+            <input id="set-maxsteps" type="number" min="1" max="8" step="1" />
+          </label>
+
+          <h3>สิทธิ์การใช้งาน (permissions)</h3>
+          <p class="hint">ปิดหมวดที่ไม่ต้องการได้ — No7 จะไม่พยายามเรียกเครื่องมือในหมวดที่ปิด</p>
+          <div id="perm-list"></div>
+
+          <h3>สมอง AI (Brain)</h3>
+          <label>โหมดค่าใช้จ่าย
+            <select id="set-costmode">
+              <option value="free">ฟรี 100% (Pollinations / Ollama)</option>
+              <option value="quality">คุณภาพสูงสุด (Gemini/OpenAI ถ้ามีคีย์)</option>
+              <option value="private">ส่วนตัวล้วน (Ollama ในเครื่องเท่านั้น)</option>
+              <option value="mixed">ผสม — ใช้ที่ตั้งไว้ แล้ว fallback ฟรี (แนะนำ)</option>
+            </select>
+          </label>
+          <label>ผู้ให้บริการ
+            <select id="set-provider">
+              <option value="pollinations">Pollinations (ฟรี ไม่ต้องใช้คีย์)</option>
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI</option>
+              <option value="ollama">Ollama (ในเครื่อง)</option>
+              <option value="openai-compatible">OpenAI-compatible (เซิร์ฟเวอร์อื่น)</option>
+            </select>
+          </label>
+          <label>โมเดล
+            <input id="set-model" placeholder="เช่น openai, gemini-2.0-flash, llama3.1" />
+          </label>
+          <label>API Key
+            <input id="set-apikey" type="password" placeholder="เก็บในเครื่องเท่านั้น" />
+          </label>
+          <label>Base URL (Ollama / compatible)
+            <input id="set-baseurl" placeholder="http://localhost:11434" />
+          </label>
+          <div class="row">
+            <button id="save-settings-btn">บันทึก</button>
+            <button id="test-ai-btn">ทดสอบ AI</button>
+          </div>
+          <p id="settings-status" class="hint"></p>
+
+          <h3>อุปกรณ์ / แพลตฟอร์ม</h3>
+          <p class="hint" id="device-info">—</p>
+          <div class="row">
+            <button id="install-btn">ติดตั้งเป็นแอป (PWA)</button>
+            <button id="export-btn">ส่งออกข้อมูล</button>
+            <button id="reset-btn">ล้างข้อมูลทั้งหมด</button>
+          </div>
+
+          <h3>เชื่อมต่อ (Phone-Link / ESP32)</h3>
+          <p class="hint">โปรโตคอลจับคู่ HMAC — ดู <code>docs/PHONE_LINK.md</code></p>
+          <div class="row">
+            <button id="pair-btn">สร้างรหัสจับคู่</button>
+          </div>
+          <pre id="pair-output" class="code"></pre>
+        </section>
+      </main>
+
+      <!-- Permission gate: asks before risky actions -->
+      <div id="confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <div class="modal-card">
+          <h3 id="confirm-title">ขออนุญาตทำต่อ</h3>
+          <p id="confirm-desc" class="hint"></p>
+          <pre id="confirm-args" class="code"></pre>
+          <div class="row">
+            <button id="confirm-yes">อนุญาต</button>
+            <button id="confirm-always">อนุญาตตลอด session</button>
+            <button id="confirm-no">ไม่อนุญาต</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Companion overlay (desktop) -->
+      <div id="companion" hidden>
+        <canvas id="companion-avatar" width="220" height="220"></canvas>
+        <div id="companion-bubble" hidden></div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
