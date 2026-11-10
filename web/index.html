@@ -370,6 +370,25 @@
           <p class="hint" id="diag-status"></p>
           <pre id="diag-output" class="code diag"></pre>
 
+          <h3>ควบคุมคอมพิวเตอร์</h3>
+          <p class="hint">เดสก์ท็อปแอป (Electron) เท่านั้น — ค่าเริ่มต้น <strong>ปิด</strong> และทุกคำสั่งต้องอยู่ใน allowlist (ดู <code>docs/CONTROL.md</code>)</p>
+          <label class="switch"><input type="checkbox" id="set-control-enabled" /> เปิดให้ No7 สั่งงานเครื่อง</label>
+          <div class="grid2">
+            <label>โปรแกรมที่อนุญาต (บรรทัดละชื่อ, ใช้ * ได้)
+              <textarea id="set-control-apps" rows="3" placeholder="code&#10;notepad&#10;chrome"></textarea>
+            </label>
+            <label>คำสั่งที่อนุญาต (บรรทัดละคำสั่ง)
+              <textarea id="set-control-commands" rows="3" placeholder="git&#10;node"></textarea>
+            </label>
+          </div>
+          <label>สูงสุดต่อนาที <input id="set-control-rate" type="number" min="1" max="60" /></label>
+          <p class="hint" id="control-audit-summary"></p>
+          <div id="control-audit" class="metric-list"></div>
+          <div class="row">
+            <button id="control-audit-refresh">🔄 ดู log ใหม่</button>
+            <button id="control-audit-clear">ล้าง log</button>
+          </div>
+
           <h3>บอทแชท (Telegram / LINE)</h3>
           <p class="hint">ให้ No7 คุยได้จาก Telegram/LINE — ตั้ง token ที่ companion server (ดู <code>docs/BOTS.md</code>)</p>
           <p class="hint" id="bots-status">กำลังตรวจสอบ…</p>

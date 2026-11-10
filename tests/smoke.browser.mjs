@@ -119,7 +119,7 @@ const submit = (text) => {
 await wait(100);
 check('boot: initial state', ['IDLE', 'SETUP'].includes($('#state-label').textContent), $('#state-label').textContent);
 check('boot: welcome message', $('#messages').children.length >= 1);
-check('boot: 24 tools in auto mode', $('#tools-grid').children.length === 24, String($('#tools-grid').children.length));
+check('boot: 25 tools in auto mode', $('#tools-grid').children.length === 25, String($('#tools-grid').children.length));
 check('boot: 5 role modes', $('#mode-chips').children.length === 5, String($('#mode-chips').children.length));
 check('boot: persona header', $('#persona-name').textContent.length > 0);
 
@@ -129,10 +129,10 @@ check('nav: memory view', $('#view-memory').classList.contains('active'));
 // mode switching filters tools
 window.document.querySelector('#mode-chips button[data-mode="hub"]').click();
 await wait(20);
-check('mode: hub filters tools', $('#tools-grid').children.length === 18, String($('#tools-grid').children.length));
+check('mode: hub filters tools', $('#tools-grid').children.length === 19, String($('#tools-grid').children.length));
 window.document.querySelector('#mode-chips button[data-mode="auto"]').click();
 await wait(20);
-check('mode: back to auto', $('#tools-grid').children.length === 24);
+check('mode: back to auto', $('#tools-grid').children.length === 25, String($('#tools-grid').children.length));
 
 $('#set-provider').value = 'pollinations';
 $('#save-settings-btn').click();
@@ -243,6 +243,9 @@ check('mcp: server listed', $('#mcp-list').textContent.includes('Demo'), $('#mcp
 check('mcp: tool count reported', $('#mcp-list').textContent.includes('1 เครื่องมือ'), $('#mcp-list').textContent.slice(0, 120));
 check('mcp: dynamic tool in tools grid', [...$('#tools-grid').children].some((b) => b.textContent.includes('send_email')));
 check('mcp: permission category listed', $('#perm-list').children.length === 6, String($('#perm-list').children.length));
+check('control: disabled by default', $('#set-control-enabled').checked === false);
+check('control: audit summary rendered', $('#control-audit-summary').textContent.length > 0, $('#control-audit-summary').textContent);
+check('control: allowlist fields present', !!$('#set-control-apps') && !!$('#set-control-commands'));
 check('bots: status polled from server', $('#bots-status').textContent.includes('Telegram: ✅'), $('#bots-status').textContent);
 check('bots: line shown as not configured', $('#bots-status').textContent.includes('LINE: —'), $('#bots-status').textContent);
 check('mcp: transport offers stdio', [...$('#mcp-transport').options].some((o) => o.value === 'stdio'));

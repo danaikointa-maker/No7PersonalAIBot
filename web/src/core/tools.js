@@ -1,6 +1,9 @@
 import { fetchText, stripHtml, pageMeta, parseRss, serverUrlFromSettings } from './net.js';
 import { getCalendar, formatWhen } from './calendar.js';
 import { getDeviceRegistry, sendCommand } from './link.js';
+import {
+  ControlAudit, normalizeControlPolicy, checkControl, runControlAction,
+} from './control.js';
 
 // Tool registry — the ESP32 "42 tools with on-screen cards" principle, re-implemented
 // for web so the SAME code runs on mobile + PC. Only key-free public APIs by default,
@@ -397,6 +400,34 @@ export const TOOLS = {
     },
   },
 
+  control_run: {
+    emoji: '🖥️',
+    label: 'ควบคุมคอมพิวเตอร์',
+    desc: 'เปิดโปรแกรม/ลิงก์ คัดลอกข้อความ หรือรันคำสั่งที่อยู่ใน allowlist (เดสก์ท็อปเท่านั้น)',
+    params: {
+      action: 'string — open_app | open_url | clipboard | run_command',
+      target: 'string — ชื่อโปรแกรม / URL / คำสั่ง',
+      text: 'string — ข้อความสำหรับ clipboard',
+    },
+    async run({ action = 'open_app', target = '', text = '' }, ctx = {}) {
+      const policy = normalizeControlPolicy(ctx.settings?.controlPolicy);
+      const audit = new ControlAudit();
+      const check = checkControl({ action, target, text, policy });
+      if (!check.allowed) {
+        audit.record({ action, target, allowed: false, reason: check.reason });
+        throw new Error(check.reason);
+      }
+      if (audit.countAllowed() >= policy.maxPerMinute) {
+        const reason = `ทำเกิน ${policy.maxPerMinute} ครั้ง/นาทีแล้ว — รอสักครู่`;
+        audit.record({ action, target, allowed: false, reason });
+        throw new Error(reason);
+      }
+      const card = await runControlAction({ action, target, text, policy });
+      audit.record({ action, target, allowed: true, reason: check.reason });
+      return card;
+    },
+  },
+
   device_command: {
     emoji: '🔗',
     label: 'สั่งอุปกรณ์',
@@ -488,6 +519,7 @@ export const TOOL_META = {
   open_url: { category: 'act', risk: 1 },
   compose_message: { category: 'message', risk: 2 },
   open_app: { category: 'control', risk: 3 },
+  control_run: { category: 'control', risk: 3 },
   device_command: { category: 'control', risk: 3 },
 };
 

@@ -91,7 +91,7 @@ test('BotSessions trims, TTL-expires and clears', () => {
 test('canned replies cover commands and unknown', () => {
   assert.match(cannedReply('/start'), /No7/);
   assert.match(cannedReply('/help'), /\/clear/);
-  assert.match(cannedReply('/tools', { toolCount: 24 }), /24 เครื่องมือ/);
+  assert.match(cannedReply('/tools', { toolCount: 25 }), /25 เครื่องมือ/);
   assert.equal(cannedReply('/nope'), null);
   assert.match(botSystemPrompt({ platform: 'line' }), /line/);
 });

@@ -127,7 +127,7 @@
 |---|---|---|---|
 | R6 | MCP ลึกขึ้น (stdio + OAuth) | 6.1–6.4 | ✅ |
 | R7 | บอทแชท (Telegram / LINE) | 7.1–7.4 | ✅ |
-| R8 | Computer control + allowlist | 8.1–8.4 | ⬜ |
+| R8 | Computer control + allowlist | 8.1–8.4 | ✅ |
 | R9 | งาน + แจ้งเตือนข้ามอุปกรณ์ | 9.1–9.4 | ⬜ |
 | R10 | Release 1.4 | 10.1–10.3 | ⬜ |
 

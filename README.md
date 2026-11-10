@@ -70,7 +70,7 @@ npm run check         # syntax + structure check
 - จัดการพื้นที่เก็บข้อมูล + ขอ persistent storage + ล้างข้อมูลเป็นกลุ่ม
 - เมนู/ปุ่มใหญ่/ปุ่มลัดคีย์บอร์ด (`Ctrl/Cmd+K`, `Ctrl/Cmd+M`, `Esc`, `Ctrl/Cmd+Enter`)
 
-### 🧰 24 tools (ไม่ต้องใช้คีย์)
+### 🧰 25 tools (ไม่ต้องใช้คีย์)
 | หมวด | tools |
 |---|---|
 | 📖 อ่าน | `weather` `air` `crypto` `fx` `gold` `wiki` `news` `calc` `rss_read` `summarize_url` |
@@ -78,7 +78,7 @@ npm run check         # syntax + structure check
 | 📅 ตาราง | `calendar_list` `calendar_add` (+ นำเข้า/ส่งออก `.ics`) |
 | ⚡ ทำงานในเครื่อง | `timer` `reminder` `clipboard_copy` `open_url` |
 | ✉️ ร่างข้อความ | `compose_message` (อีเมล/SMS/LINE — คุณกดส่งเอง) |
-| 🎛️ ควบคุม | `open_app` `device_command` `system_info` |
+| 🎛️ ควบคุม | `open_app` `control_run` `device_command` `system_info` |
 
 ### 🎭 Persona Studio
 สร้าง/แก้/ทำสำเนา/ลบ persona เอง — ตัวตน, คำทักทาย, หัวข้อต้องห้าม, คำลงท้าย, สไตล์เสียง

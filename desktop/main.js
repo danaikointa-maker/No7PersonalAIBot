@@ -107,6 +107,38 @@ ipcMain.handle('no7:open-app', async (_e, target) => {
   if (err) throw new Error(err);
   return true;
 });
+/** allowlist ของคำสั่งที่รันได้ — ตั้งผ่าน env เท่านั้น (ไม่ใช่จากหน้าเว็บ) */
+const CONTROL_ALLOW = (() => {
+  const raw = process.env.NO7_CONTROL_ALLOW_COMMANDS || '';
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+})();
+
+ipcMain.handle('no7:control-info', () => ({ allowCommands: CONTROL_ALLOW, platform: process.platform }));
+
+ipcMain.handle('no7:run-command', async (_e, req = {}) => {
+  const { execFile } = await import('node:child_process');
+  const command = String(req.command || '').trim();
+  if (!command) throw new Error('ต้องระบุคำสั่ง');
+  // แยก argv แบบง่าย (ไม่ผ่าน shell) — ตัวดำเนินการเชลล์ถูกปฏิเสธ
+  if (/[;&|><`$]/.test(command)) throw new Error('ไม่อนุญาตตัวดำเนินการเชลล์');
+  const parts = command.split(/\s+/);
+  const binary = parts[0];
+  if (!CONTROL_ALLOW.some((a) => a === binary || (a.endsWith('*') && binary.startsWith(a.slice(0, -1))))) {
+    throw new Error(`"${binary}" ไม่อยู่ใน NO7_CONTROL_ALLOW_COMMANDS`);
+  }
+  return new Promise((resolve, reject) => {
+    execFile(binary, parts.slice(1), {
+      timeout: Math.min(Number(req.timeoutMs) || 10000, 30000),
+      windowsHide: true,
+      maxBuffer: 512 * 1024,
+      shell: false,
+    }, (err, stdout, stderr) => {
+      if (err && !stdout && !stderr) { reject(new Error(err.message)); return; }
+      resolve({ code: err?.code ?? 0, stdout: String(stdout || ''), stderr: String(stderr || '') });
+    });
+  });
+});
+
 ipcMain.handle('no7:notify', (_e, { title, body }) => {
   if (Notification.isSupported()) new Notification({ title, body }).show();
   return true;

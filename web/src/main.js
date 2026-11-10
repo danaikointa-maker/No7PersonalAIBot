@@ -11,6 +11,7 @@ import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatW
 import { getTool, TOOL_IDS, runTool, toolMeta, restoreReminders, registerDynamicTools } from './core/tools.js';
 import { McpRegistry } from './core/mcp.js';
 import { createPkcePair, randomState, buildAuthorizeUrl, parseCallback } from './core/oauth.js';
+import { ControlAudit, normalizeControlPolicy, CONTROL_ACTION_META } from './core/control.js';
 import { withRetry, classifyError, OfflineQueue } from './core/retry.js';
 import { Metrics, formatMs, METRIC_KINDS } from './core/metrics.js';
 import { buildDiagnosticsReport, diagnosticsFilename, redact } from './core/diagnostics.js';
@@ -1060,6 +1061,7 @@ function renderSettingsForm() {
   bargeSel.value = BARGE_MODES[settings.bargeIn] ? settings.bargeIn : 'keyword';
 
   renderMcp();
+  renderControl();
   renderBots();
   renderMetrics();
   updateOutboxBadge();
@@ -1127,6 +1129,7 @@ function collectSettings() {
     ttsModel: $('#set-ttsmodel').value.trim(),
     ttsVoice: $('#set-ttsvoice').value.trim(),
     bargeIn: $('#set-bargein').value,
+    controlPolicy: readControlPolicy(),
     streaming: $('#set-streaming').checked,
     speakWhileStreaming: $('#set-speakstream').checked,
     wake: $('#set-wake').checked,
@@ -1421,6 +1424,41 @@ $('#diag-download')?.addEventListener('click', async () => {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   $('#diag-status').textContent = `⬇️ ดาวน์โหลด ${a.download}`;
+});
+
+/* ------------------------------------------------------------- control UI */
+function renderControl() {
+  const policy = normalizeControlPolicy(settings.controlPolicy);
+  $('#set-control-enabled').checked = policy.enabled;
+  $('#set-control-apps').value = policy.allowApps.join('\n');
+  $('#set-control-commands').value = policy.allowCommands.join('\n');
+  $('#set-control-rate').value = String(policy.maxPerMinute);
+
+  const audit = new ControlAudit();
+  const entries = audit.list().slice(-6).reverse();
+  const sum = audit.summary();
+  $('#control-audit-summary').textContent = sum.total
+    ? `บันทึกไว้ ${sum.total} ครั้ง · อนุญาต ${sum.allowed} · ปฏิเสธ ${sum.blocked}`
+    : 'ยังไม่มีประวัติการสั่งงาน';
+  $('#control-audit').innerHTML = entries.length
+    ? entries.map((e) => `<div class="metric-row"><span>${e.allowed ? '✅' : '⛔'} ${esc(CONTROL_ACTION_META[e.action]?.label || e.action)}</span>`
+      + `<span>${esc(e.target || '—')} · ${new Date(e.at).toLocaleTimeString('th-TH')}</span></div>`).join('')
+    : '<p class="hint">ยังไม่มีรายการ</p>';
+}
+
+function readControlPolicy() {
+  return normalizeControlPolicy({
+    enabled: $('#set-control-enabled').checked,
+    allowApps: $('#set-control-apps').value.split(/\n+/).map((s) => s.trim()).filter(Boolean),
+    allowCommands: $('#set-control-commands').value.split(/\n+/).map((s) => s.trim()).filter(Boolean),
+    maxPerMinute: Number($('#set-control-rate').value) || 6,
+  });
+}
+
+$('#control-audit-refresh')?.addEventListener('click', () => renderControl());
+$('#control-audit-clear')?.addEventListener('click', () => {
+  new ControlAudit().clear();
+  renderControl();
 });
 
 /* ---------------------------------------------------------------- bots UI */
