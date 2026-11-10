@@ -170,6 +170,20 @@ $('#pair-btn').click();
 await wait(50);
 check('pairing: handled (code or clear warning)', /รหัสจับคู่|ต้องเปิดผ่าน https|สร้างไม่สำเร็จ/.test($('#pair-output').textContent), $('#pair-output').textContent.slice(0, 60));
 
+// Persona Studio
+$('#nav button[data-view="settings"]').click();
+check('persona: list rendered', $('#persona-list').children.length === 8, String($('#persona-list').children.length));
+$('#persona-new').click();
+$('#pf-name').value = 'น้องสโมค';
+$('#pf-emoji').value = '🍊';
+$('#pf-system').value = 'คุณคือน้องสโมค พูดจาน่ารัก';
+$('#pf-greeting').value = 'สวัสดีค่ะ น้องสโมคมาแล้ว';
+$('#pf-save').click();
+await wait(20);
+check('persona: custom created', $('#persona-list').children.length === 9, String($('#persona-list').children.length));
+check('persona: selected header updated', $('#persona-name').textContent.includes('น้องสโมค'), $('#persona-name').textContent);
+check('persona: appears in dropdown', [...$('#set-persona').options].some((o) => o.textContent.includes('น้องสโมค')));
+
 // voice & streaming settings
 $('#nav button[data-view="settings"]').click();
 check('voice: thai voice listed', $('#set-voice').options.length >= 2, `${$('#set-voice').options.length} options`);

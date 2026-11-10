@@ -1,6 +1,6 @@
 import './styles.css';
 import { StateMachine, STATES } from './core/state.js';
-import { PERSONAS, getPersona } from './core/personas.js';
+import { allPersonas, getPersona, createPersona, updatePersona, deletePersona, duplicatePersona, personaVoice } from './core/persona-store.js';
 import { MemoryStore } from './core/memory.js';
 import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatWithFallbackStream } from './core/ai-providers.js';
 import { TOOLS, TOOL_IDS, runTool, toolMeta, restoreReminders } from './core/tools.js';
@@ -127,11 +127,12 @@ function setSubtitle(text) {
 }
 
 function voiceOptions() {
+  const personaStyle = personaVoice(getPersona(settings.persona));
   return {
     lang: settings.language === 'en' ? 'en-US' : 'th-TH',
-    rate: Number(settings.voiceRate) || 1,
-    pitch: Number(settings.voicePitch) || 1,
-    voiceName: settings.voiceName || undefined,
+    rate: Number(settings.voiceRate) || personaStyle.rate || 1,
+    pitch: Number(settings.voicePitch) || personaStyle.pitch || 1,
+    voiceName: settings.voiceName || personaStyle.voiceName,
   };
 }
 
@@ -630,10 +631,10 @@ function renderPermList() {
 function renderSettingsForm() {
   const personaSel = $('#set-persona');
   personaSel.innerHTML = '';
-  for (const p of PERSONAS) {
+  for (const p of allPersonas()) {
     const o = document.createElement('option');
     o.value = p.id;
-    o.textContent = `${p.name} — ${p.desc}`;
+    o.textContent = `${p.emoji || '🤖'} ${p.name} — ${p.desc}${p.builtin ? '' : ' ✨'}`;
     personaSel.appendChild(o);
   }
   personaSel.value = settings.persona;
@@ -658,6 +659,7 @@ function renderSettingsForm() {
   $('#out-rate').textContent = Number(settings.voiceRate || 1).toFixed(2);
   $('#out-pitch').textContent = Number(settings.voicePitch || 1).toFixed(2);
   renderVoiceOptions();
+  renderPersonaList();
   $('#set-language').value = settings.language;
   $('#set-polite').checked = settings.polite;
   $('#set-tts').checked = settings.tts;
@@ -671,7 +673,7 @@ function renderSettingsForm() {
 
 function updatePersonaHeader() {
   const p = getPersona(settings.persona);
-  $('#persona-name').textContent = p.name;
+  $('#persona-name').textContent = `${p.emoji || '🤖'} ${p.name}`;
   $('#persona-desc').textContent = p.desc;
 }
 
@@ -712,6 +714,110 @@ function collectSettings() {
     voiceName: $('#set-voice').value,
   };
 }
+
+/* ------------------------------------------------------- Persona Studio */
+let editingPersonaId = null;
+
+function renderPersonaList() {
+  const box = $('#persona-list');
+  if (!box) return;
+  box.innerHTML = '';
+  for (const p of allPersonas()) {
+    const card = document.createElement('button');
+    card.className = 'persona-card';
+    card.type = 'button';
+    card.classList.toggle('active', p.id === settings.persona);
+    card.innerHTML = `<strong>${p.emoji || '🤖'} ${p.name}${p.builtin ? '' : ' ✨'}</strong>`
+      + `<small>${p.desc || ''}</small>`;
+    card.addEventListener('click', () => {
+      settings = saveSettings({ persona: p.id });
+      renderPersonaList();
+      renderSettingsForm();
+      updatePersonaHeader();
+      $('#pf-status').textContent = `ใช้ ${p.name} แล้ว`;
+    });
+    box.appendChild(card);
+  }
+}
+
+function openPersonaForm(id = null) {
+  const persona = id ? allPersonas().find((p) => p.id === id) : null;
+  editingPersonaId = persona?.builtin ? null : (persona?.id || null);
+  const form = $('#persona-form');
+  form.hidden = false;
+  $('#pf-name').value = persona?.name || '';
+  $('#pf-emoji').value = persona?.emoji || '🤖';
+  $('#pf-desc').value = persona?.desc || '';
+  $('#pf-system').value = persona?.system || '';
+  $('#pf-greeting').value = persona?.greeting || '';
+  $('#pf-banned').value = (persona?.banned || []).join(', ');
+  $('#pf-gender').value = persona?.gender || 'neutral';
+  $('#pf-rate').value = persona?.style?.rate ?? 1;
+  $('#pf-rate-out').textContent = Number($('#pf-rate').value).toFixed(2);
+  $('#pf-delete').hidden = !editingPersonaId;
+  $('#pf-status').textContent = persona?.builtin
+    ? 'persona มาตรฐานแก้ไม่ได้ — กดบันทึกเพื่อสร้างสำเนาที่แก้ได้'
+    : '';
+  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function readPersonaForm() {
+  return {
+    name: $('#pf-name').value.trim(),
+    emoji: $('#pf-emoji').value.trim() || '🤖',
+    desc: $('#pf-desc').value.trim(),
+    system: $('#pf-system').value.trim(),
+    greeting: $('#pf-greeting').value.trim(),
+    banned: $('#pf-banned').value.split(',').map((x) => x.trim()).filter(Boolean),
+    gender: $('#pf-gender').value,
+    style: { rate: Number($('#pf-rate').value) || 1, pitch: 1, voiceName: settings.voiceName || '' },
+  };
+}
+
+$('#persona-new').addEventListener('click', () => openPersonaForm(null));
+$('#persona-dup').addEventListener('click', () => {
+  const copy = duplicatePersona(settings.persona);
+  if (!copy) return;
+  renderPersonaList();
+  openPersonaForm(copy.id);
+  $('#pf-status').textContent = 'สร้างสำเนาแล้ว — แก้ได้เลย';
+});
+$('#pf-rate').addEventListener('input', (e) => { $('#pf-rate-out').textContent = Number(e.target.value).toFixed(2); });
+$('#pf-cancel').addEventListener('click', () => { $('#persona-form').hidden = true; });
+$('#pf-save').addEventListener('click', () => {
+  const data = readPersonaForm();
+  if (!data.name || !data.system) {
+    $('#pf-status').textContent = '⚠️ ต้องมีชื่อและตัวตน (system prompt)';
+    return;
+  }
+  const saved = editingPersonaId ? updatePersona(editingPersonaId, data) : createPersona(data);
+  if (!saved) { $('#pf-status').textContent = 'บันทึกไม่สำเร็จ'; return; }
+  settings = saveSettings({ persona: saved.id });
+  editingPersonaId = saved.id;
+  $('#persona-form').hidden = true;
+  renderPersonaList();
+  renderSettingsForm();
+  updatePersonaHeader();
+  $('#settings-status').textContent = `✅ บันทึก persona "${saved.name}" แล้ว`;
+});
+$('#pf-delete').addEventListener('click', () => {
+  if (!editingPersonaId) return;
+  if (!confirm('ลบ persona นี้?')) return;
+  deletePersona(editingPersonaId);
+  editingPersonaId = null;
+  $('#persona-form').hidden = true;
+  if (!allPersonas().some((p) => p.id === settings.persona)) settings = saveSettings({ persona: 'no7' });
+  renderPersonaList();
+  renderSettingsForm();
+  updatePersonaHeader();
+});
+$('#pf-preview').addEventListener('click', async () => {
+  const data = readPersonaForm();
+  const line = data.greeting || `สวัสดีครับ ผมชื่อ ${data.name || 'No7'}`;
+  $('#pf-status').textContent = 'กำลังพูด…';
+  await voice.speak(line, { lang: 'th-TH', rate: Number($('#pf-rate').value) || 1, pitch: 1 });
+  $('#pf-status').textContent = 'พูดจบแล้ว';
+});
 
 $('#save-settings-btn').addEventListener('click', () => {
   settings = saveSettings(collectSettings());
@@ -759,6 +865,14 @@ $('#stop-voice-btn').addEventListener('click', stopSpeaking);
 if (voice.ttsSupported) {
   window.speechSynthesis.onvoiceschanged = renderVoiceOptions;
 }
+
+$('#set-persona').addEventListener('change', (e) => {
+  settings = saveSettings({ persona: e.target.value });
+  updatePersonaHeader();
+  renderPersonaList();
+  const p = getPersona(e.target.value);
+  setSubtitle(p.greeting || `${p.name} พร้อมช่วยแล้ว`);
+});
 
 $('#set-provider').addEventListener('change', () => {
   const p = PROVIDERS[$('#set-provider').value];
@@ -885,7 +999,8 @@ renderSettingsForm();
 renderModeChips();
 renderToolsGrid();
 restoreReminders();
-addMessage('bot', 'สวัสดีครับ ผม No7 👋\nพิมพ์คุยได้เลย หรือกด 🎤 เพื่อพูด\n\nลองถาม: "อากาศกรุงเทพวันนี้", "ราคาบิทคอยน์", "ตั้งเวลา 5 นาที"');
+addMessage('bot', getPersona(settings.persona).greeting
+  || `สวัสดีครับ ผม ${getPersona(settings.persona).name} 👋\nพิมพ์คุยได้เลย หรือกด 🎤 เพื่อพูด\n\nลองถาม: "อากาศกรุงเทพวันนี้", "ราคาบิทคอยน์", "ตั้งเวลา 5 นาที"`);
 setSubtitle('สวัสดีครับ ผม No7 พร้อมช่วยแล้ว');
 syncWake();
 if (!hasProviderConfigured(settings)) {

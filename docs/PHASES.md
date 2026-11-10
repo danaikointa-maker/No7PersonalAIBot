@@ -6,7 +6,7 @@
 |---|---|---|---|
 | 1 | ความจำอัจฉริยะ (Memory 2.0) | 1.1–1.4 | ✅ ปิดเฟส |
 | 2 | เสียงไว + ปลุกด้วยชื่อ (Voice 2.0) | 2.1–2.5 | ✅ ปิดเฟส |
-| 3 | Persona Studio | 3.1–3.4 | ⬜ |
+| 3 | Persona Studio | 3.1–3.4 | ✅ ปิดเฟส |
 | 4 | Connectors & Sync | 4.1–4.4 | ⬜ |
 | 5 | Device Hub (Phone-Link ครบวงจร) | 5.1–5.4 | ⬜ |
 | 6 | Ship 1.0 (คุณภาพ + แจกจ่าย) | 6.1–6.4 | ⬜ |
@@ -28,10 +28,10 @@
 
 ## เฟส 3 — Persona Studio
 
-- 3.1 Persona store (สร้าง/แก้/ลบ/ทำสำเนา) + voice params + คำทักทาย + หัวข้อต้องห้าม
-- 3.2 หน้าจอ editor + พรีวิวเสียง
-- 3.3 ต่อเข้า prompt/voice/agent
-- 3.4 Tests
+- [x] 3.1 Persona store (สร้าง/แก้/ลบ/ทำสำเนา) + voice params + คำทักทาย + หัวข้อต้องห้าม
+- [x] 3.2 หน้าจอ editor + พรีวิวเสียง + การ์ดรายชื่อ
+- [x] 3.3 ต่อเข้า prompt (banned topics) / voice / greeting / agent
+- [x] 3.4 Tests (9) + docs/PERSONA.md
 
 ## เฟส 4 — Connectors & Sync
 

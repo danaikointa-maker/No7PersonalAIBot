@@ -127,6 +127,50 @@
             </select>
           </label>
           <label><input type="checkbox" id="set-polite" checked /> ใช้ ค่ะ/ครับ ตามเพศผู้ช่วย</label>
+
+          <h3>🎭 Persona Studio</h3>
+          <p class="hint">สร้าง/แก้บุคลิกของ No7 เอง — เก็บในเครื่องนี้เท่านั้น</p>
+          <div id="persona-list" class="persona-list"></div>
+          <div class="row">
+            <button id="persona-new">＋ สร้าง persona ใหม่</button>
+            <button id="persona-dup">ทำสำเนาตัวที่เลือก</button>
+          </div>
+
+          <form id="persona-form" hidden>
+            <div class="grid2">
+              <label>ชื่อ <input id="pf-name" maxlength="24" placeholder="เช่น น้องส้ม" /></label>
+              <label>อิโมจิ <input id="pf-emoji" maxlength="4" placeholder="🍊" /></label>
+            </div>
+            <label>คำอธิบายสั้น <input id="pf-desc" maxlength="90" placeholder="ขี้เล่น พูดเก่ง" /></label>
+            <label>ตัวตน (system prompt) *
+              <textarea id="pf-system" rows="5" maxlength="1500" placeholder="คุณคือน้องส้ม ... พูดจาสนุก ..."></textarea>
+            </label>
+            <label>คำทักทายเมื่อเปิดแอป
+              <textarea id="pf-greeting" rows="2" maxlength="200" placeholder="สวัสดีค่ะ หนูชื่อน้องส้มนะ"></textarea>
+            </label>
+            <label>หัวข้อต้องห้าม (คั่นด้วยจุลภาค)
+              <input id="pf-banned" placeholder="การเมือง, การพนัน" />
+            </label>
+            <div class="grid2">
+              <label>คำลงท้าย
+                <select id="pf-gender">
+                  <option value="male">ครับ (ชาย)</option>
+                  <option value="female">ค่ะ (หญิง)</option>
+                  <option value="neutral">ไม่ระบุ</option>
+                </select>
+              </label>
+              <label>ความเร็วเสียง: <output id="pf-rate-out">1.0</output>
+                <input id="pf-rate" type="range" min="0.6" max="1.6" step="0.05" value="1" />
+              </label>
+            </div>
+            <div class="row">
+              <button type="button" id="pf-save">บันทึก</button>
+              <button type="button" id="pf-preview">🔊 ฟังเสียง</button>
+              <button type="button" id="pf-cancel">ยกเลิก</button>
+              <button type="button" id="pf-delete">ลบ</button>
+            </div>
+            <p id="pf-status" class="hint"></p>
+          </form>
           <label><input type="checkbox" id="set-tts" checked /> อ่านคำตอบออกเสียง (TTS)</label>
           <label><input type="checkbox" id="set-stt" checked /> เปิดไมค์พูด (STT)</label>
 
