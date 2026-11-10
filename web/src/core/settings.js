@@ -17,6 +17,15 @@ export const DEFAULT_SETTINGS = {
   maxSteps: 4,
   costMode: 'mixed', // free | quality | private | mixed
   permissions: DEFAULT_PERMISSIONS,
+  memoryLLM: false,       // ใช้ AI ช่วยสรุปความจำ (opt-in เพื่อคุมโควตา)
+  streaming: true,        // แสดงคำตอบแบบไหลทีละคำ
+  speakWhileStreaming: true, // เริ่มพูดก่อนคำตอบจบ
+  wake: false,            // ปลุกด้วยคำว่า "No7"
+  voiceRate: 1,
+  voicePitch: 1,
+  voiceName: '',
+  serverUrl: 'http://localhost:8787',   // companion server (AI proxy / tools / sync)
+  syncToken: '',
 };
 
 const KEY = 'no7.settings.v1';

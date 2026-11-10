@@ -9,3 +9,4 @@ ios/
 .env.local
 .vite/
 coverage/
+.no7/

@@ -181,3 +181,125 @@ export class ModelFallback {
     return models.find((m) => !this.isCooling(m)) || null;
   }
 }
+
+/* ------------------------------------------------------------------ streaming */
+// ทุกผู้ให้บริการที่รองรับจะถูกสตรีมแบบ token ต่อ token ถ้าทำไม่ได้จะถอยไปใช้ chat() ปกติ
+
+async function* readLines(res) {
+  if (!res.body?.getReader) return;
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i).trim();
+      buf = buf.slice(i + 1);
+      if (line) yield line;
+    }
+  }
+  if (buf.trim()) yield buf.trim();
+}
+
+function deltaFromEvent(json, provider) {
+  if (provider === 'gemini') {
+    return json?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
+  }
+  if (provider === 'ollama') {
+    return json?.message?.content || '';
+  }
+  return json?.choices?.[0]?.delta?.content || json?.choices?.[0]?.message?.content || '';
+}
+
+class StreamingMethods {
+  get supportsStreaming() {
+    return ['pollinations', 'openai', 'openai-compatible', 'ollama', 'gemini'].includes(this.settings.provider);
+  }
+
+  /** Stream a reply; calls onToken(delta) และคืนข้อความเต็ม */
+  async chatStream(messages, { onToken } = {}) {
+    const { provider, model, apiKey, baseUrl } = this.settings;
+    let url;
+    let body;
+    let headers = { 'Content-Type': 'application/json' };
+
+    if (provider === 'pollinations') {
+      url = 'https://text.pollinations.ai/openai';
+      body = { model: model || 'openai', messages, stream: true };
+    } else if (provider === 'ollama') {
+      url = `${(baseUrl || 'http://localhost:11434').replace(/\/$/, '')}/api/chat`;
+      body = { model: model || 'llama3.1', messages, stream: true };
+    } else if (provider === 'gemini') {
+      if (!apiKey) throw new Error('ใส่ Gemini API key ก่อนในตั้งค่า');
+      const sys = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
+      const contents = messages.filter((m) => m.role !== 'system')
+        .map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
+      url = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.0-flash'}:streamGenerateContent?alt=sse&key=${apiKey}`;
+      body = { systemInstruction: sys ? { parts: [{ text: sys }] } : undefined, contents };
+    } else if (provider === 'openai' || provider === 'openai-compatible') {
+      if (!apiKey && provider === 'openai') throw new Error('ใส่ OpenAI API key ก่อนในตั้งค่า');
+      const base = (baseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
+      url = `${base}/chat/completions`;
+      body = { model: model || 'gpt-4o-mini', messages, stream: true };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+    } else {
+      return this.chat(messages, { onToken });
+    }
+
+    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(`AI ${res.status}: ${await res.text().catch(() => '')}`);
+
+    let full = '';
+    let sawToken = false;
+    for await (const line of readLines(res)) {
+      const payload = line.startsWith('data:') ? line.slice(5).trim() : line;
+      if (!payload || payload === '[DONE]') continue;
+      let json;
+      try { json = JSON.parse(payload); } catch { continue; }
+      const delta = deltaFromEvent(json, provider);
+      if (delta) { full += delta; sawToken = true; onToken?.(delta); }
+      if (json?.done === true) break;
+    }
+
+    if (!sawToken) {
+      // ไม่มี body แบบ stream (เช่น ถูก mock/ถูก proxy) → ใช้คำตอบก้อนเดียว
+      const text = await this.chat(messages);
+      if (text) onToken?.(text);
+      return text;
+    }
+    return full;
+  }
+}
+
+// ติดเมธอดสตรีมเข้ากับ AIProvider ตัวเดิม (แยกไฟล์ไม่ได้เพราะต้องใช้ settings เดียวกัน)
+for (const [key, desc] of Object.entries(Object.getOwnPropertyDescriptors(StreamingMethods.prototype))) {
+  if (key !== 'constructor') Object.defineProperty(AIProvider.prototype, key, desc);
+}
+
+/** เหมือน chatWithFallback แต่สตรีม token — สลับเจ้าอื่นได้เฉพาะเมื่อยังไม่ออกเสียงไปแล้ว */
+export async function chatWithFallbackStream(messages, chain, { fallback, onToken } = {}) {
+  if (!chain?.length) throw new Error('ยังไม่มีสมอง AI ที่ใช้ได้ — ไปที่ตั้งค่า > สมอง AI');
+  const errors = [];
+  for (const cfg of chain) {
+    let emitted = false;
+    try {
+      const provider = new AIProvider(cfg);
+      const text = await provider.chatStream(messages, {
+        onToken: (d) => { emitted = true; onToken?.(d); },
+      });
+      return text;
+    } catch (err) {
+      const status = Number(/(\d{3})/.exec(err.message)?.[1] || 0);
+      fallback?.recordError(cfg.model, status);
+      errors.push(`${cfg.provider}: ${err.message}`);
+      if (status === 401 || status === 403) {
+        throw new Error(`คีย์/สิทธิ์ของ ${cfg.provider} ไม่ถูกต้อง — หยุดลองสมองอื่น\n${err.message}`);
+      }
+      if (emitted) throw err;   // ออกเสียงไปแล้ว สลับกลางคันไม่ได้
+    }
+  }
+  throw new Error(`ทุกสมองใช้งานไม่ได้:\n${errors.join('\n')}`);
+}

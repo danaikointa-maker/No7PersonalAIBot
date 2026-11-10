@@ -23,12 +23,17 @@
 - [x] เตือนความจำตามเวลาจริง + คืนค่าการเตือนหลังรีสตาร์ท
 - [x] เดสก์ท็อป: clipboard / open-app / notify bridge
 
-## v0.3 — ความจำและเสียงระดับถัดไป
+## v1.0 — ครบวงจร ✅
 
-- [ ] ความจำ: LLM consolidation รายวัน + หน้าจอตรวจ/แก้/ลบ + นำเข้า-ส่งออก
-- [ ] Wake word "No7" (Vosk/Porcupine หรือ Web Speech ต่อเนื่อง)
-- [ ] สตรีมมิ่งคำตอบ (token-by-token) + TTS แบบพูดทีละประโยค
-- [ ] Persona editor ให้ผู้ใช้สร้างบุคลิกเองได้
+- [x] ความจำ: LLM consolidation + หน้าจอตรวจ/แก้/ลบ/ปักหมุด + นำเข้า-ส่งออก
+- [x] Wake word "No7" + หยุดฟังขณะพูด
+- [x] สตรีมมิ่งคำตอบ + พูดก่อนคำตอบจบ
+- [x] Persona Studio (สร้าง/แก้/ทำสำเนา/ลบ)
+- [x] ปฏิทิน + นำเข้า/ส่งออก .ics
+- [x] RSS + สรุปหน้าเว็บ (พร้อม server proxy)
+- [x] ซิงก์ข้ามเครื่อง (self-hosted)
+- [x] Phone-Link HMAC + Device Hub + ESP32 client
+- [x] CI + accessibility + เอกสารครบ
 
 ## v0.4 — เชื่อมโลกภายนอก
 

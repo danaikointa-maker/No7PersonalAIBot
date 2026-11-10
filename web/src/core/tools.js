@@ -1,3 +1,7 @@
+import { fetchText, stripHtml, pageMeta, parseRss, serverUrlFromSettings } from './net.js';
+import { getCalendar, formatWhen } from './calendar.js';
+import { getDeviceRegistry, sendCommand } from './link.js';
+
 // Tool registry — the ESP32 "42 tools with on-screen cards" principle, re-implemented
 // for web so the SAME code runs on mobile + PC. Only key-free public APIs by default,
 // plus local tools (timer/todo/note) so the bot is useful offline.
@@ -179,6 +183,7 @@ export const TOOLS = {
     desc: 'จดโน้ตด่วน (เก็บในเครื่อง)',
     params: { text: 'string ข้อความโน้ต' },
     local: true,
+
     run({ text = '' }) {
       const KEY = 'no7.notes.v1';
       const list = JSON.parse(localStorage.getItem(KEY) || '[]');
@@ -191,6 +196,77 @@ export const TOOLS = {
       };
     },
   },
+
+  calendar_add: {
+    emoji: '📅',
+    label: 'เพิ่มนัด',
+    desc: 'เพิ่มนัดหมายลงปฏิทินในเครื่อง',
+    params: { title: 'string หัวข้อ', when: 'string เวลา เช่น "2026-11-12 14:30", "14:30", หรือ "+30" (นาที)', location: 'string สถานที่ (ไม่ใส่ได้)' },
+    local: true,
+    run({ title = '', when = '', location = '' }) {
+      const start = parseWhen(when);
+      if (!start) throw new Error('เวลาไม่ถูกต้อง — ลอง "14:30", "2026-11-12 14:30" หรือ "+30"');
+      const ev = getCalendar().add({ title: title || 'นัดหมาย', start, location });
+      return { title: 'เพิ่มนัดแล้ว', big: formatWhen(ev.start), lines: [ev.title, location ? `📍 ${location}` : ''].filter(Boolean) };
+    },
+  },
+
+  calendar_list: {
+    emoji: '🗓️',
+    label: 'ดูตาราง',
+    desc: 'ดูลำนัดหมายที่กำลังจะมาถึง',
+    params: { days: 'number จำนวนวันล่วงหน้า (เริ่มต้น 7)' },
+    local: true,
+    run({ days = 7 }) {
+      const list = getCalendar().upcoming({ days: Number(days) || 7, limit: 10 });
+      return {
+        title: `นัด ${days} วันข้างหน้า`,
+        big: `${list.length} รายการ`,
+        lines: list.length
+          ? list.map((e) => `${formatWhen(e.start)} — ${e.title}${e.location ? ` @${e.location}` : ''}`)
+          : ['ยังไม่มีนัด'],
+      };
+    },
+  },
+
+  rss_read: {
+    emoji: '📡',
+    label: 'อ่านฟีด',
+    desc: 'อ่านข่าวจากฟีด RSS/Atom ที่ระบุ (ใช้ server proxy ถ้าโดน CORS)',
+    params: { url: 'string ลิงก์ฟีด', limit: 'number จำนวนข่าว (เริ่มต้น 5)' },
+    async run({ url = '', limit = 5 }, ctx) {
+      const { text, via } = await fetchText(url, { serverUrl: serverUrlFromSettings(ctx?.settings) });
+      const items = parseRss(text, { limit: Number(limit) || 5 });
+      if (!items.length) throw new Error('ไม่พบรายการในฟีดนี้');
+      return {
+        title: items[0].channel || 'ฟีดข่าว',
+        big: `${items.length} ข่าว`,
+        lines: items.map((i, n) => `${n + 1}. ${i.title}`),
+        url,
+        via,
+      };
+    },
+  },
+
+  summarize_url: {
+    emoji: '📄',
+    label: 'สรุปหน้าเว็บ',
+    desc: 'อ่านเนื้อหาหน้าเว็บแล้วสรุปให้ (ต้องมีสมอง AI)',
+    params: { url: 'string ลิงก์ที่ต้องการสรุป', focus: 'string สิ่งที่อยากให้เน้น (ไม่ใส่ได้)' },
+    async run({ url = '', focus = '' }, ctx) {
+      if (!ctx?.chat) throw new Error('ต้องมีสมอง AI สำหรับสรุป');
+      const { text, via } = await fetchText(url, { serverUrl: serverUrlFromSettings(ctx?.settings) });
+      const meta = pageMeta(text);
+      const body = stripHtml(text).slice(0, 6000);
+      const reply = await ctx.chat([
+        { role: 'system', content: 'สรุปเนื้อหาเว็บให้กระชับ เป็นภาษาไทย 3–5 ประโยค ขึ้นด้วยใจความหลัก' },
+        { role: 'user', content: `หัวข้อ: ${meta.title}\n${focus ? `เน้น: ${focus}\n` : ''}เนื้อหา:\n${body}` },
+      ]);
+      const summary = String(reply || '').replace(/```[\s\S]*?```/g, '').trim();
+      return { title: meta.title || 'สรุปหน้าเว็บ', big: '', lines: (summary || meta.description || body.slice(0, 240)).split('\n'), url, via };
+    },
+  },
+
 
   calc: {
     emoji: '🧮',
@@ -321,6 +397,24 @@ export const TOOLS = {
     },
   },
 
+  device_command: {
+    emoji: '🔗',
+    label: 'สั่งอุปกรณ์',
+    desc: 'ส่งคำสั่งไปยังอุปกรณ์ที่ลงทะเบียนไว้ (PC/ESP32 ผ่าน Phone-Link)',
+    params: { device: 'string ชื่ออุปกรณ์ (ไม่ใส่ = เครื่องแรก)', command: 'string เช่น ping, status, eyes, say, time, sleep', args: 'object พารามิเตอร์เพิ่มเติม' },
+    async run({ device = '', command = 'ping', args = {} }) {
+      const list = getDeviceRegistry().list();
+      if (!list.length) throw new Error('ยังไม่มีอุปกรณ์ — เพิ่มที่เมนู 🔗 อุปกรณ์');
+      const target = list.find((d) => d.name.includes(device) || d.id === device) || list[0];
+      const res = await sendCommand(target, command, args);
+      return {
+        title: `ส่งคำสั่งไป ${target.name}`,
+        big: command,
+        lines: [`คิว: ${res?.id || '—'}`, target.baseUrl],
+      };
+    },
+  },
+
   system_info: {
     emoji: '📊',
     label: 'ข้อมูลเครื่อง',
@@ -358,12 +452,17 @@ export const TOOL_META = {
   memory_save: { category: 'memory', risk: 0 },
   note: { category: 'memory', risk: 0 },
   todo: { category: 'memory', risk: 0 },
+  calendar_list: { category: 'read', risk: 0 },
+  calendar_add: { category: 'act', risk: 1 },
+  rss_read: { category: 'read', risk: 0 },
+  summarize_url: { category: 'read', risk: 0 },
   timer: { category: 'act', risk: 1 },
   reminder: { category: 'act', risk: 1 },
   clipboard_copy: { category: 'act', risk: 1 },
   open_url: { category: 'act', risk: 1 },
   compose_message: { category: 'message', risk: 2 },
   open_app: { category: 'control', risk: 3 },
+  device_command: { category: 'control', risk: 3 },
 };
 
 export function toolMeta(id) {
@@ -444,6 +543,33 @@ export function restoreReminders() {
     const list = JSON.parse(localStorage.getItem('no7.reminders.v1') || '[]');
     for (const r of list) if (r.when > Date.now()) scheduleReminder(r);
   } catch {}
+}
+
+/** แปลง "14:30" | "2026-11-12 14:30" | "+30" | ISO → timestamp */
+export function parseWhen(when = '') {
+  const v = String(when).trim();
+  if (!v) return null;
+  const rel = /^\+(\d+)\s*(m|min|นาที|h|ชม)?$/i.exec(v);
+  if (rel) {
+    const n = Number(rel[1]);
+    const unit = (rel[2] || 'm').toLowerCase();
+    return Date.now() + n * (/^(h|ชม)$/.test(unit) ? 3600000 : 60000);
+  }
+  const iso = /^\d{4}-\d{2}-\d{2}T/.test(v) ? Date.parse(v) : NaN;
+  if (Number.isFinite(iso)) return iso;
+  const dt = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?$/.exec(v);
+  if (dt) {
+    const ts = new Date(+dt[1], +dt[2] - 1, +dt[3], +(dt[4] || 0), +(dt[5] || 0)).getTime();
+    return Number.isFinite(ts) ? ts : null;
+  }
+  const hm = /^(\d{1,2}):(\d{2})$/.exec(v);
+  if (hm) {
+    const d = new Date();
+    d.setHours(+hm[1], +hm[2], 0, 0);
+    if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1);
+    return d.getTime();
+  }
+  return null;
 }
 
 function fmt(n) {

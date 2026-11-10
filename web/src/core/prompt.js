@@ -41,7 +41,14 @@ export function buildSystemPrompt({
       + 'ถ้าจำเป็นต้องใช้เครื่องมือที่ปิดอยู่ ให้บอกผู้ใช้ว่าไปเปิดที่ "ตั้งค่า > สิทธิ์" — ห้ามพยายามเรียกซ้ำ'
     : '';
 
-  return `${persona.system}
+  const personaCore = persona.system || '';
+  const banned = (persona.banned || []).filter(Boolean);
+  const banBlock = banned.length
+    ? `\nหัวข้อที่ต้องหลีกเลี่ยงโดยเด็ดขาด: ${banned.join(', ')}\n`
+      + 'ถ้าผู้ใช้ถามเรื่องเหล่านี้ ให้บอกอย่างสุภาพว่าไม่สะดวกตอบ แล้วชวนคุยเรื่องอื่น'
+    : '';
+
+  return `${personaCore}${banBlock}
 
 กฎการทำงาน:
 - ${langLine}

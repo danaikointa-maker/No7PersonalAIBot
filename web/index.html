@@ -20,10 +20,12 @@
             <small>Mobile + PC · ไทยก่อน</small>
           </div>
         </div>
-        <nav id="nav">
+        <nav id="nav" aria-label="เมนูหลัก">
           <button data-view="chat" class="active">💬 แชท</button>
           <button data-view="tools">🧰 เครื่องมือ</button>
           <button data-view="memory">🧠 ความจำ</button>
+          <button data-view="calendar">📅 ตารางนัด</button>
+          <button data-view="devices">🔗 อุปกรณ์</button>
           <button data-view="settings">⚙️ ตั้งค่า</button>
         </nav>
         <div class="sidebar-foot">
@@ -41,6 +43,8 @@
             <small id="state-label">IDLE</small>
           </div>
           <div class="topbar-actions">
+            <span id="wake-badge" class="wake-badge" hidden title="กำลังฟังคำว่า No7">🎙 No7</span>
+            <button id="stop-btn" title="หยุดพูด" hidden>⏹</button>
             <button id="companion-btn" title="โหมดเพื่อนบนจอ (Desktop)">🖥️</button>
             <button id="mic-btn" title="พูด (Push to talk)">🎤</button>
           </div>
@@ -52,7 +56,7 @@
           <div class="avatar-meta">
             <strong id="persona-name">No7</strong>
             <small id="persona-desc">เพื่อน AI ของคุณ</small>
-            <div id="subtitle" class="subtitle">สวัสดีครับ ผม No7 พร้อมช่วยแล้ว</div>
+            <div id="subtitle" class="subtitle" role="status" aria-live="polite">สวัสดีครับ ผม No7 พร้อมช่วยแล้ว</div>
           </div>
         </section>
 
@@ -78,18 +82,77 @@
 
         <section id="view-memory" class="view">
           <h2>🧠 ความจำระยะยาว</h2>
-          <p class="hint">GraphRAG-lite (BM25) + บันทึกบทสนทนา — เก็บในเครื่องเท่านั้น</p>
+          <p class="hint">GraphRAG-lite (BM25) + บันทึกบทสนทนา — เก็บในเครื่องนี้เท่านั้น</p>
+
+          <div id="mem-stats" class="stats"></div>
+
           <div class="row">
-            <input id="mem-query" placeholder="ค้นหาความจำ…" />
+            <input id="mem-query" placeholder="ค้นหาความจำ…" autocomplete="off" />
             <button id="mem-search-btn">ค้นหา</button>
+            <button id="mem-clear-search" hidden>ล้าง</button>
           </div>
-          <div id="mem-results"></div>
-          <h3>ข้อเท็จจริงที่จำได้</h3>
-          <div id="mem-facts"></div>
+
+          <div id="mem-filters" class="chips"></div>
+
           <div class="row">
-            <input id="mem-new" placeholder="สอนความจำใหม่ เช่น: ชื่อฉันคือ…" />
+            <input id="mem-new" placeholder="สอนความจำใหม่ เช่น: ชื่อฉันคือ…" autocomplete="off" />
             <button id="mem-add-btn">จำไว้</button>
           </div>
+
+          <div id="mem-results"></div>
+
+          <div class="row">
+            <button id="mem-consolidate-btn">🔄 สรุปความจำเดี๋ยวนี้</button>
+            <button id="mem-export-btn">⬇️ ส่งออก</button>
+            <button id="mem-import-btn">⬆️ นำเข้า</button>
+            <input id="mem-import-file" type="file" accept="application/json" hidden />
+          </div>
+          <label class="inline">
+            <input type="checkbox" id="mem-llm-toggle" />
+            ใช้ AI ช่วยสรุปความจำ (แม่นขึ้น แต่ใช้โควตา)
+          </label>
+          <p id="mem-status" class="hint"></p>
+        </section>
+
+        <section id="view-calendar" class="view">
+          <h2>📅 ตารางนัด</h2>
+          <p class="hint">เก็บในเครื่อง · นำเข้า/ส่งออก .ics ได้ · No7 เพิ่มนัดให้ได้เอง</p>
+          <div class="row">
+            <input id="cal-title" placeholder="หัวข้อ เช่น ประชุมทีม" />
+            <input id="cal-when" type="datetime-local" />
+            <button id="cal-add-btn">เพิ่ม</button>
+          </div>
+          <div class="row">
+            <button id="cal-import-btn">⬆️ นำเข้า .ics</button>
+            <input id="cal-import-file" type="file" accept=".ics,text/calendar" hidden />
+            <button id="cal-export-btn">⬇️ ส่งออก .ics</button>
+            <button id="cal-today-btn">วันนี้</button>
+          </div>
+          <p id="cal-status" class="hint"></p>
+          <div id="cal-list"></div>
+        </section>
+
+        <section id="view-devices" class="view">
+          <h2>🔗 อุปกรณ์ (Phone-Link)</h2>
+          <p class="hint">สั่งงาน PC / ESP32 ผ่าน companion server ด้วยลายเซ็น HMAC — ไม่มีคลาวด์</p>
+
+          <div id="dev-list"></div>
+
+          <h3>เพิ่มอุปกรณ์</h3>
+          <div class="row">
+            <input id="dev-name" placeholder="ชื่อ เช่น PC ห้องนอน" />
+            <input id="dev-url" placeholder="http://192.168.1.10:8787" />
+          </div>
+          <div class="row">
+            <input id="dev-code" placeholder="รหัสจับคู่ (6 หลัก)" inputmode="numeric" />
+            <input id="dev-secret" placeholder="secret (hex 64)" type="password" />
+          </div>
+          <div class="row">
+            <button id="dev-pair">🎲 ขอรหัสจาก server</button>
+            <button id="dev-add">＋ เพิ่มอุปกรณ์</button>
+          </div>
+          <p id="dev-status" class="hint"></p>
+          <pre id="dev-log" class="code" hidden></pre>
         </section>
 
         <section id="view-settings" class="view">
@@ -107,6 +170,50 @@
             </select>
           </label>
           <label><input type="checkbox" id="set-polite" checked /> ใช้ ค่ะ/ครับ ตามเพศผู้ช่วย</label>
+
+          <h3>🎭 Persona Studio</h3>
+          <p class="hint">สร้าง/แก้บุคลิกของ No7 เอง — เก็บในเครื่องนี้เท่านั้น</p>
+          <div id="persona-list" class="persona-list"></div>
+          <div class="row">
+            <button id="persona-new">＋ สร้าง persona ใหม่</button>
+            <button id="persona-dup">ทำสำเนาตัวที่เลือก</button>
+          </div>
+
+          <form id="persona-form" hidden>
+            <div class="grid2">
+              <label>ชื่อ <input id="pf-name" maxlength="24" placeholder="เช่น น้องส้ม" /></label>
+              <label>อิโมจิ <input id="pf-emoji" maxlength="4" placeholder="🍊" /></label>
+            </div>
+            <label>คำอธิบายสั้น <input id="pf-desc" maxlength="90" placeholder="ขี้เล่น พูดเก่ง" /></label>
+            <label>ตัวตน (system prompt) *
+              <textarea id="pf-system" rows="5" maxlength="1500" placeholder="คุณคือน้องส้ม ... พูดจาสนุก ..."></textarea>
+            </label>
+            <label>คำทักทายเมื่อเปิดแอป
+              <textarea id="pf-greeting" rows="2" maxlength="200" placeholder="สวัสดีค่ะ หนูชื่อน้องส้มนะ"></textarea>
+            </label>
+            <label>หัวข้อต้องห้าม (คั่นด้วยจุลภาค)
+              <input id="pf-banned" placeholder="การเมือง, การพนัน" />
+            </label>
+            <div class="grid2">
+              <label>คำลงท้าย
+                <select id="pf-gender">
+                  <option value="male">ครับ (ชาย)</option>
+                  <option value="female">ค่ะ (หญิง)</option>
+                  <option value="neutral">ไม่ระบุ</option>
+                </select>
+              </label>
+              <label>ความเร็วเสียง: <output id="pf-rate-out">1.0</output>
+                <input id="pf-rate" type="range" min="0.6" max="1.6" step="0.05" value="1" />
+              </label>
+            </div>
+            <div class="row">
+              <button type="button" id="pf-save">บันทึก</button>
+              <button type="button" id="pf-preview">🔊 ฟังเสียง</button>
+              <button type="button" id="pf-cancel">ยกเลิก</button>
+              <button type="button" id="pf-delete">ลบ</button>
+            </div>
+            <p id="pf-status" class="hint"></p>
+          </form>
           <label><input type="checkbox" id="set-tts" checked /> อ่านคำตอบออกเสียง (TTS)</label>
           <label><input type="checkbox" id="set-stt" checked /> เปิดไมค์พูด (STT)</label>
 
@@ -159,6 +266,25 @@
           </div>
           <p id="settings-status" class="hint"></p>
 
+          <h3>เสียงและการตอบ</h3>
+          <label><input type="checkbox" id="set-streaming" checked /> สตรีมคำตอบ (เห็นข้อความไหลทีละคำ)</label>
+          <label><input type="checkbox" id="set-speakstream" checked /> เริ่มพูดก่อนคำตอบจบ (ไวขึ้น)</label>
+          <label><input type="checkbox" id="set-wake" /> ปลุกด้วยคำว่า "No7" (ฟังเบื้องหลัง)</label>
+          <label>ความเร็วเสียง: <output id="out-rate">1.0</output>
+            <input id="set-rate" type="range" min="0.6" max="1.6" step="0.05" value="1" />
+          </label>
+          <label>ระดับเสียง (pitch): <output id="out-pitch">1.0</output>
+            <input id="set-pitch" type="range" min="0.6" max="1.6" step="0.05" value="1" />
+          </label>
+          <label>เสียงที่ใช้
+            <select id="set-voice"><option value="">อัตโนมัติ (เสียงไทยของเครื่อง)</option></select>
+          </label>
+          <div class="row">
+            <button id="test-voice-btn">🔊 ทดสอบเสียง</button>
+            <button id="stop-voice-btn">⏹ หยุด</button>
+          </div>
+          <p id="voice-status" class="hint"></p>
+
           <h3>อุปกรณ์ / แพลตฟอร์ม</h3>
           <p class="hint" id="device-info">—</p>
           <div class="row">
@@ -166,6 +292,26 @@
             <button id="export-btn">ส่งออกข้อมูล</button>
             <button id="reset-btn">ล้างข้อมูลทั้งหมด</button>
           </div>
+
+          <h3>🔄 ซิงก์ข้ามเครื่อง</h3>
+          <p class="hint">ใช้ companion server ของคุณเอง (npm run server) — ไม่มีคลาวด์ ไม่มีบัญชี</p>
+          <label>ที่อยู่ server <input id="set-serverurl" placeholder="http://192.168.1.10:8787" /></label>
+          <label>Sync token <input id="set-synctoken" type="password" placeholder="NO7_SYNC_TOKEN ของ server" /></label>
+          <div class="row">
+            <button id="sync-push-btn">⬆️ อัปโหลดจากเครื่องนี้</button>
+            <button id="sync-pull-btn">⬇️ ดึง + ผสาน</button>
+            <button id="sync-test-btn">ทดสอบเชื่อมต่อ</button>
+          </div>
+          <p id="sync-status" class="hint"></p>
+
+          <h3>⌨️ คีย์ลัด</h3>
+          <ul class="hint shortcuts">
+            <li><kbd>Ctrl</kbd>+<kbd>K</kbd> — โฟกัสช่องพิมพ์</li>
+            <li><kbd>Ctrl</kbd>+<kbd>M</kbd> — เริ่ม/หยุดฟัง</li>
+            <li><kbd>Esc</kbd> — ปิดกล่องยืนยัน / หยุดพูด</li>
+            <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> — ส่งข้อความ</li>
+            <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> — push-to-talk ระดับระบบ (เดสก์ท็อป)</li>
+          </ul>
 
           <h3>เชื่อมต่อ (Phone-Link / ESP32)</h3>
           <p class="hint">โปรโตคอลจับคู่ HMAC — ดู <code>docs/PHONE_LINK.md</code></p>
@@ -177,7 +323,7 @@
       </main>
 
       <!-- Permission gate: asks before risky actions -->
-      <div id="confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <div id="confirm-modal" hidden role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-desc">
         <div class="modal-card">
           <h3 id="confirm-title">ขออนุญาตทำต่อ</h3>
           <p id="confirm-desc" class="hint"></p>

@@ -36,6 +36,54 @@ const MIME = {
 /** In-memory pairing registry: code -> { secret, createdAt } */
 const pairings = new Map();
 
+/** Sync store: เก็บล่าสุดในหน่วยความจำ + ไฟล์ .no7/sync.json (ถ้าเขียนได้) */
+const SYNC_DIR = path.join(ROOT, '.no7');
+const SYNC_FILE = path.join(SYNC_DIR, 'sync.json');
+const SYNC_TOKEN = process.env.NO7_SYNC_TOKEN || '';
+
+function readSync() {
+  try { return JSON.parse(fs.readFileSync(SYNC_FILE, 'utf8')); } catch { return null; }
+}
+function writeSync(data) {
+  try {
+    fs.mkdirSync(SYNC_DIR, { recursive: true });
+    fs.writeFileSync(SYNC_FILE, JSON.stringify(data, null, 2));
+    return true;
+  } catch { return false; }
+}
+/* ---------------- Phone-Link: command queue + results ---------------- */
+const linkState = {
+  queues: new Map(),    // code -> [{id, command, args, ts, delivered}]
+  results: new Map(),   // code -> [{id, command, ok, data, ts}]
+  seen: new Map(),      // code -> lastSeen ms
+};
+
+function verifyLink(req, method, raw = '') {
+  const code = String(req.headers['x-no7-code'] || '');
+  const sig = String(req.headers['x-no7-signature'] || '');
+  const entry = pairings.get(code);
+  if (!entry || !sig) return null;
+  const path = new URL(req.url, 'http://x').pathname;
+  const candidates = [
+    crypto.createHmac('sha256', Buffer.from(entry.secret)).update(`${method}\n${path}\n${raw}`).digest('hex'),
+    crypto.createHmac('sha256', Buffer.from(entry.secret)).update(raw).digest('hex'),  // legacy: body only
+  ];
+  for (const expected of candidates) {
+    const a = Buffer.from(expected);
+    const b = Buffer.from(sig);
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+      linkState.seen.set(code, Date.now());
+      return code;
+    }
+  }
+  return null;
+}
+
+function syncAuthorized(req) {
+  if (!SYNC_TOKEN) return true;                       // ไม่ตั้ง token = เปิดให้ใน LAN
+  return String(req.headers['x-no7-sync'] || '') === SYNC_TOKEN;
+}
+
 function json(res, code, obj) {
   const body = JSON.stringify(obj);
   res.writeHead(code, {
@@ -86,9 +134,12 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === '/api/health') {
     return json(res, 200, {
-      ok: true, app: 'no7-personal-ai-bot', version: '0.2.0',
+      ok: true, app: 'no7-personal-ai-bot', version: '1.0.0',
       platform: process.platform, node: process.version,
       hasDist: fs.existsSync(path.join(DIST, 'index.html')),
+      sync: { enabled: true, requiresToken: !!SYNC_TOKEN, hasData: !!readSync() },
+      endpoints: ['/api/health', '/api/chat', '/api/tools', '/api/tools/run', '/api/pair', '/api/sync', '/api/fetch',
+        '/api/link/command', '/api/link/poll', '/api/link/status', '/api/link/results'],
       aiKeys: {
         gemini: !!process.env.GEMINI_API_KEY,
         openai: !!process.env.OPENAI_API_KEY,
@@ -120,6 +171,112 @@ async function handleApi(req, res, url) {
     } catch (e) {
       return json(res, 502, { error: e.message });
     }
+  }
+
+  // ---- Phone-Link endpoints (HMAC signed) ----
+  if (url.pathname.startsWith('/api/link/')) {
+    const method = req.method;
+    if (method === 'POST') {
+      const raw = await new Promise((resolve, reject) => {
+        let b = '';
+        req.on('data', (c) => { b += c; });
+        req.on('end', () => resolve(b));
+        req.on('error', reject);
+      });
+      const code = verifyLink(req, method, raw);
+      if (!code) return json(res, 401, { error: 'bad signature' });
+
+      let body = {};
+      try { body = raw ? JSON.parse(raw) : {}; } catch { return json(res, 400, { error: 'invalid JSON' }); }
+
+      if (url.pathname === '/api/link/command') {
+        const q = linkState.queues.get(code) || [];
+        const item = {
+          id: `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 4)}`,
+          command: String(body.command || 'ping').slice(0, 40),
+          args: body.args || {},
+          ts: Date.now(),
+          delivered: false,
+        };
+        q.push(item);
+        linkState.queues.set(code, q.slice(-100));
+        return json(res, 200, { ok: true, id: item.id, queued: true });
+      }
+
+      if (url.pathname === '/api/link/result') {
+        const r = linkState.results.get(code) || [];
+        r.push({ id: body.id || null, command: body.command || '', ok: !!body.ok, data: body.data ?? null, ts: Date.now() });
+        linkState.results.set(code, r.slice(-50));
+        return json(res, 200, { ok: true });
+      }
+      return json(res, 404, { error: 'not found' });
+    }
+
+    if (method === 'GET') {
+      const code = verifyLink(req, method, '');
+      if (!code) return json(res, 401, { error: 'bad signature' });
+
+      if (url.pathname === '/api/link/poll') {
+        const q = linkState.queues.get(code) || [];
+        const pending = q.filter((c) => !c.delivered);
+        for (const c of pending) c.delivered = true;
+        return json(res, 200, { commands: pending, serverTime: Date.now() });
+      }
+      if (url.pathname === '/api/link/status') {
+        const q = linkState.queues.get(code) || [];
+        const lastSeen = linkState.seen.get(code) || 0;
+        return json(res, 200, {
+          code,
+          online: Date.now() - lastSeen < 30000,
+          lastSeen,
+          pending: q.filter((c) => !c.delivered).length,
+          delivered: q.filter((c) => c.delivered).length,
+        });
+      }
+      if (url.pathname === '/api/link/results') {
+        const since = Number(url.searchParams.get('since') || 0);
+        const all = linkState.results.get(code) || [];
+        return json(res, 200, { results: all.filter((r) => r.ts > since) });
+      }
+      return json(res, 404, { error: 'not found' });
+    }
+    return json(res, 405, { error: 'method not allowed' });
+  }
+
+  // ---- cross-device sync (opt-in, self-hosted) ----
+  if (url.pathname === '/api/sync') {
+    if (!syncAuthorized(req)) return json(res, 401, { error: 'bad sync token' });
+    if (req.method === 'GET') {
+      const data = readSync();
+      if (!data) return json(res, 404, { error: 'no sync data yet' });
+      return json(res, 200, data);
+    }
+    if (req.method === 'PUT') {
+      const body = await readBody(req, 5_000_000);
+      const saved = writeSync({ ...body, serverAt: new Date().toISOString() });
+      return json(res, 200, { ok: true, persisted: saved, updatedAt: body.updatedAt || null });
+    }
+    return json(res, 405, { error: 'use GET or PUT' });
+  }
+
+  // ---- fetch proxy: เลี่ยง CORS ให้ RSS/สรุปหน้าเว็บ ----
+  if (url.pathname === '/api/fetch' && req.method === 'GET') {
+    const target = url.searchParams.get('url') || '';
+    if (!/^https?:\/\//i.test(target)) return json(res, 400, { error: 'url ต้องขึ้นต้นด้วย http(s)' });
+    try {
+      const r = await fetch(target, { headers: { 'User-Agent': 'No7Bot/0.3 (+self-hosted)' } });
+      if (!r.ok) return json(res, 502, { error: `upstream ${r.status}` });
+      const text = (await r.text()).slice(0, 800_000);
+      res.writeHead(200, {
+        'Content-Type': r.headers.get('content-type') || 'text/plain; charset=utf-8',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-cache',
+      });
+      res.end(text);
+    } catch (e) {
+      json(res, 502, { error: e.message });
+    }
+    return;
   }
 
   // ---- tool catalog + execution for ESP32 / Phone-Link clients ----
@@ -293,7 +450,9 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`No7 companion server → http://localhost:${PORT}`);
   console.log(`  LAN: http://<your-ip>:${PORT}  (เปิดจากมือถือในวง Wi-Fi เดียวกัน)`);
-  console.log(`  health: /api/health · tools: /api/tools`);
+  console.log(`  health: /api/health · tools: /api/tools · sync: /api/sync`);
+  if (!SYNC_TOKEN) console.log('  ⚠️  ยังไม่ได้ตั้ง NO7_SYNC_TOKEN — /api/sync เปิดให้ทุกคนใน LAN อ่านได้');
+  else console.log('  🔐 sync protected by NO7_SYNC_TOKEN');
 });
 
 export { server, runServerTool, proxyChat, verifySignature, pairings };

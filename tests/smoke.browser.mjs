@@ -103,7 +103,7 @@ const submit = (text) => {
 await wait(100);
 check('boot: initial state', ['IDLE', 'SETUP'].includes($('#state-label').textContent), $('#state-label').textContent);
 check('boot: welcome message', $('#messages').children.length >= 1);
-check('boot: 19 tools in auto mode', $('#tools-grid').children.length === 19, String($('#tools-grid').children.length));
+check('boot: 24 tools in auto mode', $('#tools-grid').children.length === 24, String($('#tools-grid').children.length));
 check('boot: 5 role modes', $('#mode-chips').children.length === 5, String($('#mode-chips').children.length));
 check('boot: persona header', $('#persona-name').textContent.length > 0);
 
@@ -113,10 +113,10 @@ check('nav: memory view', $('#view-memory').classList.contains('active'));
 // mode switching filters tools
 window.document.querySelector('#mode-chips button[data-mode="hub"]').click();
 await wait(20);
-check('mode: hub filters tools', $('#tools-grid').children.length === 14, String($('#tools-grid').children.length));
+check('mode: hub filters tools', $('#tools-grid').children.length === 18, String($('#tools-grid').children.length));
 window.document.querySelector('#mode-chips button[data-mode="auto"]').click();
 await wait(20);
-check('mode: back to auto', $('#tools-grid').children.length === 19);
+check('mode: back to auto', $('#tools-grid').children.length === 24);
 
 $('#set-provider').value = 'pollinations';
 $('#save-settings-btn').click();
@@ -129,10 +129,11 @@ check('settings: test AI', $('#settings-status').textContent.includes('OK'), $('
 $('#mem-new').value = 'ฉันชอบกาแฟดำ';
 $('#mem-add-btn').click();
 await wait(20);
-check('memory: fact added', $('#mem-facts').textContent.includes('กาแฟดำ'));
+check('memory: fact added', $('#mem-results').textContent.includes('กาแฟดำ'), $('#mem-results').textContent.slice(0, 60));
 $('#mem-query').value = 'กาแฟ';
 $('#mem-search-btn').click();
 check('memory: BM25 search', $('#mem-results').textContent.includes('กาแฟ'));
+check('memory: stats rendered', $('#mem-stats').textContent.includes('ข้อเท็จจริง'), $('#mem-stats').textContent.slice(0, 40));
 
 submit('สวัสดี No7');
 await wait(120);
@@ -150,15 +151,74 @@ $('#mic-btn').click();
 await wait(80);
 check('voice: transcript sent', [...$('#messages').querySelectorAll('.msg.user')].some((m) => m.textContent.includes('ทดสอบเสียง')));
 
+await wait(400);          // รอให้คิวก่อนหน้าจบ (busy guard)
 submit('จำไว้ว่า ฉันมีแมวชื่อมีโจ');
-await wait(120);
+await wait(300);
 $('#nav button[data-view="memory"]').click();
-check('memory: learned from chat', $('#mem-facts').textContent.includes('มีโจ'), $('#mem-facts').textContent.slice(0, 80));
+check('memory: learned from chat', $('#mem-results').textContent.includes('มีโจ'), $('#mem-results').textContent.slice(0, 80));
+
+// calendar view
+$('#nav button[data-view="calendar"]').click();
+$('#cal-title').value = 'ประชุมทดสอบ';
+$('#cal-when').value = '2026-12-01T10:00';
+$('#cal-add-btn').click();
+await wait(20);
+check('calendar: event added', $('#cal-list').textContent.includes('ประชุมทดสอบ'), $('#cal-list').textContent.slice(0, 60));
+check('calendar: persisted', JSON.parse(window.localStorage.getItem('no7.calendar.v1') || '[]').length > 0);
+
+// memory 2.0: pin + consolidate run
+$('#nav button[data-view="memory"]').click();
+await wait(20);
+$('#mem-results').querySelector('.fact button')?.click();      // ปุ่ม 📍 ตัวแรก
+await wait(20);
+check('memory: pin toggles', $('#mem-results').textContent.includes('📌'), $('#mem-results').textContent.slice(0, 40));
+$('#mem-consolidate-btn').click();
+await wait(200);
+check('memory: consolidate runs', $('#mem-status').textContent.includes('สรุปเสร็จ'), $('#mem-status').textContent);
 
 $('#nav button[data-view="settings"]').click();
 $('#pair-btn').click();
 await wait(50);
 check('pairing: handled (code or clear warning)', /รหัสจับคู่|ต้องเปิดผ่าน https|สร้างไม่สำเร็จ/.test($('#pair-output').textContent), $('#pair-output').textContent.slice(0, 60));
+
+// devices view (no server running → must fail gracefully)
+$('#nav button[data-view="devices"]').click();
+$('#dev-name').value = 'PC ทดสอบ';
+$('#dev-url').value = 'http://127.0.0.1:9';
+$('#dev-code').value = '123456';
+$('#dev-secret').value = 'a'.repeat(64);
+$('#dev-add').click();
+await wait(20);
+check('devices: added to registry', $('#dev-list').textContent.includes('PC ทดสอบ'), $('#dev-list').textContent.slice(0, 60));
+$('#dev-list').querySelector('.dev-actions button')?.click();
+await wait(150);
+check('devices: failure logged, no crash', $('#dev-log').hidden === false, $('#dev-log').textContent.slice(0, 80));
+
+// Persona Studio
+$('#nav button[data-view="settings"]').click();
+check('sync: controls present', !!$('#sync-push-btn') && !!$('#set-serverurl'));
+check('persona: list rendered', $('#persona-list').children.length === 8, String($('#persona-list').children.length));
+$('#persona-new').click();
+$('#pf-name').value = 'น้องสโมค';
+$('#pf-emoji').value = '🍊';
+$('#pf-system').value = 'คุณคือน้องสโมค พูดจาน่ารัก';
+$('#pf-greeting').value = 'สวัสดีค่ะ น้องสโมคมาแล้ว';
+$('#pf-save').click();
+await wait(20);
+check('persona: custom created', $('#persona-list').children.length === 9, String($('#persona-list').children.length));
+check('persona: selected header updated', $('#persona-name').textContent.includes('น้องสโมค'), $('#persona-name').textContent);
+check('persona: appears in dropdown', [...$('#set-persona').options].some((o) => o.textContent.includes('น้องสโมค')));
+
+// voice & streaming settings
+$('#nav button[data-view="settings"]').click();
+check('voice: thai voice listed', $('#set-voice').options.length >= 2, `${$('#set-voice').options.length} options`);
+$('#set-streaming').checked = false;
+$('#set-speakstream').checked = false;
+$('#save-settings-btn').click();
+await wait(20);
+$('#nav button[data-view="chat"]').click();
+$('#stop-btn').click();
+check('voice: stop button halts speech', $('#subtitle').textContent.includes('หยุดแล้ว'), $('#subtitle').textContent);
 
 // permission gate: risky tool must ask first
 submit('เปิดเว็บ example.com ให้หน่อย');
