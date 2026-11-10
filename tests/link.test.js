@@ -1,0 +1,112 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+globalThis.localStorage = (() => {
+  const m = new Map();
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k), clear: () => m.clear() };
+})();
+
+const {
+  signRequest, canonical, hexToBytes, bytesToHex, DeviceRegistry,
+  sendCommand, testConnection, deviceStatus, QUICK_COMMANDS,
+} = await import('../web/src/core/link.js');
+
+const SECRET = 'a'.repeat(64);
+const freshRegistry = () => { localStorage.clear(); return new DeviceRegistry(); };
+
+test('hex ↔ bytes round-trips', () => {
+  const bytes = hexToBytes('deadbeef');
+  assert.deepEqual([...bytes], [0xde, 0xad, 0xbe, 0xef]);
+  assert.equal(bytesToHex(bytes), 'deadbeef');
+  assert.equal(bytesToHex(hexToBytes('AA:BB')), 'aabb');
+});
+
+test('canonical string covers method, path and body', () => {
+  assert.equal(canonical('post', '/api/link/command', '{"a":1}'), 'POST\n/api/link/command\n{"a":1}');
+});
+
+test('signature is stable and differs when body changes', async () => {
+  const a = await signRequest(SECRET, 'POST', '/api/link/command', '{"x":1}');
+  const b = await signRequest(SECRET, 'POST', '/api/link/command', '{"x":1}');
+  const c = await signRequest(SECRET, 'POST', '/api/link/command', '{"x":2}');
+  assert.equal(a, b);
+  assert.notEqual(a, c);
+  assert.match(a, /^[0-9a-f]{64}$/);
+});
+
+test('registry add validates secret and base URL', () => {
+  const reg = freshRegistry();
+  assert.throws(() => reg.add({ name: 'x', baseUrl: 'http://a' }), /secret/);
+  assert.throws(() => reg.add({ name: 'x', baseUrl: 'http://a', secret: 'zzz' }), /secret/);
+  const d = reg.add({ name: 'PC', baseUrl: 'http://192.168.1.5:8787/', code: '123456', secret: SECRET });
+  assert.equal(d.baseUrl, 'http://192.168.1.5:8787');
+  assert.equal(reg.list().length, 1);
+});
+
+test('registry persists and removes devices', () => {
+  const reg = freshRegistry();
+  const d = reg.add({ name: 'PC', baseUrl: 'http://a', code: '1', secret: SECRET });
+  const reloaded = new DeviceRegistry();
+  assert.equal(reloaded.list().length, 1);
+  assert.equal(reloaded.get(d.id).name, 'PC');
+  assert.equal(reloaded.remove(d.id), true);
+  assert.equal(new DeviceRegistry().list().length, 0);
+});
+
+test('registry touch updates lastSeen', () => {
+  const reg = freshRegistry();
+  const d = reg.add({ name: 'PC', baseUrl: 'http://a', code: '1', secret: SECRET });
+  const before = d.lastSeen;
+  const after = reg.touch(d.id, { lastCommand: 'ping' });
+  assert.ok(after.lastSeen >= before);
+  assert.equal(after.lastCommand, 'ping');
+});
+
+test('sendCommand signs and posts, and errors surface server messages', async () => {
+  const reg = freshRegistry();
+  const device = reg.add({ name: 'PC', baseUrl: 'http://srv', code: '42', secret: SECRET });
+  let seen = null;
+  globalThis.fetch = async (url, init) => {
+    seen = { url, init };
+    return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, id: 'c-1' }) };
+  };
+  const res = await sendCommand(device, 'ping', { a: 1 });
+  assert.equal(res.id, 'c-1');
+  assert.equal(seen.url, 'http://srv/api/link/command');
+  assert.equal(seen.init.method, 'POST');
+  assert.equal(seen.init.headers['X-No7-Code'], '42');
+  assert.match(seen.init.headers['X-No7-Signature'], /^[0-9a-f]{64}$/);
+  const expected = await signRequest(SECRET, 'POST', '/api/link/command', seen.init.body);
+  assert.equal(seen.init.headers['X-No7-Signature'], expected);
+
+  globalThis.fetch = async () => ({ ok: false, status: 401, text: async () => '{"error":"bad signature"}' });
+  await assert.rejects(() => sendCommand(device, 'ping'), /bad signature/);
+});
+
+test('status URL keeps the query out of the signature', async () => {
+  const reg = freshRegistry();
+  const device = reg.add({ name: 'PC', baseUrl: 'http://srv', code: '42', secret: SECRET });
+  let url = '';
+  let sig = '';
+  globalThis.fetch = async (u, init) => { url = u; sig = init.headers['X-No7-Signature']; return { ok: true, status: 200, text: async () => '{"online":true}' }; };
+  const st = await deviceStatus(device);
+  assert.equal(st.online, true);
+  assert.match(url, /\/api\/link\/status\?code=42/);
+  assert.equal(sig, await signRequest(SECRET, 'GET', '/api/link/status', ''));
+});
+
+test('testConnection hits /api/health', async () => {
+  const reg = freshRegistry();
+  const device = reg.add({ name: 'PC', baseUrl: 'http://srv', code: '1', secret: SECRET });
+  globalThis.fetch = async (u) => ({ ok: true, status: 200, text: async () => JSON.stringify({ version: '0.3.0' }) });
+  const res = await testConnection(device);
+  assert.equal(res.health.version, '0.3.0');
+});
+
+test('quick commands have ids and labels', () => {
+  assert.ok(QUICK_COMMANDS.length >= 5);
+  for (const c of QUICK_COMMANDS) {
+    assert.ok(c.id && c.label);
+    assert.equal(typeof c.args, 'object');
+  }
+});

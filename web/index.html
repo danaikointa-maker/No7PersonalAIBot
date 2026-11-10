@@ -25,6 +25,7 @@
           <button data-view="tools">🧰 เครื่องมือ</button>
           <button data-view="memory">🧠 ความจำ</button>
           <button data-view="calendar">📅 ตารางนัด</button>
+          <button data-view="devices">🔗 อุปกรณ์</button>
           <button data-view="settings">⚙️ ตั้งค่า</button>
         </nav>
         <div class="sidebar-foot">
@@ -129,6 +130,29 @@
           </div>
           <p id="cal-status" class="hint"></p>
           <div id="cal-list"></div>
+        </section>
+
+        <section id="view-devices" class="view">
+          <h2>🔗 อุปกรณ์ (Phone-Link)</h2>
+          <p class="hint">สั่งงาน PC / ESP32 ผ่าน companion server ด้วยลายเซ็น HMAC — ไม่มีคลาวด์</p>
+
+          <div id="dev-list"></div>
+
+          <h3>เพิ่มอุปกรณ์</h3>
+          <div class="row">
+            <input id="dev-name" placeholder="ชื่อ เช่น PC ห้องนอน" />
+            <input id="dev-url" placeholder="http://192.168.1.10:8787" />
+          </div>
+          <div class="row">
+            <input id="dev-code" placeholder="รหัสจับคู่ (6 หลัก)" inputmode="numeric" />
+            <input id="dev-secret" placeholder="secret (hex 64)" type="password" />
+          </div>
+          <div class="row">
+            <button id="dev-pair">🎲 ขอรหัสจาก server</button>
+            <button id="dev-add">＋ เพิ่มอุปกรณ์</button>
+          </div>
+          <p id="dev-status" class="hint"></p>
+          <pre id="dev-log" class="code" hidden></pre>
         </section>
 
         <section id="view-settings" class="view">

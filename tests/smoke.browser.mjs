@@ -103,7 +103,7 @@ const submit = (text) => {
 await wait(100);
 check('boot: initial state', ['IDLE', 'SETUP'].includes($('#state-label').textContent), $('#state-label').textContent);
 check('boot: welcome message', $('#messages').children.length >= 1);
-check('boot: 23 tools in auto mode', $('#tools-grid').children.length === 23, String($('#tools-grid').children.length));
+check('boot: 24 tools in auto mode', $('#tools-grid').children.length === 24, String($('#tools-grid').children.length));
 check('boot: 5 role modes', $('#mode-chips').children.length === 5, String($('#mode-chips').children.length));
 check('boot: persona header', $('#persona-name').textContent.length > 0);
 
@@ -113,10 +113,10 @@ check('nav: memory view', $('#view-memory').classList.contains('active'));
 // mode switching filters tools
 window.document.querySelector('#mode-chips button[data-mode="hub"]').click();
 await wait(20);
-check('mode: hub filters tools', $('#tools-grid').children.length === 17, String($('#tools-grid').children.length));
+check('mode: hub filters tools', $('#tools-grid').children.length === 18, String($('#tools-grid').children.length));
 window.document.querySelector('#mode-chips button[data-mode="auto"]').click();
 await wait(20);
-check('mode: back to auto', $('#tools-grid').children.length === 23);
+check('mode: back to auto', $('#tools-grid').children.length === 24);
 
 $('#set-provider').value = 'pollinations';
 $('#save-settings-btn').click();
@@ -180,6 +180,19 @@ $('#nav button[data-view="settings"]').click();
 $('#pair-btn').click();
 await wait(50);
 check('pairing: handled (code or clear warning)', /รหัสจับคู่|ต้องเปิดผ่าน https|สร้างไม่สำเร็จ/.test($('#pair-output').textContent), $('#pair-output').textContent.slice(0, 60));
+
+// devices view (no server running → must fail gracefully)
+$('#nav button[data-view="devices"]').click();
+$('#dev-name').value = 'PC ทดสอบ';
+$('#dev-url').value = 'http://127.0.0.1:9';
+$('#dev-code').value = '123456';
+$('#dev-secret').value = 'a'.repeat(64);
+$('#dev-add').click();
+await wait(20);
+check('devices: added to registry', $('#dev-list').textContent.includes('PC ทดสอบ'), $('#dev-list').textContent.slice(0, 60));
+$('#dev-list').querySelector('.dev-actions button')?.click();
+await wait(150);
+check('devices: failure logged, no crash', $('#dev-log').hidden === false, $('#dev-log').textContent.slice(0, 80));
 
 // Persona Studio
 $('#nav button[data-view="settings"]').click();

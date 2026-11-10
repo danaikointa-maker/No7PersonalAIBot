@@ -19,7 +19,7 @@ test('registry exposes the v0.2 tool set', () => {
   const expected = ['weather', 'air', 'crypto', 'fx', 'gold', 'wiki', 'news', 'calc',
     'timer', 'reminder', 'todo', 'note', 'memory_save', 'memory_search',
     'open_url', 'clipboard_copy', 'compose_message', 'open_app', 'system_info',
-    'calendar_add', 'calendar_list', 'rss_read', 'summarize_url'];
+    'calendar_add', 'calendar_list', 'rss_read', 'summarize_url', 'device_command'];
   for (const id of expected) assert.ok(TOOL_IDS.includes(id), `missing ${id}`);
 });
 

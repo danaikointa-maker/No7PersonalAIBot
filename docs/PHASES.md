@@ -8,7 +8,7 @@
 | 2 | เสียงไว + ปลุกด้วยชื่อ (Voice 2.0) | 2.1–2.5 | ✅ ปิดเฟส |
 | 3 | Persona Studio | 3.1–3.4 | ✅ ปิดเฟส |
 | 4 | Connectors & Sync | 4.1–4.4 | ✅ ปิดเฟส |
-| 5 | Device Hub (Phone-Link ครบวงจร) | 5.1–5.4 | ⬜ |
+| 5 | Device Hub (Phone-Link ครบวงจร) | 5.1–5.4 | ✅ ปิดเฟส |
 | 6 | Ship 1.0 (คุณภาพ + แจกจ่าย) | 6.1–6.4 | ⬜ |
 
 ## เฟส 1 — ความจำอัจฉริยะ
@@ -42,10 +42,10 @@
 
 ## เฟส 5 — Device Hub
 
-- 5.1 Link client (HMAC signer) + device registry ในเครื่อง
-- 5.2 Server: command queue + poll + pairing persistence
-- 5.3 UI: อุปกรณ์, ทดสอบเชื่อมต่อ, คำสั่งด่วน
-- 5.4 ESP32 reference client + tests
+- [x] 5.1 Link client (HMAC canonical signer) + device registry ในเครื่อง
+- [x] 5.2 Server: command queue + poll + results + status (ไฟล์/หน่วยความจำ)
+- [x] 5.3 UI อุปกรณ์ + tool `device_command` (control/risk3) + log
+- [x] 5.4 ESP32 reference client (`devices/esp32/`) + tests (10 link) + docs/DEVICES.md
 
 ## เฟส 6 — Ship 1.0
 

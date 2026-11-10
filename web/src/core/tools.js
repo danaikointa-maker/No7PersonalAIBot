@@ -1,5 +1,6 @@
 import { fetchText, stripHtml, pageMeta, parseRss, serverUrlFromSettings } from './net.js';
 import { getCalendar, formatWhen } from './calendar.js';
+import { getDeviceRegistry, sendCommand } from './link.js';
 
 // Tool registry — the ESP32 "42 tools with on-screen cards" principle, re-implemented
 // for web so the SAME code runs on mobile + PC. Only key-free public APIs by default,
@@ -396,6 +397,24 @@ export const TOOLS = {
     },
   },
 
+  device_command: {
+    emoji: '🔗',
+    label: 'สั่งอุปกรณ์',
+    desc: 'ส่งคำสั่งไปยังอุปกรณ์ที่ลงทะเบียนไว้ (PC/ESP32 ผ่าน Phone-Link)',
+    params: { device: 'string ชื่ออุปกรณ์ (ไม่ใส่ = เครื่องแรก)', command: 'string เช่น ping, status, eyes, say, time, sleep', args: 'object พารามิเตอร์เพิ่มเติม' },
+    async run({ device = '', command = 'ping', args = {} }) {
+      const list = getDeviceRegistry().list();
+      if (!list.length) throw new Error('ยังไม่มีอุปกรณ์ — เพิ่มที่เมนู 🔗 อุปกรณ์');
+      const target = list.find((d) => d.name.includes(device) || d.id === device) || list[0];
+      const res = await sendCommand(target, command, args);
+      return {
+        title: `ส่งคำสั่งไป ${target.name}`,
+        big: command,
+        lines: [`คิว: ${res?.id || '—'}`, target.baseUrl],
+      };
+    },
+  },
+
   system_info: {
     emoji: '📊',
     label: 'ข้อมูลเครื่อง',
@@ -443,6 +462,7 @@ export const TOOL_META = {
   open_url: { category: 'act', risk: 1 },
   compose_message: { category: 'message', risk: 2 },
   open_app: { category: 'control', risk: 3 },
+  device_command: { category: 'control', risk: 3 },
 };
 
 export function toolMeta(id) {

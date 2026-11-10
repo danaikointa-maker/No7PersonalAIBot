@@ -3,6 +3,7 @@ import { StateMachine, STATES } from './core/state.js';
 import { allPersonas, customPersonas, getPersona, createPersona, updatePersona, deletePersona, duplicatePersona, personaVoice } from './core/persona-store.js';
 import { getCalendar, formatWhen } from './core/calendar.js';
 import { collectBundle, pushBundle, pullBundle, mergeBundle } from './core/sync.js';
+import { getDeviceRegistry, sendCommand, deviceStatus, testConnection, QUICK_COMMANDS } from './core/link.js';
 import { MemoryStore } from './core/memory.js';
 import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatWithFallbackStream } from './core/ai-providers.js';
 import { TOOLS, TOOL_IDS, runTool, toolMeta, restoreReminders } from './core/tools.js';
@@ -69,10 +70,11 @@ $('#device-info').textContent = `${platformLabel(platform)} · จอ ${window.i
 function showView(name) {
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${name}`));
   document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
-  $('#view-title').textContent = { chat: 'แชทกับ No7', tools: 'เครื่องมือ', memory: 'ความจำ', calendar: 'ตารางนัด', settings: 'ตั้งค่า' }[name] || name;
+  $('#view-title').textContent = { chat: 'แชทกับ No7', tools: 'เครื่องมือ', memory: 'ความจำ', calendar: 'ตารางนัด', devices: 'อุปกรณ์', settings: 'ตั้งค่า' }[name] || name;
   $('#sidebar').classList.remove('open');
   if (name === 'tools') renderToolsGrid();
   if (name === 'calendar') renderCalendar();
+  if (name === 'devices') renderDevices();
   if (name === 'memory') {
     memQuery = '';                       // เข้าหน้าความจำ = ดูทั้งหมดก่อน
     const q = $('#mem-query');
@@ -672,6 +674,129 @@ $('#cal-today-btn').addEventListener('click', () => {
   $('#cal-status').textContent = list.length
     ? `วันนี้/พรุ่งนี้: ${list.map((e) => `${formatWhen(e.start)} ${e.title}`).join(' · ')}`
     : 'ไม่มีนัดในช่วง 24 ชั่วโมง';
+});
+
+/* ----------------------------------------------------------------- devices */
+const devices = getDeviceRegistry();
+
+function devLog(text) {
+  const el = $('#dev-log');
+  el.hidden = false;
+  el.textContent = `${new Date().toLocaleTimeString('th-TH')} — ${text}\n${el.textContent}`.slice(0, 4000);
+}
+
+function renderDevices() {
+  const box = $('#dev-list');
+  if (!box) return;
+  const list = devices.list();
+  box.innerHTML = list.length ? '' : '<p class="hint">ยังไม่มีอุปกรณ์ — เปิด server (npm run server) แล้วเพิ่มอุปกรณ์ด้านล่าง</p>';
+
+  for (const d of list) {
+    const card = document.createElement('div');
+    card.className = 'device';
+
+    const header = document.createElement('header');
+    header.innerHTML = `<span class="dot" id="dot-${d.id}"></span><strong>${d.name}</strong>`
+      + `<small>${d.baseUrl}</small>`;
+    card.appendChild(header);
+
+    const info = document.createElement('small');
+    info.textContent = `รหัส ${d.code || '—'} · ${d.lastSeen ? `เห็นล่าสุด ${new Date(d.lastSeen).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}` : 'ยังไม่เคยเชื่อมต่อ'}`;
+    card.appendChild(info);
+
+    const actions = document.createElement('div');
+    actions.className = 'dev-actions';
+
+    const testBtn = document.createElement('button');
+    testBtn.textContent = '🔌 ทดสอบ';
+    testBtn.addEventListener('click', async () => {
+      testBtn.disabled = true;
+      try {
+        const r = await testConnection(d);
+        devices.touch(d.id);
+        renderDevices();
+        devLog(`✅ ${d.name}: เชื่อมต่อได้ (v${r.health?.version || '?'})`);
+      } catch (e) { devLog(`❌ ${d.name}: ${e.message}`); }
+      testBtn.disabled = false;
+    });
+    actions.appendChild(testBtn);
+
+    const statusBtn = document.createElement('button');
+    statusBtn.textContent = '📊 สถานะ';
+    statusBtn.addEventListener('click', async () => {
+      try {
+        const st = await deviceStatus(d);
+        const dot = document.getElementById(`dot-${d.id}`);
+        if (dot) dot.className = `dot ${st.online ? 'online' : 'offline'}`;
+        devLog(`${d.name}: online=${st.online} · ค้างส่ง ${st.pending} · ส่งแล้ว ${st.delivered}`);
+      } catch (e) { devLog(`❌ ${d.name}: ${e.message}`); }
+    });
+    actions.appendChild(statusBtn);
+
+    for (const q of QUICK_COMMANDS.slice(0, 4)) {
+      const b = document.createElement('button');
+      b.textContent = q.label;
+      b.addEventListener('click', async () => {
+        try {
+          const res = await sendCommand(d, q.id, q.args);
+          devices.touch(d.id, { lastCommand: q.id });
+          devLog(`➡️ ${d.name}: ส่ง "${q.label}" (${res?.id || 'queued'})`);
+          renderDevices();
+        } catch (e) { devLog(`❌ ส่งไม่สำเร็จ: ${e.message}`); }
+      });
+      actions.appendChild(b);
+    }
+
+    const del = document.createElement('button');
+    del.className = 'danger';
+    del.textContent = 'ลบ';
+    del.addEventListener('click', () => {
+      if (!confirm(`ลบอุปกรณ์ ${d.name}?`)) return;
+      devices.remove(d.id);
+      renderDevices();
+    });
+    actions.appendChild(del);
+
+    card.appendChild(actions);
+    box.appendChild(card);
+  }
+}
+
+$('#dev-pair').addEventListener('click', async () => {
+  const url = ($('#dev-url').value.trim() || settings.serverUrl || '').replace(/\/$/, '');
+  if (!url) { $('#dev-status').textContent = 'ใส่ที่อยู่ server ก่อน'; return; }
+  $('#dev-status').textContent = 'กำลังขอรหัส…';
+  try {
+    const res = await fetch(`${url}/api/pair`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'no7-device' }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    $('#dev-code').value = data.code;
+    $('#dev-secret').value = data.secret;
+    $('#dev-status').textContent = `ได้รหัส ${data.code} แล้ว — นำไปใส่ในอุปกรณ์ (บอร์ด) ด้วย`;
+    devLog(`ขอรหัสจับคู่จาก ${url} สำเร็จ`);
+  } catch (e) {
+    $('#dev-status').textContent = `ขอรหัสไม่สำเร็จ: ${e.message}`;
+  }
+});
+
+$('#dev-add').addEventListener('click', () => {
+  try {
+    const d = devices.add({
+      name: $('#dev-name').value.trim() || 'อุปกรณ์ใหม่',
+      baseUrl: $('#dev-url').value.trim(),
+      code: $('#dev-code').value.trim(),
+      secret: $('#dev-secret').value.trim(),
+    });
+    $('#dev-status').textContent = `เพิ่ม ${d.name} แล้ว ✅`;
+    $('#dev-name').value = ''; $('#dev-code').value = ''; $('#dev-secret').value = '';
+    renderDevices();
+  } catch (e) {
+    $('#dev-status').textContent = `เพิ่มไม่สำเร็จ: ${e.message}`;
+  }
 });
 
 /* --------------------------------------------------------------- settings */
