@@ -53,6 +53,15 @@ curl -X PUT http://localhost:8787/api/sync \
 curl http://localhost:8787/api/sync -H "X-No7-Sync: $NO7_SYNC_TOKEN"
 ```
 
+## MCP / เครื่องมือภายนอก
+
+นอกจากคอนเนกเตอร์ในเครื่องแล้ว No7 ต่อกับ MCP server ได้ (Gmail, ปฏิทิน, ไฟล์, ฐานข้อมูล)
+ผ่าน JSON-RPC 2.0 over HTTP — ดูรายละเอียดที่ [`docs/MCP.md`](./MCP.md)
+
+- เพิ่ม server ที่หน้าตั้งค่า → ปลั๊กอิน MCP (ชื่อ + URL + API key)
+- เครื่องมือที่ค้นพบจะกลายเป็น `mcp__<server>__<tool>` และเรียกผ่าน permission gate หมวด `mcp` (risk 2 = ถามก่อน)
+- ต้องมี companion server (`npm run server`) เป็น proxy เว้นแต่ MCP server เปิด CORS เอง
+
 ## ข้อจำกัดที่รู้ตัว
 
 - ยังไม่มี conflict resolution ระดับ field — ใช้การรวมแบบ additive (ปลอดภัยกว่า แต่ไม่ลบข้อมูลตามอีกเครื่อง)

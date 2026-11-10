@@ -24,6 +24,13 @@ export const DEFAULT_SETTINGS = {
   voiceRate: 1,
   voicePitch: 1,
   voiceName: '',
+  ttsProvider: 'system',   // system | openai | off
+  ttsVoice: 'alloy',       // OpenAI-compatible voice name
+  ttsModel: 'tts-1',
+  ttsBaseUrl: '',
+  ttsApiKey: '',
+  bargeIn: 'keyword',      // off | keyword | any
+  mcpServers: [],          // [{id, name, url, apiKey, transport, enabled}]
   serverUrl: 'http://localhost:8787',   // companion server (AI proxy / tools / sync)
   syncToken: '',
 };
@@ -41,7 +48,15 @@ export function loadSettings() {
 
 export function saveSettings(patch) {
   const next = { ...loadSettings(), ...patch };
-  try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
+  try {
+    localStorage.setItem(KEY, JSON.stringify(next));
+  } catch (err) {
+    try {
+      globalThis.dispatchEvent?.(new CustomEvent('no7:storage-error', {
+        detail: { key: KEY, message: `บันทึกตั้งค่าไม่สำเร็จ: ${err?.message || err}` },
+      }));
+    } catch {}
+  }
   return next;
 }
 

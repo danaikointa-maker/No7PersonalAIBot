@@ -4,9 +4,15 @@ import { allPersonas, customPersonas, getPersona, createPersona, updatePersona, 
 import { getCalendar, formatWhen } from './core/calendar.js';
 import { collectBundle, pushBundle, pullBundle, mergeBundle } from './core/sync.js';
 import { getDeviceRegistry, sendCommand, deviceStatus, testConnection, QUICK_COMMANDS } from './core/link.js';
+import { detectCapabilities, summarizeCapabilities, requestMicrophone, requestNotifications } from './core/capabilities.js';
+import { usageBreakdown, formatBytes, estimateQuota, isPersisted, requestPersistentStorage, clearGroup } from './core/storage.js';
 import { MemoryStore } from './core/memory.js';
 import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatWithFallbackStream } from './core/ai-providers.js';
-import { TOOLS, TOOL_IDS, runTool, toolMeta, restoreReminders } from './core/tools.js';
+import { getTool, TOOL_IDS, runTool, toolMeta, restoreReminders, registerDynamicTools } from './core/tools.js';
+import { McpRegistry } from './core/mcp.js';
+import { withRetry, classifyError, OfflineQueue } from './core/retry.js';
+import { Metrics, formatMs, METRIC_KINDS } from './core/metrics.js';
+import { buildDiagnosticsReport, diagnosticsFilename, redact } from './core/diagnostics.js';
 import { Agent } from './core/agent.js';
 import { MODES, MODE_IDS, getMode, toolsForMode } from './core/modes.js';
 import { CATEGORIES, AUTONOMY, DEFAULT_PERMISSIONS, normalizePermissions, riskLabel } from './core/permissions.js';
@@ -14,10 +20,94 @@ import { consolidate, shouldConsolidate, startDailyConsolidation } from './core/
 import { Voice } from './core/voice.js';
 import { SentenceSplitter, SpeechQueue, withCursor } from './core/stream.js';
 import { WakeWord } from './core/wake.js';
+import { BargeIn, BARGE_MODES } from './core/bargein.js';
+import { TTSRouter, TTS_PROVIDERS } from './core/tts.js';
 import { EyeAvatar } from './ui/avatar.js';
 import { renderCard, renderError } from './ui/cards.js';
 import { loadSettings, saveSettings, resetSettings, hasProviderConfigured, loadPermissions } from './core/settings.js';
 import { detectPlatform, platformLabel, isDesktopHost } from './core/platform.js';
+
+/** escape ค่าที่มาจากภายนอกก่อนใส่ innerHTML */
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[c]));
+
+/* ------------------------------------------------------------------- MCP */
+const mcp = new McpRegistry({
+  settings: () => settings,
+  serverUrl: () => settings.serverUrl || 'http://localhost:8787',
+});
+
+function applyMcpTools() {
+  const defs = mcp.toolDefs();
+  registerDynamicTools(defs);
+  return Object.keys(defs).length;
+}
+
+function renderMcp() {
+  const list = $('#mcp-list');
+  if (!list) return;
+  const cfg = Array.isArray(settings.mcpServers) ? settings.mcpServers : [];
+  const status = mcp.status();
+  if (!cfg.length) {
+    list.innerHTML = '<p class="hint">ยังไม่มี MCP server — เพิ่มด้านล่างได้เลย</p>';
+    $('#mcp-status').textContent = 'ยังไม่มี server';
+    return;
+  }
+  list.innerHTML = cfg.map((s) => {
+    const row = status.servers.find((r) => r.id === (s.id || s.name || s.url));
+    const on = s.enabled !== false;
+    return `<div class="mcp-row" data-id="${esc(s.id || s.name || s.url)}">
+      <div class="mcp-main">
+        <strong>${esc(s.name || s.id || 'MCP')}</strong>
+        <span class="hint">${esc(s.url)}</span>
+        <span class="hint">${row ? `${row.tools} เครื่องมือ${row.error ? ` · ⚠️ ${esc(row.error)}` : ''}` : 'ยังไม่ได้เชื่อม'}</span>
+      </div>
+      <div class="row">
+        <label class="switch"><input type="checkbox" data-mcp-toggle ${on ? 'checked' : ''} /> เปิด</label>
+        <button data-mcp-remove>ลบ</button>
+      </div>
+    </div>`;
+  }).join('');
+  const total = status.totalTools;
+  $('#mcp-status').textContent = total
+    ? `เชื่อมต่อแล้ว ${status.servers.filter((r) => !r.error).length}/${status.servers.length} server · ${total} เครื่องมือ`
+    : 'ยังไม่ได้ค้นหาเครื่องมือ — กด "ค้นหาเครื่องมือ"';
+}
+
+async function refreshMcp({ quiet = false } = {}) {
+  if (!Array.isArray(settings.mcpServers) || !settings.mcpServers.length) {
+    renderMcp();
+    return [];
+  }
+  if (!quiet) $('#mcp-status').textContent = 'กำลังเชื่อมต่อ MCP…';
+  const results = await mcp.refresh();
+  const count = applyMcpTools();
+  renderMcp();
+  renderToolsGrid(true);
+  if (!quiet) {
+    const bad = results.filter((r) => !r.ok);
+    $('#mcp-status').textContent = bad.length
+      ? `เชื่อมได้ ${results.length - bad.length}/${results.length} server · ${bad.map((b) => `${b.name}: ${b.error}`).join(' · ')}`
+      : `เชื่อมต่อแล้ว ${results.length} server · ${count} เครื่องมือ`;
+  }
+  return results;
+}
+
+function saveMcpServers(next) {
+  settings = saveSettings({ mcpServers: next });
+  renderMcp();
+}
+
+/* ------------------------------------------------------- metrics / outbox */
+const metrics = new Metrics();
+const outbox = new OfflineQueue();
+const recentErrors = [];
+
+function noteError(err, where) {
+  recentErrors.push({ at: Date.now(), where, message: redact(err?.message || String(err)).slice(0, 300) });
+  if (recentErrors.length > 10) recentErrors.shift();
+}
 
 /* ------------------------------------------------------------------ boot */
 const $ = (sel) => document.querySelector(sel);
@@ -146,9 +236,18 @@ async function speak(text) {
   setSubtitle(text);
   $('#stop-btn').hidden = false;
   wakeWord.pause();
+  bargeIn.mode = settings.bargeIn || 'keyword';
+  bargeIn.setSpoken(text);
+  bargeIn.start();
+  const ttsStart = performance.now();
   try {
-    await voice.speak(text, voiceOptions());
+    await tts.speak(text, voiceOptions());
+    metrics.record({ kind: 'tts', label: settings.ttsProvider || 'system', totalMs: performance.now() - ttsStart });
+  } catch (err) {
+    metrics.record({ kind: 'tts', label: settings.ttsProvider || 'system', totalMs: performance.now() - ttsStart, ok: false });
+    noteError(err, 'tts');
   } finally {
+    bargeIn.stop();
     $('#stop-btn').hidden = true;
     wakeWordResume();
   }
@@ -209,7 +308,9 @@ async function respond(userText) {
   const botEl = addMessage('bot', '…');
   const cards = [];
   const splitter = new SentenceSplitter();
-  const queue = new SpeechQueue(voice);
+  const queue = new SpeechQueue(speechVoice, {
+    onSentence: (sentence) => { bargeIn.setSpoken(sentence); },
+  });
   activeQueue = queue;
 
   const streaming = !!settings.streaming;
@@ -217,24 +318,48 @@ async function respond(userText) {
   let streamBuf = '';
   let toolLikely = false;
   let botText = '';
+  const chatStart = performance.now();
+  let firstTokenAt = 0;
+  let chatOk = true;
+  let retriedOnce = false;
 
   wakeWord.pause();
+  bargeIn.mode = settings.bargeIn || 'keyword';
+  if (speakLive) bargeIn.start();
   $('#stop-btn').hidden = false;
 
   const agent = new Agent({
-    chat: (messages, { onToken } = {}) => (streaming
-      ? chatWithFallbackStream(messages, chain, { fallback, onToken })
-      : chatWithFallback(messages, chain, { fallback })),
+    chat: (messages, { onToken } = {}) => {
+      let emitted = false;
+      const tap = onToken ? (delta) => { emitted = true; onToken(delta); } : undefined;
+      // ลองใหม่เฉพาะเมื่อยังไม่มี token ไหลออกมา (กันข้อความซ้ำ)
+      return withRetry(
+        () => (streaming
+          ? chatWithFallbackStream(messages, chain, { fallback, onToken: tap })
+          : chatWithFallback(messages, chain, { fallback })),
+        {
+          retries: 1,
+          baseMs: 400,
+          isRetryable: (err) => !emitted && classifyError(err).retryable,
+          onRetry: ({ delay, kind }) => {
+            retriedOnce = true;
+            setSubtitle(`เชื่อมต่อสะดุด (${kind}) — กำลังลองใหม่ใน ${Math.round(delay / 100) / 10}s`);
+          },
+        },
+      );
+    },
     memory,
     settings,
     confirm: askConfirm,
     maxSteps: Number(settings.maxSteps) || 4,
+    onToolTiming: ({ tool, ms, ok }) => metrics.record({ kind: 'tool', label: tool, totalMs: ms, ok }),
     onEvent: (e) => {
       if (e.type === 'thinking') {
         sm.set({ requestInFlight: true, toolRunning: false });
         if (e.step > 1 && !streamBuf) botEl.textContent = 'กำลังคิดต่อ…';
       }
       if (e.type === 'token') {
+        if (!firstTokenAt) firstTokenAt = performance.now();
         streamBuf += e.delta;
         if (streamBuf.includes('```') || /^\s*\{/.test(streamBuf)) toolLikely = true;
         botEl.textContent = withCursor(streamBuf, !toolLikely);
@@ -292,6 +417,8 @@ async function respond(userText) {
     sm.set({ requestInFlight: false, toolRunning: false });
     if (!speakLive) await speak(botText);
   } catch (err) {
+    chatOk = false;
+    noteError(err, retriedOnce ? 'chat(retry)' : 'chat');
     queue.stop();
     botEl.textContent = `⚠️ ${err.message}`;
     sm.set({ error: err.message, requestInFlight: false, toolRunning: false });
@@ -299,9 +426,19 @@ async function respond(userText) {
     setTimeout(() => sm.set({ error: null }), 4000);
   } finally {
     busy = false;
+    bargeIn.stop();
     $('#stop-btn').hidden = true;
     wakeWordResume();
     avatar.setEmotion(stateEmotion(sm.current));
+    metrics.record({
+      kind: 'chat',
+      label: settings.provider || 'auto',
+      firstTokenMs: firstTokenAt ? firstTokenAt - chatStart : null,
+      totalMs: performance.now() - chatStart,
+      ok: chatOk,
+      error: chatOk ? null : 'chat failed',
+    });
+    renderMetrics();
   }
 }
 
@@ -324,8 +461,35 @@ $('#composer').addEventListener('submit', (e) => {
   if (!text) return;
   $('#input').value = '';
   addMessage('user', text);
+
+  if (!navigator.onLine) {
+    outbox.enqueue(text);
+    addMessage('bot', `📥 ออฟไลน์อยู่ — เก็บข้อความไว้ในคิวแล้ว (${outbox.size()} รายการ) จะส่งให้ทันทีที่กลับมาออนไลน์`);
+    setSubtitle('ออฟไลน์ — เก็บข้อความไว้ในคิว');
+    updateOutboxBadge();
+    return;
+  }
   respond(text);
 });
+
+/** ส่งข้อความที่ค้างในคิวเมื่อกลับมาออนไลน์ */
+async function flushOutbox() {
+  if (!outbox.size() || !navigator.onLine) { updateOutboxBadge(); return; }
+  const { sent, left } = await outbox.drain(async (item) => {
+    if (busy) throw new Error('busy');
+    await respond(item.text);
+  });
+  if (sent) addMessage('bot', `📤 ส่งข้อความที่ค้างไว้ให้แล้ว ${sent} รายการ${left ? ` (เหลือ ${left})` : ''}`);
+  updateOutboxBadge();
+}
+
+function updateOutboxBadge() {
+  const n = outbox.size();
+  const el = $('#outbox-badge');
+  if (!el) return;
+  el.hidden = n === 0;
+  el.textContent = `📥 ค้างส่ง ${n}`;
+}
 
 /** ฟังหนึ่งครั้ง → ส่งข้อความ (ใช้ร่วมกันทั้งปุ่มไมค์และ wake word) */
 async function triggerListen() {
@@ -381,10 +545,38 @@ function syncWake() {
   try { wakeWord.start(); } catch (e) { $('#voice-status').textContent = e.message; }
 }
 
+/* ---------------------------------------------------------- tts + barge-in */
+const tts = new TTSRouter({
+  settings: () => settings,
+  voice,
+  serverUrl: () => settings.serverUrl || 'http://localhost:8787',
+});
+tts.onFallback = (err) => {
+  setSubtitle(`เสียงคุณภาพสูงใช้ไม่ได้ (${err.message}) — เปลี่ยนเป็นเสียงเครื่องให้แล้ว`);
+};
+
+const bargeIn = new BargeIn({
+  mode: settings.bargeIn || 'keyword',
+  lang: settings.language === 'en' ? 'en-US' : 'th-TH',
+  onInterrupt: (heard) => {
+    stopSpeaking();
+    setSubtitle(`✋ หยุดให้แล้ว (ได้ยิน "${heard.slice(0, 24)}")`);
+    sm.touch();
+  },
+});
+
+/** voice ที่มี interface เดียวกับ Voice แต่ผ่าน router (ใช้กับ SpeechQueue) */
+const speechVoice = {
+  speak: (text) => tts.speak(text, voiceOptions()),
+  stopSpeaking: () => tts.stop(),
+};
+
 /* ---------------------------------------------------------- stop speaking */
 function stopSpeaking() {
   activeQueue?.stop();
   activeQueue = null;
+  bargeIn.stop();
+  tts.stop();
   voice.stopSpeaking();
   $('#stop-btn').hidden = true;
   setSubtitle('หยุดแล้ว');
@@ -409,21 +601,22 @@ function stateEmotion(s) {
 }
 
 /* ------------------------------------------------------------------ tools */
-function renderToolsGrid() {
+function renderToolsGrid(force = false) {
   const grid = $('#tools-grid');
   const mode = getMode(settings.mode);
   const modeId = settings.mode || 'auto';
-  if (grid.dataset.ready === modeId) return;
+  if (!force && grid.dataset.ready === modeId) return;
+  if (force) grid.dataset.ready = '';
   grid.innerHTML = '';
   grid.dataset.ready = modeId;
 
   const ids = toolsForMode(modeId);
   for (const id of ids) {
-    const t = TOOLS[id];
+    const t = getTool(id);
     const meta = toolMeta(id);
     const btn = document.createElement('button');
     btn.className = 'tool-btn';
-    btn.innerHTML = `<strong>${t.emoji} ${t.label}</strong><small>${t.desc}</small>`
+    btn.innerHTML = `<strong>${esc(t.emoji)} ${esc(t.label)}</strong><small>${esc(t.desc)}</small>`
       + `<small style="display:block;opacity:.7;margin-top:4px">${CATEGORIES[meta.category]?.label || meta.category} · ${riskLabel(meta.risk)}</small>`;
     btn.addEventListener('click', async () => {
       const out = $('#tool-result');
@@ -850,6 +1043,24 @@ function renderSettingsForm() {
   $('#set-synctoken').value = settings.syncToken || '';
   renderPermList();
 
+  const ttsSel = $('#set-ttsprovider');
+  ttsSel.innerHTML = Object.entries(TTS_PROVIDERS).map(([id, p]) => `<option value="${id}">${p.label}</option>`).join('');
+  ttsSel.value = TTS_PROVIDERS[settings.ttsProvider] ? settings.ttsProvider : 'system';
+  $('#tts-provider-hint').textContent = TTS_PROVIDERS[ttsSel.value].desc;
+  $('#tts-openai-fields').hidden = ttsSel.value !== 'openai';
+  $('#set-ttsbaseurl').value = settings.ttsBaseUrl || '';
+  $('#set-ttsapikey').value = settings.ttsApiKey || '';
+  $('#set-ttsmodel').value = settings.ttsModel || 'tts-1';
+  $('#set-ttsvoice').value = settings.ttsVoice || 'alloy';
+
+  const bargeSel = $('#set-bargein');
+  bargeSel.innerHTML = Object.entries(BARGE_MODES).map(([id, m]) => `<option value="${id}">${m.label}</option>`).join('');
+  bargeSel.value = BARGE_MODES[settings.bargeIn] ? settings.bargeIn : 'keyword';
+
+  renderMcp();
+  renderMetrics();
+  updateOutboxBadge();
+
   $('#set-streaming').checked = settings.streaming !== false;
   $('#set-speakstream').checked = settings.speakWhileStreaming !== false;
   $('#set-wake').checked = !!settings.wake;
@@ -859,6 +1070,8 @@ function renderSettingsForm() {
   $('#out-pitch').textContent = Number(settings.voicePitch || 1).toFixed(2);
   renderVoiceOptions();
   renderPersonaList();
+  renderCapabilities();
+  renderStorage();
   $('#set-language').value = settings.language;
   $('#set-polite').checked = settings.polite;
   $('#set-tts').checked = settings.tts;
@@ -905,6 +1118,12 @@ function collectSettings() {
       autonomy: $('#set-autonomy').value,
       allow: { ...(permDraft?.allow || DEFAULT_PERMISSIONS.allow) },
     },
+    ttsProvider: $('#set-ttsprovider').value,
+    ttsBaseUrl: $('#set-ttsbaseurl').value.trim(),
+    ttsApiKey: $('#set-ttsapikey').value.trim(),
+    ttsModel: $('#set-ttsmodel').value.trim(),
+    ttsVoice: $('#set-ttsvoice').value.trim(),
+    bargeIn: $('#set-bargein').value,
     streaming: $('#set-streaming').checked,
     speakWhileStreaming: $('#set-speakstream').checked,
     wake: $('#set-wake').checked,
@@ -915,6 +1134,105 @@ function collectSettings() {
     syncToken: $('#set-synctoken').value.trim(),
   };
 }
+
+/* ------------------------------------------------ device capabilities */
+async function renderCapabilities() {
+  const box = $('#caps-list');
+  if (!box) return;
+  const caps = await detectCapabilities(window);
+  const sum = summarizeCapabilities(caps);
+  box.innerHTML = '';
+
+  const head = document.createElement('div');
+  head.className = 'hint';
+  head.textContent = `พร้อมใช้ ${sum.ok}/${sum.total} (${sum.score}%)`
+    + (sum.missing.length ? ` · ยังไม่มี: ${sum.missing.join(', ')}` : '');
+  box.appendChild(head);
+
+  for (const c of caps) {
+    const row = document.createElement('div');
+    row.className = `cap ${c.ok ? 'ok' : 'no'}`;
+    const label = document.createElement('span');
+    label.textContent = c.label;
+    const mark = document.createElement('span');
+    mark.className = 'mark';
+    mark.textContent = c.ok ? '✅' : '➖';
+    const extra = document.createElement('small');
+    extra.textContent = c.value ? String(c.value) : (c.ok ? '' : (c.hint || 'ไม่รองรับ'));
+    row.append(mark, label, extra);
+    box.appendChild(row);
+  }
+}
+
+async function renderStorage() {
+  const { rows, total } = usageBreakdown(window);
+  const est = await estimateQuota(window);
+  const persisted = await isPersisted(window);
+
+  $('#storage-summary').textContent = `ข้อมูล No7 ใช้ ${formatBytes(total)}`
+    + (est?.quota ? ` · เบราว์เซอร์ใช้ ${est.usageText}/${est.quotaText} (${est.percent}%)` : '')
+    + ` · พื้นที่ถาวร: ${persisted ? '✅ เปิดแล้ว' : '❌ ยังไม่เปิด'}`;
+
+  const box = $('#storage-rows');
+  box.innerHTML = '';
+  const max = Math.max(1, ...rows.map((r) => r.bytes));
+  for (const r of rows.filter((x) => x.bytes > 0).sort((a, b) => b.bytes - a.bytes)) {
+    const row = document.createElement('div');
+    row.className = 'storage-row';
+    row.innerHTML = `<span>${r.label}</span><span class="bar"><i style="width:${Math.round((r.bytes / max) * 100)}%"></i></span><span>${formatBytes(r.bytes)}</span>`;
+    box.appendChild(row);
+  }
+  if (!box.children.length) box.innerHTML = '<p class="hint">ยังไม่มีข้อมูลที่บันทึกไว้</p>';
+}
+
+$('#caps-refresh').addEventListener('click', () => renderCapabilities());
+$('#caps-mic').addEventListener('click', async () => {
+  $('#caps-status').textContent = 'กำลังขอสิทธิ์…';
+  try {
+    await requestMicrophone(window);
+    $('#caps-status').textContent = '✅ ได้สิทธิ์ไมโครโฟนแล้ว';
+    renderCapabilities();
+  } catch (e) {
+    $('#caps-status').textContent = `❌ ${e.message}`;
+  }
+});
+$('#caps-notify').addEventListener('click', async () => {
+  try {
+    const res = await requestNotifications(window);
+    $('#caps-status').textContent = res === 'granted' ? '✅ เปิดแจ้งเตือนแล้ว' : `ผล: ${res}`;
+    renderCapabilities();
+  } catch (e) {
+    $('#caps-status').textContent = `❌ ${e.message}`;
+  }
+});
+
+$('#storage-persist').addEventListener('click', async () => {
+  try {
+    const ok = await requestPersistentStorage(window);
+    $('#settings-status').textContent = ok ? '✅ ได้พื้นที่ถาวรแล้ว' : 'เบราว์เซอร์ยังไม่อนุญาต (อาจต้องติดตั้งเป็นแอปก่อน)';
+    renderStorage();
+  } catch (e) {
+    $('#settings-status').textContent = `❌ ${e.message}`;
+  }
+});
+$('#storage-clean-metrics').addEventListener('click', () => {
+  clearGroup('metrics', window);
+  renderStorage();
+  $('#settings-status').textContent = 'ล้างสถิติแล้ว';
+});
+$('#storage-clean-notes').addEventListener('click', () => {
+  if (!confirm('ล้างโน้ต/รายการงาน/เตือนความจำ?')) return;
+  clearGroup('notes', window);
+  renderStorage();
+  $('#settings-status').textContent = 'ล้างโน้ตและรายการงานแล้ว';
+});
+
+// แจ้งเตือนเมื่อพื้นที่เต็ม
+window.addEventListener('no7:storage-error', (e) => {
+  const msg = e.detail?.message || 'พื้นที่เก็บข้อมูลเต็ม';
+  $('#offline-banner').hidden = false;
+  $('#offline-banner').textContent = `⚠️ ${msg}`;
+});
 
 /* ------------------------------------------------------- Persona Studio */
 let editingPersonaId = null;
@@ -1020,14 +1338,158 @@ $('#pf-preview').addEventListener('click', async () => {
   $('#pf-status').textContent = 'พูดจบแล้ว';
 });
 
+/* ------------------------------------------------- metrics + diagnostics */
+function renderMetrics() {
+  const box = $('#metrics-list');
+  if (!box) return;
+  const sum = metrics.summary();
+  $('#metrics-summary').textContent = sum.total
+    ? `เก็บ ${sum.total} ตัวอย่าง (ในเครื่องนี้เท่านั้น)`
+    : 'ยังไม่มีข้อมูล — ลองคุยหรือใช้เครื่องมือสักครั้ง';
+  const rows = [];
+  for (const [kind, meta] of Object.entries(METRIC_KINDS)) {
+    const k = sum.kinds[kind];
+    if (!k.count) continue;
+    rows.push(`<div class="metric-row"><span>${meta.emoji} ${meta.label}</span><span>${k.count} ครั้ง · เฉลี่ย ${formatMs(k.avg)} · p95 ${formatMs(k.p95)}`
+      + `${k.firstTokenAvg ? ` · token แรก ${formatMs(k.firstTokenAvg)}` : ''} · สำเร็จ ${Math.round((k.okRate || 0) * 100)}%</span></div>`);
+  }
+  for (const l of sum.labels.slice(0, 5)) {
+    rows.push(`<div class="metric-row"><span>${METRIC_KINDS[l.kind]?.emoji || '•'} ${esc(l.label)}</span><span>${l.count} ครั้ง · เฉลี่ย ${formatMs(l.avg)}</span></div>`);
+  }
+  box.innerHTML = rows.join('') || '<p class="hint">ยังไม่มีข้อมูล</p>';
+}
+
+async function renderDiagnostics() {
+  const out = $('#diag-output');
+  if (!out) return '';
+  const caps = await detectCapabilities(window);
+  const { rows, total } = usageBreakdown(window);
+  const persisted = await isPersisted(window);
+  const report = buildDiagnosticsReport({
+    app: {
+      name: 'No7 Personal AI',
+      version: window.NO7_VERSION || '1.3.0',
+      platform: platformLabel(platform),
+      userAgent: navigator.userAgent,
+    },
+    settings,
+    capabilities: caps,
+    metrics: metrics.summary(),
+    mcp: mcp.status(),
+    storage: {
+      rows: rows.filter((r) => r.bytes > 0).map((r) => ({ label: r.label, pretty: formatBytes(r.bytes) })),
+      total: formatBytes(total),
+      persisted,
+    },
+    errors: recentErrors,
+  });
+  out.textContent = report;
+  return report;
+}
+
+$('#metrics-reset')?.addEventListener('click', () => {
+  metrics.reset();
+  renderMetrics();
+  $('#metrics-summary').textContent = 'ล้างสถิติแล้ว';
+});
+
+$('#diag-run')?.addEventListener('click', async () => {
+  $('#diag-status').textContent = 'กำลังสร้างรายงาน…';
+  const report = await renderDiagnostics();
+  $('#diag-status').textContent = report ? '✅ สร้างรายงานแล้ว (ตรวจซ้ำก่อนแชร์)' : 'สร้างไม่สำเร็จ';
+});
+
+$('#diag-copy')?.addEventListener('click', async () => {
+  const report = $('#diag-output').textContent || await renderDiagnostics();
+  try {
+    await navigator.clipboard.writeText(report);
+    $('#diag-status').textContent = '📋 คัดลอกแล้ว';
+  } catch {
+    $('#diag-status').textContent = 'คัดลอกไม่ได้ — เลือกข้อความในกล่องแล้วคัดลอกเอง';
+  }
+});
+
+$('#diag-download')?.addEventListener('click', async () => {
+  const report = $('#diag-output').textContent || await renderDiagnostics();
+  const blob = new Blob([report], { type: 'text/markdown;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = diagnosticsFilename();
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  $('#diag-status').textContent = `⬇️ ดาวน์โหลด ${a.download}`;
+});
+
+/* -------- MCP UI -------- */
+function mcpSlug(name, url) {
+  const base = String(name || url || 'mcp').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return `${base || 'mcp'}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+$('#mcp-add').addEventListener('click', () => {
+  const name = $('#mcp-name').value.trim();
+  const url = $('#mcp-url').value.trim();
+  if (!/^https?:\/\//.test(url)) {
+    $('#mcp-status').textContent = 'URL ต้องขึ้นต้นด้วย http:// หรือ https://';
+    return;
+  }
+  const next = [...(Array.isArray(settings.mcpServers) ? settings.mcpServers : []), {
+    id: mcpSlug(name, url),
+    name: name || new URL(url).host,
+    url,
+    apiKey: $('#mcp-apikey').value.trim(),
+    transport: $('#mcp-transport').value === 'direct' ? 'direct' : 'proxy',
+    enabled: true,
+  }];
+  saveMcpServers(next);
+  $('#mcp-name').value = '';
+  $('#mcp-url').value = '';
+  $('#mcp-apikey').value = '';
+  refreshMcp();
+});
+
+$('#mcp-refresh').addEventListener('click', () => { refreshMcp(); });
+
+$('#mcp-list').addEventListener('click', (e) => {
+  const row = e.target.closest('.mcp-row');
+  if (!row) return;
+  const id = row.dataset.id;
+  const list = Array.isArray(settings.mcpServers) ? settings.mcpServers : [];
+  if (e.target.matches('[data-mcp-remove]')) {
+    saveMcpServers(list.filter((s) => (s.id || s.name || s.url) !== id));
+    mcp.hydrateFromCache();
+    applyMcpTools();
+    renderToolsGrid(true);
+    refreshMcp();
+  }
+});
+
+$('#mcp-list').addEventListener('change', (e) => {
+  if (!e.target.matches('[data-mcp-toggle]')) return;
+  const row = e.target.closest('.mcp-row');
+  const id = row?.dataset.id;
+  const list = (Array.isArray(settings.mcpServers) ? settings.mcpServers : [])
+    .map((s) => ((s.id || s.name || s.url) === id ? { ...s, enabled: e.target.checked } : s));
+  saveMcpServers(list);
+  mcp.hydrateFromCache();
+  applyMcpTools();
+  renderToolsGrid(true);
+  refreshMcp({ quiet: true });
+});
+
 $('#save-settings-btn').addEventListener('click', () => {
   settings = saveSettings(collectSettings());
   sm.set({ hasProvider: hasProviderConfigured(settings), error: null });
   updatePersonaHeader();
   renderModeChips();
-  renderToolsGrid();
+  renderToolsGrid(true);
   syncWake();
   $('#settings-status').textContent = '✅ บันทึกแล้ว (เก็บในเครื่องนี้เท่านั้น)';
+  if (Array.isArray(settings.mcpServers) && settings.mcpServers.length) {
+    mcp.hydrateFromCache();
+    applyMcpTools();
+    refreshMcp({ quiet: true });
+  }
 });
 
 $('#test-ai-btn').addEventListener('click', async () => {
@@ -1047,6 +1509,12 @@ $('#test-ai-btn').addEventListener('click', async () => {
   } catch (e) {
     $('#settings-status').textContent = `❌ ${e.message}`;
   }
+});
+
+$('#set-ttsprovider').addEventListener('change', (e) => {
+  const p = TTS_PROVIDERS[e.target.value];
+  $('#tts-provider-hint').textContent = p.desc;
+  $('#tts-openai-fields').hidden = e.target.value !== 'openai';
 });
 
 $('#set-rate').addEventListener('input', (e) => { $('#out-rate').textContent = Number(e.target.value).toFixed(2); });
@@ -1102,7 +1570,10 @@ $('#sync-pull-btn').addEventListener('click', async () => {
 
 $('#test-voice-btn').addEventListener('click', async () => {
   $('#voice-status').textContent = 'กำลังพูดทดสอบ…';
-  await voice.speak('สวัสดีครับ ผมคือ No7 ผู้ช่วยส่วนตัวของคุณ', {
+  const testSettings = { ...settings, ...collectSettings() };
+  const tester = new TTSRouter({ settings: () => testSettings, voice, serverUrl: () => testSettings.serverUrl });
+  tester.onFallback = (err) => { $('#voice-status').textContent = `คุณภาพสูงใช้ไม่ได้ (${err.message}) — ใช้เสียงเครื่องแทน`; };
+  await tester.speak('สวัสดีครับ ผมคือ No7 ผู้ช่วยส่วนตัวของคุณ', {
     ...voiceOptions(),
     rate: Number($('#set-rate').value) || 1,
     pitch: Number($('#set-pitch').value) || 1,
@@ -1277,9 +1748,31 @@ window.addEventListener('keydown', (e) => {
 /* -------------------------------------------------------------- startup */
 startDailyConsolidation(memory, () => consolidate(memory, { chat: llmChat, useLLM: !!settings.memoryLLM }));
 
+function syncOnlineState() {
+  const offline = !navigator.onLine;
+  const banner = $('#offline-banner');
+  if (offline) {
+    banner.hidden = false;
+    banner.textContent = '⚠️ ออฟไลน์อยู่ — ความจำ/โน้ต/ปฏิทินยังใช้ได้ แต่การคุยกับ AI ต้องรอเน็ต';
+  } else if (banner.textContent.startsWith('⚠️ ออฟไลน์')) {
+    banner.hidden = true;
+  }
+}
+window.addEventListener('online', () => { syncOnlineState(); flushOutbox(); });
+window.addEventListener('offline', syncOnlineState);
+syncOnlineState();
+
+// PWA shortcut / deep link: ?view=memory
+const bootView = new URLSearchParams(location.search).get('view');
+if (bootView && document.getElementById(`view-${bootView}`)) showView(bootView);
+
+mcp.hydrateFromCache();
+applyMcpTools();
+renderMcp();
 renderSettingsForm();
 renderModeChips();
 renderToolsGrid();
+if (Array.isArray(settings.mcpServers) && settings.mcpServers.length) refreshMcp({ quiet: true });
 restoreReminders();
 addMessage('bot', getPersona(settings.persona).greeting
   || `สวัสดีครับ ผม ${getPersona(settings.persona).name} 👋\nพิมพ์คุยได้เลย หรือกด 🎤 เพื่อพูด\n\nลองถาม: "อากาศกรุงเทพวันนี้", "ราคาบิทคอยน์", "ตั้งเวลา 5 นาที"`);

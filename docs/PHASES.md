@@ -66,3 +66,52 @@
 | 6 | CI + a11y + docs + 1.0.0 | — |
 
 รวม: **112 unit tests · 40 e2e checks · 24 tools · 43 JS files**
+
+
+---
+
+# รอบที่ 2 (v1.1 → v1.3)
+
+เป้าหมาย: ทำให้ "ใช้จริงบนมือถือ" แข็งแรงขึ้น, พูดคุยเป็นธรรมชาติขึ้น (ขัดจังหวะได้), เปิดให้ต่อโลกภายนอกด้วย MCP
+
+| เฟส | ชื่อ | งานย่อย | สถานะ |
+|---|---|---|---|
+| R1 | ความเสถียรบนมือถือ (Mobile hardening) | 1.1–1.4 | ✅ ปิดเฟส |
+| R2 | Barge-in + TTS ระดับพรีเมียม | 2.1–2.4 | ✅ |
+| R3 | MCP / Integrations | 3.1–3.4 | ✅ |
+| R4 | Reliability & Performance | 4.1–4.4 | ✅ |
+| R5 | Release 1.3 | 5.1–5.3 | ✅ |
+
+## R1 — ความเสถียรบนมือถือ
+
+- [x] 1.1 PWA: manifest shortcuts + เปิด view จาก query + แถบออฟไลน์
+- [x] 1.2 Capabilities: ตรวจ 15 ความสามารถ + ขอสิทธิ์ไมค์/แจ้งเตือน + แผงสถานะ
+- [x] 1.3 Storage: ขนาดต่อส่วน, โควตา, ขอพื้นที่ถาวร, จัดการ QuotaExceeded, ล้างรายกลุ่ม
+- [x] 1.4 Tests (9 capabilities + 9 storage) + docs/MOBILE.md
+
+## R2 — Barge-in + TTS
+
+- [x] 2.1 Barge-in: พูดขัดจังหวะได้ (keyword หรือ any-speech) + กันเสียงสะท้อนของตัวเอง (`core/bargein.js`)
+- [x] 2.2 TTS provider router: system / OpenAI-compatible (ผ่าน `POST /api/tts` proxy) / ปิดเสียง (`core/tts.js`)
+- [x] 2.3 เลือก provider + voice/model/base URL ในหน้าตั้งค่า, ใช้ router ทั้งการพูดปกติและ streaming
+- [x] 2.4 Tests (`tests/bargein.test.js`, `tests/tts.test.js`) + อัปเดต `docs/VOICE.md`
+
+## R3 — MCP
+
+- [x] 3.1 MCP client (JSON-RPC 2.0 over HTTP) + discovery (`initialize`, `tools/list`, `tools/call`) — `core/mcp.js`, proxy `POST /api/mcp`, รองรับ JSON + SSE + `mcp-session-id`
+- [x] 3.2 Dynamic tool registry: `registerDynamicTools()` รวม tool จาก MCP เข้ากับ 24 tools ในเครื่อง (prompt + tools grid + agent)
+- [x] 3.3 Permission หมวดใหม่ `mcp` (risk 2) + UI เพิ่ม/เปิดปิด/ค้นหา server + cache `no7.mcp.tools.v1`
+- [x] 3.4 Tests (`tests/mcp.test.js` 9) + `docs/MCP.md`
+
+## R4 — Reliability & Performance
+
+- [x] 4.1 Retry/backoff (`core/retry.js`) + offline outbox `no7.outbox.v1` ส่งอัตโนมัติเมื่อกลับมาออนไลน์
+- [x] 4.2 Metrics: first token / total / tool time / tts + แผงสถิติในหน้าตั้งค่า (`core/metrics.js`)
+- [x] 4.3 Diagnostics: รายงาน markdown ที่ปิดข้อมูลอ่อนไหว + คัดลอก/ดาวน์โหลด (`core/diagnostics.js`)
+- [x] 4.4 Tests (`retry` 11, `metrics` 5, `diagnostics` 6) + `docs/RELIABILITY.md`
+
+## R5 — Release 1.3
+
+- [x] 5.1 version 1.3.0 (`package.json`, `/api/health` อ่านจาก package.json) + CHANGELOG
+- [x] 5.2 README ปรับเป็น v1.3 + ตารางสรุป Round 2 ปิดครบ
+- [x] 5.3 ตรวจรับรวม: `npm run check` 59 ไฟล์ · `npm test` 177 · `npm run test:browser` 60/60 · `vite build` ผ่าน → เปิด PR

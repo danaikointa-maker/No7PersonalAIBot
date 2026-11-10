@@ -437,6 +437,32 @@ export const TOOLS = {
 
 export const TOOL_IDS = Object.keys(TOOLS);
 
+/** เครื่องมือที่ลงทะเบียนตอนรันไทม์ (MCP / ปลั๊กอิน) */
+const DYNAMIC_TOOLS = new Map();
+
+/** แทนที่ชุดเครื่องมือ dynamic ทั้งหมด (เรียกหลังต่อ MCP เสร็จ) */
+export function registerDynamicTools(defs = {}) {
+  DYNAMIC_TOOLS.clear();
+  for (const [id, def] of Object.entries(defs || {})) {
+    if (id && def && typeof def.run === 'function') DYNAMIC_TOOLS.set(id, def);
+  }
+  return [...DYNAMIC_TOOLS.keys()];
+}
+
+export function dynamicToolIds() {
+  return [...DYNAMIC_TOOLS.keys()];
+}
+
+/** id ทั้งหมด (ในเครื่อง + dynamic) */
+export function allToolIds() {
+  return [...TOOL_IDS, ...DYNAMIC_TOOLS.keys()];
+}
+
+/** tool definition จาก id (ทั้งสองแบบ) */
+export function getTool(id) {
+  return TOOLS[id] || DYNAMIC_TOOLS.get(id) || null;
+}
+
 /** category = what kind of access, risk = 0 read … 3 device control */
 export const TOOL_META = {
   weather: { category: 'read', risk: 0 },
@@ -466,13 +492,17 @@ export const TOOL_META = {
 };
 
 export function toolMeta(id) {
-  return TOOL_META[id] || { category: 'read', risk: 0 };
+  if (TOOL_META[id]) return TOOL_META[id];
+  const dyn = DYNAMIC_TOOLS.get(id);
+  if (dyn?.meta) return { category: 'read', risk: 0, ...dyn.meta };
+  if (String(id).startsWith('mcp__')) return { category: 'mcp', risk: 2 };
+  return { category: 'read', risk: 0 };
 }
 
 /** Compact tool list for the system prompt. */
 export function describeTools() {
-  return TOOL_IDS.map((id) => {
-    const t = TOOLS[id];
+  return allToolIds().map((id) => {
+    const t = getTool(id);
     const p = Object.keys(t.params || {}).join(', ') || 'ไม่มี';
     const m = toolMeta(id);
     return `- ${id} [${m.category}/risk${m.risk}]: ${t.desc} | params: ${p}`;
@@ -481,7 +511,7 @@ export function describeTools() {
 
 /** Execute a tool and return { tool, data } or throw. */
 export async function runTool(name, args = {}, ctx = {}) {
-  const tool = TOOLS[name];
+  const tool = getTool(name);
   if (!tool) throw new Error(`ไม่มีเครื่องมือชื่อ "${name}"`);
   ctx.onStart?.(name);
   try {

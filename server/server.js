@@ -16,6 +16,11 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
+const APP_VERSION = (() => {
+  try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version || '0.0.0'; }
+  catch { return '0.0.0'; }
+})();
+
 const DIST = path.join(ROOT, 'dist');
 const PORT = Number(process.env.NO7_PORT || 8787);
 const HOST = process.env.NO7_HOST || '0.0.0.0';
@@ -134,12 +139,12 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === '/api/health') {
     return json(res, 200, {
-      ok: true, app: 'no7-personal-ai-bot', version: '1.0.0',
+      ok: true, app: 'no7-personal-ai-bot', version: APP_VERSION,
       platform: process.platform, node: process.version,
       hasDist: fs.existsSync(path.join(DIST, 'index.html')),
       sync: { enabled: true, requiresToken: !!SYNC_TOKEN, hasData: !!readSync() },
       endpoints: ['/api/health', '/api/chat', '/api/tools', '/api/tools/run', '/api/pair', '/api/sync', '/api/fetch',
-        '/api/link/command', '/api/link/poll', '/api/link/status', '/api/link/results'],
+        '/api/link/command', '/api/link/poll', '/api/link/status', '/api/link/results', '/api/tts', '/api/mcp'],
       aiKeys: {
         gemini: !!process.env.GEMINI_API_KEY,
         openai: !!process.env.OPENAI_API_KEY,
@@ -170,6 +175,78 @@ async function handleApi(req, res, url) {
       return json(res, 200, { text });
     } catch (e) {
       return json(res, 502, { error: e.message });
+    }
+  }
+
+  // ---- TTS proxy: เลี่ยง CORS และซ่อน API key ไว้ที่ server ----
+  if (url.pathname === '/api/tts' && req.method === 'POST') {
+    const body = await readBody(req);
+    const text = String(body.text || '').slice(0, 3000);
+    if (!text) return json(res, 400, { error: 'ต้องมี text' });
+    const key = body.apiKey || process.env.OPENAI_API_KEY;
+    if (!key) return json(res, 400, { error: 'ไม่มี API key — ตั้ง OPENAI_API_KEY ที่ server หรือกรอกในแอป' });
+    const base = String(body.baseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+    try {
+      const r = await fetch(`${base}/audio/speech`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model: body.model || 'tts-1',
+          voice: body.voice || 'alloy',
+          input: text,
+          response_format: 'mp3',
+        }),
+      });
+      if (!r.ok) {
+        const detail = await r.text().catch(() => '');
+        return json(res, 502, { error: `provider ${r.status}: ${detail.slice(0, 200)}` });
+      }
+      const buf = Buffer.from(await r.arrayBuffer());
+      res.writeHead(200, {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': buf.length,
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-store',
+      });
+      res.end(buf);
+    } catch (e) {
+      json(res, 502, { error: e.message });
+    }
+    return;
+  }
+
+  // ---- MCP proxy: JSON-RPC 2.0 ไปยัง MCP server (เลี่ยง CORS) ----
+  if (url.pathname === '/api/mcp' && req.method === 'POST') {
+    const body = await readBody(req);
+    const target = String(body.url || '');
+    let parsed;
+    try { parsed = new URL(target); } catch { return json(res, 400, { error: 'url ไม่ถูกต้อง' }); }
+    if (!/^https?:$/.test(parsed.protocol)) return json(res, 400, { error: 'รองรับเฉพาะ http/https' });
+    const headers = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+      ...(body.headers && typeof body.headers === 'object' ? Object.fromEntries(
+        Object.entries(body.headers).filter(([k, v]) => typeof k === 'string' && typeof v === 'string')
+      ) : {}),
+    };
+    const key = body.apiKey || '';
+    if (key) headers.Authorization = `Bearer ${key}`;
+    if (body.sessionId) headers['mcp-session-id'] = String(body.sessionId);
+    try {
+      const r = await fetch(target, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body.payload || {}),
+      });
+      const text = await r.text();
+      return json(res, 200, {
+        status: r.status,
+        contentType: r.headers.get('content-type') || '',
+        headers: { 'mcp-session-id': r.headers.get('mcp-session-id') || '' },
+        body: text.slice(0, 400000),
+      });
+    } catch (e) {
+      return json(res, 502, { error: e.message, status: 0, body: '' });
     }
   }
 

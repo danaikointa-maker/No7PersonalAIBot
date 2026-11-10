@@ -50,6 +50,8 @@
           </div>
         </header>
 
+        <div id="offline-banner" hidden role="status">⚠️ ออฟไลน์อยู่ — ความจำ/โน้ต/ปฏิทินยังใช้ได้ แต่การคุยกับ AI ต้องรอเน็ต</div>
+
         <!-- Avatar strip -->
         <section id="avatar-strip">
           <canvas id="avatar" width="360" height="140" aria-label="อวาตาร์"></canvas>
@@ -66,6 +68,7 @@
         <!-- Views -->
         <section id="view-chat" class="view active">
           <div id="messages" aria-live="polite"></div>
+          <span id="outbox-badge" class="pill" hidden></span>
           <form id="composer">
             <input id="input" type="text" placeholder="พิมพ์หรือพูดกับ No7…" autocomplete="off" />
             <button type="submit" id="send-btn">ส่ง</button>
@@ -279,6 +282,25 @@
           <label>เสียงที่ใช้
             <select id="set-voice"><option value="">อัตโนมัติ (เสียงไทยของเครื่อง)</option></select>
           </label>
+          <label>ผู้ให้บริการเสียง (TTS)
+            <select id="set-ttsprovider"></select>
+          </label>
+          <p class="hint" id="tts-provider-hint"></p>
+          <div id="tts-openai-fields" hidden>
+            <label>Base URL ของผู้ให้บริการ (OpenAI-compatible)
+              <input id="set-ttsbaseurl" placeholder="https://api.openai.com/v1" />
+            </label>
+            <label>API key (เว้นว่าง = ใช้ OPENAI_API_KEY ที่ server)
+              <input id="set-ttsapikey" type="password" placeholder="เก็บในเครื่องเท่านั้น" />
+            </label>
+            <div class="grid2">
+              <label>โมเดล <input id="set-ttsmodel" placeholder="tts-1" /></label>
+              <label>เสียง <input id="set-ttsvoice" placeholder="alloy" /></label>
+            </div>
+          </div>
+          <label>พูดขัดจังหวะได้ (barge-in)
+            <select id="set-bargein"></select>
+          </label>
           <div class="row">
             <button id="test-voice-btn">🔊 ทดสอบเสียง</button>
             <button id="stop-voice-btn">⏹ หยุด</button>
@@ -304,6 +326,25 @@
           </div>
           <p id="sync-status" class="hint"></p>
 
+          <h3>📱 ความสามารถของอุปกรณ์นี้</h3>
+          <p class="hint">ตรวจจาก API จริงของเครื่อง — ปุ่มที่ใช้ไม่ได้จะบอกเหตุผล</p>
+          <div id="caps-list"></div>
+          <div class="row">
+            <button id="caps-mic">ขอสิทธิ์ไมโครโฟน</button>
+            <button id="caps-notify">ขอสิทธิ์แจ้งเตือน</button>
+            <button id="caps-refresh">ตรวจใหม่</button>
+          </div>
+          <p id="caps-status" class="hint"></p>
+
+          <h3>💾 พื้นที่จัดเก็บ</h3>
+          <div id="storage-summary" class="hint"></div>
+          <div id="storage-rows"></div>
+          <div class="row">
+            <button id="storage-persist">ขอพื้นที่ถาวร</button>
+            <button id="storage-clean-metrics">ล้างสถิติ</button>
+            <button id="storage-clean-notes">ล้างโน้ต/งาน</button>
+          </div>
+
           <h3>⌨️ คีย์ลัด</h3>
           <ul class="hint shortcuts">
             <li><kbd>Ctrl</kbd>+<kbd>K</kbd> — โฟกัสช่องพิมพ์</li>
@@ -312,6 +353,44 @@
             <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> — ส่งข้อความ</li>
             <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> — push-to-talk ระดับระบบ (เดสก์ท็อป)</li>
           </ul>
+
+          <h3>สถิติการทำงาน</h3>
+          <p class="hint">วัดเวลา token แรก, เวลารวม, เวลาต่อเครื่องมือ — เก็บในเครื่องนี้เท่านั้น</p>
+          <div id="metrics-summary" class="hint"></div>
+          <div id="metrics-list" class="metric-list"></div>
+          <div class="row"><button id="metrics-reset">ล้างสถิติ</button></div>
+
+          <h3>รายงานปัญหา (Diagnostics)</h3>
+          <p class="hint">สร้างรายงานที่ปิดข้อมูลอ่อนไหว (key, token, อีเมล, เบอร์โทร) แล้วคัดลอก/ดาวน์โหลดส่งให้ผู้ดูแลได้</p>
+          <div class="row">
+            <button id="diag-run">🧪 สร้างรายงาน</button>
+            <button id="diag-copy">📋 คัดลอก</button>
+            <button id="diag-download">⬇️ ดาวน์โหลด .md</button>
+          </div>
+          <p class="hint" id="diag-status"></p>
+          <pre id="diag-output" class="code diag"></pre>
+
+          <h3>ปลั๊กอิน MCP</h3>
+          <p class="hint">ต่อ No7 เข้ากับ MCP server ของคุณเอง (Gmail, ปฏิทิน, ไฟล์) — เรียกผ่าน companion server <code>POST /api/mcp</code></p>
+          <div id="mcp-list" class="mcp-list"></div>
+          <p class="hint" id="mcp-status">ยังไม่มี server</p>
+          <div class="grid2">
+            <label>ชื่อ <input id="mcp-name" placeholder="Gmail" /></label>
+            <label>URL <input id="mcp-url" placeholder="http://localhost:3100/mcp" /></label>
+          </div>
+          <div class="grid2">
+            <label>API key (ไม่บังคับ) <input id="mcp-apikey" type="password" /></label>
+            <label>ช่องทาง
+              <select id="mcp-transport">
+                <option value="proxy">ผ่าน server (แนะนำ)</option>
+                <option value="direct">ตรงจากเบราว์เซอร์</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <button id="mcp-add">➕ เพิ่ม server</button>
+            <button id="mcp-refresh">🔄 ค้นหาเครื่องมือ</button>
+          </div>
 
           <h3>เชื่อมต่อ (Phone-Link / ESP32)</h3>
           <p class="hint">โปรโตคอลจับคู่ HMAC — ดู <code>docs/PHONE_LINK.md</code></p>

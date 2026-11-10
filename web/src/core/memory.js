@@ -16,7 +16,23 @@ function loadRaw(key, fallback) {
   } catch { return fallback; }
 }
 function saveRaw(key, val) {
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+    return true;
+  } catch (err) {
+    const quota = /quota|exceeded/i.test(err?.name || err?.message || '');
+    try {
+      globalThis.dispatchEvent?.(new CustomEvent('no7:storage-error', {
+        detail: {
+          key,
+          message: quota
+            ? 'พื้นที่เก็บข้อมูลเต็ม — ส่งออกความจำแล้วลบรายการเก่า หรือเปิด "พื้นที่ถาวร" ในหน้าตั้งค่า'
+            : `บันทึกความจำไม่สำเร็จ: ${err?.message || err}`,
+        },
+      }));
+    } catch {}
+    return false;
+  }
 }
 
 // --- Thai text features (from ESP32 TextFeatures) ---

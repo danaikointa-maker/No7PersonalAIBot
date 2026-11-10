@@ -81,6 +81,16 @@ window.fetch = async (url, opts = {}) => {
     if (last.includes('เปิดเว็บ')) return reply('```tool\n{"tool":"open_url","args":{"url":"https://example.com"}}\n```');
     return reply('สวัสดีครับ ผมชื่อ No7');
   }
+  if (u.includes('/api/mcp')) {
+    const payload = JSON.parse(opts.body || '{}').payload || {};
+    const ok = (result) => ({ ok: true, json: async () => ({ status: 200, headers: {}, body: JSON.stringify({ jsonrpc: '2.0', id: payload.id, result }) }) });
+    if (payload.method === 'initialize') return ok({ protocolVersion: '2024-11-05', serverInfo: { name: 'Demo' } });
+    if (payload.method === 'tools/list') {
+      return ok({ tools: [{ name: 'send_email', description: 'ส่งอีเมลผ่าน MCP', inputSchema: { type: 'object', properties: { to: { type: 'string' }, subject: { type: 'string' } } } }] });
+    }
+    if (payload.method === 'tools/call') return ok({ content: [{ type: 'text', text: 'ส่งอีเมลแล้ว' }] });
+    return { ok: true, json: async () => ({ status: 202, headers: {}, body: '' }) };
+  }
   if (u.includes('gold-api')) return { ok: true, json: async () => ({ price: 2412.5, updatedAt: new Date().toISOString() }) };
   return { ok: true, json: async () => ({}) };
 };
@@ -194,6 +204,14 @@ $('#dev-list').querySelector('.dev-actions button')?.click();
 await wait(150);
 check('devices: failure logged, no crash', $('#dev-log').hidden === false, $('#dev-log').textContent.slice(0, 80));
 
+// capabilities + storage panels (R1)
+check('caps: list rendered', $('#caps-list').children.length > 3, String($('#caps-list').children.length));
+check('caps: summary line', /พร้อมใช้/.test($('#caps-list').textContent), $('#caps-list').textContent.slice(0, 50));
+check('storage: summary rendered', $('#storage-summary').textContent.includes('พื้นที่'), $('#storage-summary').textContent.slice(0, 60));
+$('#storage-clean-metrics').click();
+check('storage: clean metrics works', $('#settings-status').textContent.includes('ล้างสถิติ'), $('#settings-status').textContent);
+check('offline banner hidden while online', $('#offline-banner').hidden === true);
+
 // Persona Studio
 $('#nav button[data-view="settings"]').click();
 check('sync: controls present', !!$('#sync-push-btn') && !!$('#set-serverurl'));
@@ -209,9 +227,26 @@ check('persona: custom created', $('#persona-list').children.length === 9, Strin
 check('persona: selected header updated', $('#persona-name').textContent.includes('น้องสโมค'), $('#persona-name').textContent);
 check('persona: appears in dropdown', [...$('#set-persona').options].some((o) => o.textContent.includes('น้องสโมค')));
 
+// MCP: add server → discover tools → tools appear in grid
+check('mcp: empty state shown', $('#mcp-status').textContent.includes('ยังไม่มี server'), $('#mcp-status').textContent);
+$('#mcp-name').value = 'Demo';
+$('#mcp-url').value = 'http://localhost:3100/mcp';
+$('#mcp-add').click();
+await wait(150);
+check('mcp: server listed', $('#mcp-list').textContent.includes('Demo'), $('#mcp-list').textContent.slice(0, 80));
+check('mcp: tool count reported', $('#mcp-list').textContent.includes('1 เครื่องมือ'), $('#mcp-list').textContent.slice(0, 120));
+check('mcp: dynamic tool in tools grid', [...$('#tools-grid').children].some((b) => b.textContent.includes('send_email')));
+check('mcp: permission category listed', $('#perm-list').children.length === 6, String($('#perm-list').children.length));
+
 // voice & streaming settings
 $('#nav button[data-view="settings"]').click();
 check('voice: thai voice listed', $('#set-voice').options.length >= 2, `${$('#set-voice').options.length} options`);
+check('voice: 3 tts providers offered', $('#set-ttsprovider').options.length === 3, `${$('#set-ttsprovider').options.length} options`);
+check('voice: openai fields hidden by default', $('#tts-openai-fields').hidden === true);
+$('#set-ttsprovider').value = 'openai';
+$('#set-ttsprovider').dispatchEvent(new window.Event('change'));
+check('voice: openai fields reveal on select', $('#tts-openai-fields').hidden === false);
+check('voice: barge-in defaults to keyword', $('#set-bargein').value === 'keyword', $('#set-bargein').value);
 $('#set-streaming').checked = false;
 $('#set-speakstream').checked = false;
 $('#save-settings-btn').click();
@@ -241,6 +276,26 @@ $('#nav button[data-view="tools"]').click();
 $('#tools-grid').children[4].click();
 await wait(80);
 check('tools view: direct run card', $('#tool-result').children.length > 0);
+
+// reliability: metrics, diagnostics, offline queue
+$('#nav button[data-view="settings"]').click();
+await wait(20);
+check('metrics: summary rendered', $('#metrics-summary').textContent.length > 0, $('#metrics-summary').textContent);
+$('#diag-run').click();
+await wait(80);
+check('diagnostics: report generated', $('#diag-output').textContent.includes('# No7 Diagnostics'), $('#diag-output').textContent.slice(0, 40));
+check('diagnostics: no api keys in report', !/sk-[A-Za-z0-9]{8,}/.test($('#diag-output').textContent));
+check('diagnostics: settings section present', $('#diag-output').textContent.includes('## สถิติ'));
+
+$('#nav button[data-view="chat"]').click();
+Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+submit('ทดสอบคิวออฟไลน์');
+await wait(30);
+check('offline: message queued', $('#outbox-badge').hidden === false && $('#outbox-badge').textContent.includes('1'), $('#outbox-badge').textContent);
+Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
+window.dispatchEvent(new window.Event('online'));
+await wait(250);
+check('offline: queue flushed when back online', $('#messages').textContent.includes('ส่งข้อความที่ค้างไว้'), $('#messages').textContent.slice(-120));
 
 const failed = results.filter((r) => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✓' : '✗'} ${r.name}${r.ok ? '' : `  → ${r.extra}`}`);

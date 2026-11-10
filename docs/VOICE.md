@@ -42,7 +42,39 @@
 - ถ้าเบราว์เซอร์ปฏิเสธไมค์ (`not-allowed`) จะปิดสวิตช์ให้เองและแจ้งในหน้าตั้งค่า
 - ต้องเป็น secure context (`https://` หรือ `localhost`) เหมือน STT ทั้งหมด
 
-## 4) การปรับเสียง
+## 4) Barge-in (พูดขัดจังหวะ)
+
+`web/src/core/bargein.js` — ฟังไมค์ระหว่างที่ No7 พูด แล้วหยุดทันทีเมื่อผู้ใช้แทรก
+
+| โหมด | หยุดเมื่อ |
+|---|---|
+| `off` | ไม่ฟัง |
+| `keyword` (ค่าเริ่มต้น) | ได้ยินคำสั่งหยุด: `หยุด`, `เดี๋ยว`, `รอ`, `ฟังก่อน`, `stop`, `wait`, `hold on`, `cancel` |
+| `any` | ได้ยินเสียงพูดอะไรก็ได้ |
+
+- `isEcho()` กันเสียงตัวเอง: ถ้าข้อความที่ได้ยินเป็นส่วนหนึ่งของประโยคที่กำลังพูด (ตรงตัว หรือตัวอักษรซ้ำ >85%) จะไม่นับ
+- `setSpoken(sentence)` ถูกเรียกทุกประโยคจาก `SpeechQueue.onSentence` เพื่ออัปเดตประโยคอ้างอิง
+- ระหว่างพูด: `wakeWord.pause()` + barge-in ฟัง; จบ/หยุด: `bargeIn.stop()` แล้ว `wakeWordResume()`
+- เมื่อถูกขัดจังหวะ → `stopSpeaking()` ล้างคิว + หยุดเสียง + แสดงข้อความ "✋ หยุดให้แล้ว"
+- ต้องมี `SpeechRecognition` (Chrome/Edge/Android) และ secure context
+
+## 5) TTS provider router
+
+`web/src/core/tts.js` — เลือกเอนจินเสียงได้ 3 แบบ (ตั้งค่า → เสียงและการตอบ)
+
+| Provider | การทำงาน |
+|---|---|
+| `system` | Web Speech ของเครื่อง (ฟรี, ออฟไลน์ได้, คุณภาพตาม OS) |
+| `openai` | `POST /api/tts` → `${baseUrl}/audio/speech` คืน `audio/mpeg` แล้วเล่นผ่าน `<audio>` |
+| `off` | ไม่มีเสียง |
+
+- ค่าที่ใช้: `ttsVoice` (เช่น `alloy`, `nova`), `ttsModel` (`tts-1`, `tts-1-hd`), `ttsBaseUrl`, `ttsApiKey`
+- ไม่ใส่ API key ในแอปก็ได้ — server ใช้ `OPENAI_API_KEY` ของตัวเอง (เบราว์เซอร์ฝาก key ไว้ใน localStorage เท่านั้น)
+- base URL เปลี่ยนได้ → ใช้ผู้ให้บริการที่เข้ากันได้กับ OpenAI (เช่น LocalAI, LM Studio, Groq TTS) โดยไม่ต้องแก้โค้ด
+- **fallback**: ถ้าเรียก API ไม่สำเร็จ (`onFallback`) จะกลับไปใช้เสียงเครื่องทันทีและแจ้งในซับไทเทิล ไม่ทำให้บทสนทนาขาด
+- `stop()` หยุดทั้ง `<audio>` และเสียงเครื่อง
+
+## 6) การปรับเสียง
 
 หน้าตั้งค่า → เสียงและการตอบ:
 - ความเร็ว (`rate` 0.6–1.6) และ pitch (0.6–1.6)
@@ -52,8 +84,9 @@
 ค่าถูกส่งเข้า `voice.speak(text, {lang, rate, pitch, voiceName})`
 บน Electron ยังใช้ engine ของ Chromium (มีเสียงระบบของ OS) — ถ้าต้องการเสียงระดับพรีเมียมให้ใช้ native TTS ผ่าน preload (จุดต่อพร้อมแล้วที่ `voice.js → speakNative`)
 
-## 5) ข้อจำกัด
+## 7) ข้อจำกัด
 
 - Web Speech STT บน Android WebView บางรุ่นไม่มี → ต้องใช้ native plugin (ดู `mobile/README.md`)
 - wake word ต้องเปิดแอปค้างไว้ (ไม่ใช่ background service) — เป็นข้อจำกัดของเบราว์เซอร์
-- ยังไม่มีการตรวจจับเสียงพูดขัดจังหวะ (barge-in) ระหว่างที่ No7 พูด — ใช้ปุ่ม ⏹ แทน
+- barge-in ต้องใช้ `SpeechRecognition` — iOS Safari ยังไม่รองรับ (ใช้ปุ่ม ⏹ แทน)
+- TTS คุณภาพสูงต้องออนไลน์และมี API key; โหมดออฟไลน์ใช้เสียงเครื่องเท่านั้น
