@@ -281,6 +281,25 @@
           <label>เสียงที่ใช้
             <select id="set-voice"><option value="">อัตโนมัติ (เสียงไทยของเครื่อง)</option></select>
           </label>
+          <label>ผู้ให้บริการเสียง (TTS)
+            <select id="set-ttsprovider"></select>
+          </label>
+          <p class="hint" id="tts-provider-hint"></p>
+          <div id="tts-openai-fields" hidden>
+            <label>Base URL ของผู้ให้บริการ (OpenAI-compatible)
+              <input id="set-ttsbaseurl" placeholder="https://api.openai.com/v1" />
+            </label>
+            <label>API key (เว้นว่าง = ใช้ OPENAI_API_KEY ที่ server)
+              <input id="set-ttsapikey" type="password" placeholder="เก็บในเครื่องเท่านั้น" />
+            </label>
+            <div class="grid2">
+              <label>โมเดล <input id="set-ttsmodel" placeholder="tts-1" /></label>
+              <label>เสียง <input id="set-ttsvoice" placeholder="alloy" /></label>
+            </div>
+          </div>
+          <label>พูดขัดจังหวะได้ (barge-in)
+            <select id="set-bargein"></select>
+          </label>
           <div class="row">
             <button id="test-voice-btn">🔊 ทดสอบเสียง</button>
             <button id="stop-voice-btn">⏹ หยุด</button>

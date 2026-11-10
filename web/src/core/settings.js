@@ -24,6 +24,12 @@ export const DEFAULT_SETTINGS = {
   voiceRate: 1,
   voicePitch: 1,
   voiceName: '',
+  ttsProvider: 'system',   // system | openai | off
+  ttsVoice: 'alloy',       // OpenAI-compatible voice name
+  ttsModel: 'tts-1',
+  ttsBaseUrl: '',
+  ttsApiKey: '',
+  bargeIn: 'keyword',      // off | keyword | any
   serverUrl: 'http://localhost:8787',   // companion server (AI proxy / tools / sync)
   syncToken: '',
 };

@@ -77,7 +77,7 @@
 | เฟส | ชื่อ | งานย่อย | สถานะ |
 |---|---|---|---|
 | R1 | ความเสถียรบนมือถือ (Mobile hardening) | 1.1–1.4 | ✅ ปิดเฟส |
-| R2 | Barge-in + TTS ระดับพรีเมียม | 2.1–2.4 | ⬜ |
+| R2 | Barge-in + TTS ระดับพรีเมียม | 2.1–2.4 | ✅ |
 | R3 | MCP / Integrations | 3.1–3.4 | ⬜ |
 | R4 | Reliability & Performance | 4.1–4.4 | ⬜ |
 | R5 | Release 1.3 | 5.1–5.3 | ⬜ |
@@ -91,10 +91,10 @@
 
 ## R2 — Barge-in + TTS
 
-- 2.1 Barge-in: พูดขัดจังหวะได้ (keyword หรือ any-speech) + กันเสียงสะท้อนของตัวเอง
-- 2.2 TTS provider router: system / OpenAI-compatible (ผ่าน server proxy) / ปิดเสียง
-- 2.3 ตั้งค่าเสียงต่อ persona + เลือก provider ใน UI
-- 2.4 Tests + อัปเดต docs/VOICE.md
+- [x] 2.1 Barge-in: พูดขัดจังหวะได้ (keyword หรือ any-speech) + กันเสียงสะท้อนของตัวเอง (`core/bargein.js`)
+- [x] 2.2 TTS provider router: system / OpenAI-compatible (ผ่าน `POST /api/tts` proxy) / ปิดเสียง (`core/tts.js`)
+- [x] 2.3 เลือก provider + voice/model/base URL ในหน้าตั้งค่า, ใช้ router ทั้งการพูดปกติและ streaming
+- [x] 2.4 Tests (`tests/bargein.test.js`, `tests/tts.test.js`) + อัปเดต `docs/VOICE.md`
 
 ## R3 — MCP
 

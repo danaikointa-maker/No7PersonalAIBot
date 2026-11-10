@@ -39,10 +39,13 @@ test('BM25 search ranks the relevant fact first', () => {
 });
 
 test('importance boosts ranking between otherwise equal matches', () => {
+  localStorage.clear();
   const mem = new MemoryStore();
   mem.addFact('โปรดจำว่าต้องจ่ายค่าไฟ');
   mem.addFact('โปรดจำว่าต้องจ่ายค่าไฟ', 5); // merges, raises importance
-  assert.equal(mem.listFacts()[0].importance, 5);
+  const merged = mem.listFacts().filter((f) => f.text.includes('ค่าไฟ'));
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].importance, 5);
 });
 
 test('logTurn keeps episodic history', () => {

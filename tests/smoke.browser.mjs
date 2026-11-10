@@ -220,6 +220,12 @@ check('persona: appears in dropdown', [...$('#set-persona').options].some((o) =>
 // voice & streaming settings
 $('#nav button[data-view="settings"]').click();
 check('voice: thai voice listed', $('#set-voice').options.length >= 2, `${$('#set-voice').options.length} options`);
+check('voice: 3 tts providers offered', $('#set-ttsprovider').options.length === 3, `${$('#set-ttsprovider').options.length} options`);
+check('voice: openai fields hidden by default', $('#tts-openai-fields').hidden === true);
+$('#set-ttsprovider').value = 'openai';
+$('#set-ttsprovider').dispatchEvent(new window.Event('change'));
+check('voice: openai fields reveal on select', $('#tts-openai-fields').hidden === false);
+check('voice: barge-in defaults to keyword', $('#set-bargein').value === 'keyword', $('#set-bargein').value);
 $('#set-streaming').checked = false;
 $('#set-speakstream').checked = false;
 $('#save-settings-btn').click();

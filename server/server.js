@@ -139,7 +139,7 @@ async function handleApi(req, res, url) {
       hasDist: fs.existsSync(path.join(DIST, 'index.html')),
       sync: { enabled: true, requiresToken: !!SYNC_TOKEN, hasData: !!readSync() },
       endpoints: ['/api/health', '/api/chat', '/api/tools', '/api/tools/run', '/api/pair', '/api/sync', '/api/fetch',
-        '/api/link/command', '/api/link/poll', '/api/link/status', '/api/link/results'],
+        '/api/link/command', '/api/link/poll', '/api/link/status', '/api/link/results', '/api/tts'],
       aiKeys: {
         gemini: !!process.env.GEMINI_API_KEY,
         openai: !!process.env.OPENAI_API_KEY,
@@ -171,6 +171,43 @@ async function handleApi(req, res, url) {
     } catch (e) {
       return json(res, 502, { error: e.message });
     }
+  }
+
+  // ---- TTS proxy: เลี่ยง CORS และซ่อน API key ไว้ที่ server ----
+  if (url.pathname === '/api/tts' && req.method === 'POST') {
+    const body = await readBody(req);
+    const text = String(body.text || '').slice(0, 3000);
+    if (!text) return json(res, 400, { error: 'ต้องมี text' });
+    const key = body.apiKey || process.env.OPENAI_API_KEY;
+    if (!key) return json(res, 400, { error: 'ไม่มี API key — ตั้ง OPENAI_API_KEY ที่ server หรือกรอกในแอป' });
+    const base = String(body.baseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
+    try {
+      const r = await fetch(`${base}/audio/speech`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({
+          model: body.model || 'tts-1',
+          voice: body.voice || 'alloy',
+          input: text,
+          response_format: 'mp3',
+        }),
+      });
+      if (!r.ok) {
+        const detail = await r.text().catch(() => '');
+        return json(res, 502, { error: `provider ${r.status}: ${detail.slice(0, 200)}` });
+      }
+      const buf = Buffer.from(await r.arrayBuffer());
+      res.writeHead(200, {
+        'Content-Type': 'audio/mpeg',
+        'Content-Length': buf.length,
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-store',
+      });
+      res.end(buf);
+    } catch (e) {
+      json(res, 502, { error: e.message });
+    }
+    return;
   }
 
   // ---- Phone-Link endpoints (HMAC signed) ----

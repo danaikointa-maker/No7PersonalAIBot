@@ -16,6 +16,8 @@ import { consolidate, shouldConsolidate, startDailyConsolidation } from './core/
 import { Voice } from './core/voice.js';
 import { SentenceSplitter, SpeechQueue, withCursor } from './core/stream.js';
 import { WakeWord } from './core/wake.js';
+import { BargeIn, BARGE_MODES } from './core/bargein.js';
+import { TTSRouter, TTS_PROVIDERS } from './core/tts.js';
 import { EyeAvatar } from './ui/avatar.js';
 import { renderCard, renderError } from './ui/cards.js';
 import { loadSettings, saveSettings, resetSettings, hasProviderConfigured, loadPermissions } from './core/settings.js';
@@ -148,9 +150,13 @@ async function speak(text) {
   setSubtitle(text);
   $('#stop-btn').hidden = false;
   wakeWord.pause();
+  bargeIn.mode = settings.bargeIn || 'keyword';
+  bargeIn.setSpoken(text);
+  bargeIn.start();
   try {
-    await voice.speak(text, voiceOptions());
+    await tts.speak(text, voiceOptions());
   } finally {
+    bargeIn.stop();
     $('#stop-btn').hidden = true;
     wakeWordResume();
   }
@@ -211,7 +217,9 @@ async function respond(userText) {
   const botEl = addMessage('bot', '…');
   const cards = [];
   const splitter = new SentenceSplitter();
-  const queue = new SpeechQueue(voice);
+  const queue = new SpeechQueue(speechVoice, {
+    onSentence: (sentence) => { bargeIn.setSpoken(sentence); },
+  });
   activeQueue = queue;
 
   const streaming = !!settings.streaming;
@@ -221,6 +229,8 @@ async function respond(userText) {
   let botText = '';
 
   wakeWord.pause();
+  bargeIn.mode = settings.bargeIn || 'keyword';
+  if (speakLive) bargeIn.start();
   $('#stop-btn').hidden = false;
 
   const agent = new Agent({
@@ -301,6 +311,7 @@ async function respond(userText) {
     setTimeout(() => sm.set({ error: null }), 4000);
   } finally {
     busy = false;
+    bargeIn.stop();
     $('#stop-btn').hidden = true;
     wakeWordResume();
     avatar.setEmotion(stateEmotion(sm.current));
@@ -383,10 +394,38 @@ function syncWake() {
   try { wakeWord.start(); } catch (e) { $('#voice-status').textContent = e.message; }
 }
 
+/* ---------------------------------------------------------- tts + barge-in */
+const tts = new TTSRouter({
+  settings: () => settings,
+  voice,
+  serverUrl: () => settings.serverUrl || 'http://localhost:8787',
+});
+tts.onFallback = (err) => {
+  setSubtitle(`เสียงคุณภาพสูงใช้ไม่ได้ (${err.message}) — เปลี่ยนเป็นเสียงเครื่องให้แล้ว`);
+};
+
+const bargeIn = new BargeIn({
+  mode: settings.bargeIn || 'keyword',
+  lang: settings.language === 'en' ? 'en-US' : 'th-TH',
+  onInterrupt: (heard) => {
+    stopSpeaking();
+    setSubtitle(`✋ หยุดให้แล้ว (ได้ยิน "${heard.slice(0, 24)}")`);
+    sm.touch();
+  },
+});
+
+/** voice ที่มี interface เดียวกับ Voice แต่ผ่าน router (ใช้กับ SpeechQueue) */
+const speechVoice = {
+  speak: (text) => tts.speak(text, voiceOptions()),
+  stopSpeaking: () => tts.stop(),
+};
+
 /* ---------------------------------------------------------- stop speaking */
 function stopSpeaking() {
   activeQueue?.stop();
   activeQueue = null;
+  bargeIn.stop();
+  tts.stop();
   voice.stopSpeaking();
   $('#stop-btn').hidden = true;
   setSubtitle('หยุดแล้ว');
@@ -852,6 +891,20 @@ function renderSettingsForm() {
   $('#set-synctoken').value = settings.syncToken || '';
   renderPermList();
 
+  const ttsSel = $('#set-ttsprovider');
+  ttsSel.innerHTML = Object.entries(TTS_PROVIDERS).map(([id, p]) => `<option value="${id}">${p.label}</option>`).join('');
+  ttsSel.value = TTS_PROVIDERS[settings.ttsProvider] ? settings.ttsProvider : 'system';
+  $('#tts-provider-hint').textContent = TTS_PROVIDERS[ttsSel.value].desc;
+  $('#tts-openai-fields').hidden = ttsSel.value !== 'openai';
+  $('#set-ttsbaseurl').value = settings.ttsBaseUrl || '';
+  $('#set-ttsapikey').value = settings.ttsApiKey || '';
+  $('#set-ttsmodel').value = settings.ttsModel || 'tts-1';
+  $('#set-ttsvoice').value = settings.ttsVoice || 'alloy';
+
+  const bargeSel = $('#set-bargein');
+  bargeSel.innerHTML = Object.entries(BARGE_MODES).map(([id, m]) => `<option value="${id}">${m.label}</option>`).join('');
+  bargeSel.value = BARGE_MODES[settings.bargeIn] ? settings.bargeIn : 'keyword';
+
   $('#set-streaming').checked = settings.streaming !== false;
   $('#set-speakstream').checked = settings.speakWhileStreaming !== false;
   $('#set-wake').checked = !!settings.wake;
@@ -909,6 +962,12 @@ function collectSettings() {
       autonomy: $('#set-autonomy').value,
       allow: { ...(permDraft?.allow || DEFAULT_PERMISSIONS.allow) },
     },
+    ttsProvider: $('#set-ttsprovider').value,
+    ttsBaseUrl: $('#set-ttsbaseurl').value.trim(),
+    ttsApiKey: $('#set-ttsapikey').value.trim(),
+    ttsModel: $('#set-ttsmodel').value.trim(),
+    ttsVoice: $('#set-ttsvoice').value.trim(),
+    bargeIn: $('#set-bargein').value,
     streaming: $('#set-streaming').checked,
     speakWhileStreaming: $('#set-speakstream').checked,
     wake: $('#set-wake').checked,
@@ -1152,6 +1211,12 @@ $('#test-ai-btn').addEventListener('click', async () => {
   }
 });
 
+$('#set-ttsprovider').addEventListener('change', (e) => {
+  const p = TTS_PROVIDERS[e.target.value];
+  $('#tts-provider-hint').textContent = p.desc;
+  $('#tts-openai-fields').hidden = e.target.value !== 'openai';
+});
+
 $('#set-rate').addEventListener('input', (e) => { $('#out-rate').textContent = Number(e.target.value).toFixed(2); });
 $('#set-pitch').addEventListener('input', (e) => { $('#out-pitch').textContent = Number(e.target.value).toFixed(2); });
 $('#sync-test-btn').addEventListener('click', async () => {
@@ -1205,7 +1270,10 @@ $('#sync-pull-btn').addEventListener('click', async () => {
 
 $('#test-voice-btn').addEventListener('click', async () => {
   $('#voice-status').textContent = 'กำลังพูดทดสอบ…';
-  await voice.speak('สวัสดีครับ ผมคือ No7 ผู้ช่วยส่วนตัวของคุณ', {
+  const testSettings = { ...settings, ...collectSettings() };
+  const tester = new TTSRouter({ settings: () => testSettings, voice, serverUrl: () => testSettings.serverUrl });
+  tester.onFallback = (err) => { $('#voice-status').textContent = `คุณภาพสูงใช้ไม่ได้ (${err.message}) — ใช้เสียงเครื่องแทน`; };
+  await tester.speak('สวัสดีครับ ผมคือ No7 ผู้ช่วยส่วนตัวของคุณ', {
     ...voiceOptions(),
     rate: Number($('#set-rate').value) || 1,
     pitch: Number($('#set-pitch').value) || 1,
