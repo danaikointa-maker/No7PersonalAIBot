@@ -8,7 +8,8 @@ import { detectCapabilities, summarizeCapabilities, requestMicrophone, requestNo
 import { usageBreakdown, formatBytes, estimateQuota, isPersisted, requestPersistentStorage, clearGroup } from './core/storage.js';
 import { MemoryStore } from './core/memory.js';
 import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatWithFallbackStream } from './core/ai-providers.js';
-import { TOOLS, TOOL_IDS, runTool, toolMeta, restoreReminders } from './core/tools.js';
+import { getTool, TOOL_IDS, runTool, toolMeta, restoreReminders, registerDynamicTools } from './core/tools.js';
+import { McpRegistry } from './core/mcp.js';
 import { Agent } from './core/agent.js';
 import { MODES, MODE_IDS, getMode, toolsForMode } from './core/modes.js';
 import { CATEGORIES, AUTONOMY, DEFAULT_PERMISSIONS, normalizePermissions, riskLabel } from './core/permissions.js';
@@ -22,6 +23,78 @@ import { EyeAvatar } from './ui/avatar.js';
 import { renderCard, renderError } from './ui/cards.js';
 import { loadSettings, saveSettings, resetSettings, hasProviderConfigured, loadPermissions } from './core/settings.js';
 import { detectPlatform, platformLabel, isDesktopHost } from './core/platform.js';
+
+/** escape ค่าที่มาจากภายนอกก่อนใส่ innerHTML */
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[c]));
+
+/* ------------------------------------------------------------------- MCP */
+const mcp = new McpRegistry({
+  settings: () => settings,
+  serverUrl: () => settings.serverUrl || 'http://localhost:8787',
+});
+
+function applyMcpTools() {
+  const defs = mcp.toolDefs();
+  registerDynamicTools(defs);
+  return Object.keys(defs).length;
+}
+
+function renderMcp() {
+  const list = $('#mcp-list');
+  if (!list) return;
+  const cfg = Array.isArray(settings.mcpServers) ? settings.mcpServers : [];
+  const status = mcp.status();
+  if (!cfg.length) {
+    list.innerHTML = '<p class="hint">ยังไม่มี MCP server — เพิ่มด้านล่างได้เลย</p>';
+    $('#mcp-status').textContent = 'ยังไม่มี server';
+    return;
+  }
+  list.innerHTML = cfg.map((s) => {
+    const row = status.servers.find((r) => r.id === (s.id || s.name || s.url));
+    const on = s.enabled !== false;
+    return `<div class="mcp-row" data-id="${esc(s.id || s.name || s.url)}">
+      <div class="mcp-main">
+        <strong>${esc(s.name || s.id || 'MCP')}</strong>
+        <span class="hint">${esc(s.url)}</span>
+        <span class="hint">${row ? `${row.tools} เครื่องมือ${row.error ? ` · ⚠️ ${esc(row.error)}` : ''}` : 'ยังไม่ได้เชื่อม'}</span>
+      </div>
+      <div class="row">
+        <label class="switch"><input type="checkbox" data-mcp-toggle ${on ? 'checked' : ''} /> เปิด</label>
+        <button data-mcp-remove>ลบ</button>
+      </div>
+    </div>`;
+  }).join('');
+  const total = status.totalTools;
+  $('#mcp-status').textContent = total
+    ? `เชื่อมต่อแล้ว ${status.servers.filter((r) => !r.error).length}/${status.servers.length} server · ${total} เครื่องมือ`
+    : 'ยังไม่ได้ค้นหาเครื่องมือ — กด "ค้นหาเครื่องมือ"';
+}
+
+async function refreshMcp({ quiet = false } = {}) {
+  if (!Array.isArray(settings.mcpServers) || !settings.mcpServers.length) {
+    renderMcp();
+    return [];
+  }
+  if (!quiet) $('#mcp-status').textContent = 'กำลังเชื่อมต่อ MCP…';
+  const results = await mcp.refresh();
+  const count = applyMcpTools();
+  renderMcp();
+  renderToolsGrid(true);
+  if (!quiet) {
+    const bad = results.filter((r) => !r.ok);
+    $('#mcp-status').textContent = bad.length
+      ? `เชื่อมได้ ${results.length - bad.length}/${results.length} server · ${bad.map((b) => `${b.name}: ${b.error}`).join(' · ')}`
+      : `เชื่อมต่อแล้ว ${results.length} server · ${count} เครื่องมือ`;
+  }
+  return results;
+}
+
+function saveMcpServers(next) {
+  settings = saveSettings({ mcpServers: next });
+  renderMcp();
+}
 
 /* ------------------------------------------------------------------ boot */
 const $ = (sel) => document.querySelector(sel);
@@ -450,21 +523,22 @@ function stateEmotion(s) {
 }
 
 /* ------------------------------------------------------------------ tools */
-function renderToolsGrid() {
+function renderToolsGrid(force = false) {
   const grid = $('#tools-grid');
   const mode = getMode(settings.mode);
   const modeId = settings.mode || 'auto';
-  if (grid.dataset.ready === modeId) return;
+  if (!force && grid.dataset.ready === modeId) return;
+  if (force) grid.dataset.ready = '';
   grid.innerHTML = '';
   grid.dataset.ready = modeId;
 
   const ids = toolsForMode(modeId);
   for (const id of ids) {
-    const t = TOOLS[id];
+    const t = getTool(id);
     const meta = toolMeta(id);
     const btn = document.createElement('button');
     btn.className = 'tool-btn';
-    btn.innerHTML = `<strong>${t.emoji} ${t.label}</strong><small>${t.desc}</small>`
+    btn.innerHTML = `<strong>${esc(t.emoji)} ${esc(t.label)}</strong><small>${esc(t.desc)}</small>`
       + `<small style="display:block;opacity:.7;margin-top:4px">${CATEGORIES[meta.category]?.label || meta.category} · ${riskLabel(meta.risk)}</small>`;
     btn.addEventListener('click', async () => {
       const out = $('#tool-result');
@@ -905,6 +979,8 @@ function renderSettingsForm() {
   bargeSel.innerHTML = Object.entries(BARGE_MODES).map(([id, m]) => `<option value="${id}">${m.label}</option>`).join('');
   bargeSel.value = BARGE_MODES[settings.bargeIn] ? settings.bargeIn : 'keyword';
 
+  renderMcp();
+
   $('#set-streaming').checked = settings.streaming !== false;
   $('#set-speakstream').checked = settings.speakWhileStreaming !== false;
   $('#set-wake').checked = !!settings.wake;
@@ -1182,14 +1258,76 @@ $('#pf-preview').addEventListener('click', async () => {
   $('#pf-status').textContent = 'พูดจบแล้ว';
 });
 
+/* -------- MCP UI -------- */
+function mcpSlug(name, url) {
+  const base = String(name || url || 'mcp').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return `${base || 'mcp'}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+$('#mcp-add').addEventListener('click', () => {
+  const name = $('#mcp-name').value.trim();
+  const url = $('#mcp-url').value.trim();
+  if (!/^https?:\/\//.test(url)) {
+    $('#mcp-status').textContent = 'URL ต้องขึ้นต้นด้วย http:// หรือ https://';
+    return;
+  }
+  const next = [...(Array.isArray(settings.mcpServers) ? settings.mcpServers : []), {
+    id: mcpSlug(name, url),
+    name: name || new URL(url).host,
+    url,
+    apiKey: $('#mcp-apikey').value.trim(),
+    transport: $('#mcp-transport').value === 'direct' ? 'direct' : 'proxy',
+    enabled: true,
+  }];
+  saveMcpServers(next);
+  $('#mcp-name').value = '';
+  $('#mcp-url').value = '';
+  $('#mcp-apikey').value = '';
+  refreshMcp();
+});
+
+$('#mcp-refresh').addEventListener('click', () => { refreshMcp(); });
+
+$('#mcp-list').addEventListener('click', (e) => {
+  const row = e.target.closest('.mcp-row');
+  if (!row) return;
+  const id = row.dataset.id;
+  const list = Array.isArray(settings.mcpServers) ? settings.mcpServers : [];
+  if (e.target.matches('[data-mcp-remove]')) {
+    saveMcpServers(list.filter((s) => (s.id || s.name || s.url) !== id));
+    mcp.hydrateFromCache();
+    applyMcpTools();
+    renderToolsGrid(true);
+    refreshMcp();
+  }
+});
+
+$('#mcp-list').addEventListener('change', (e) => {
+  if (!e.target.matches('[data-mcp-toggle]')) return;
+  const row = e.target.closest('.mcp-row');
+  const id = row?.dataset.id;
+  const list = (Array.isArray(settings.mcpServers) ? settings.mcpServers : [])
+    .map((s) => ((s.id || s.name || s.url) === id ? { ...s, enabled: e.target.checked } : s));
+  saveMcpServers(list);
+  mcp.hydrateFromCache();
+  applyMcpTools();
+  renderToolsGrid(true);
+  refreshMcp({ quiet: true });
+});
+
 $('#save-settings-btn').addEventListener('click', () => {
   settings = saveSettings(collectSettings());
   sm.set({ hasProvider: hasProviderConfigured(settings), error: null });
   updatePersonaHeader();
   renderModeChips();
-  renderToolsGrid();
+  renderToolsGrid(true);
   syncWake();
   $('#settings-status').textContent = '✅ บันทึกแล้ว (เก็บในเครื่องนี้เท่านั้น)';
+  if (Array.isArray(settings.mcpServers) && settings.mcpServers.length) {
+    mcp.hydrateFromCache();
+    applyMcpTools();
+    refreshMcp({ quiet: true });
+  }
 });
 
 $('#test-ai-btn').addEventListener('click', async () => {
@@ -1466,9 +1604,13 @@ syncOnlineState();
 const bootView = new URLSearchParams(location.search).get('view');
 if (bootView && document.getElementById(`view-${bootView}`)) showView(bootView);
 
+mcp.hydrateFromCache();
+applyMcpTools();
+renderMcp();
 renderSettingsForm();
 renderModeChips();
 renderToolsGrid();
+if (Array.isArray(settings.mcpServers) && settings.mcpServers.length) refreshMcp({ quiet: true });
 restoreReminders();
 addMessage('bot', getPersona(settings.persona).greeting
   || `สวัสดีครับ ผม ${getPersona(settings.persona).name} 👋\nพิมพ์คุยได้เลย หรือกด 🎤 เพื่อพูด\n\nลองถาม: "อากาศกรุงเทพวันนี้", "ราคาบิทคอยน์", "ตั้งเวลา 5 นาที"`);

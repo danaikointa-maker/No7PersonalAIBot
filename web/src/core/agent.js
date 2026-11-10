@@ -1,6 +1,6 @@
 // Agent loop — หลายก้าวในคำสั่งเดียว พร้อมประตูอนุญาต (permission gate)
 // และ callback ยืนยันจากผู้ใช้ก่อนทำงานเสี่ยง
-import { extractToolCall, stripToolCalls, runTool, TOOLS, toolMeta } from './tools.js';
+import { extractToolCall, stripToolCalls, runTool, getTool, toolMeta } from './tools.js';
 import { buildSystemPrompt } from './prompt.js';
 import { getMode, detectMode } from './modes.js';
 import { isAllowed, needsConfirm, permissionSummary } from './permissions.js';
@@ -62,7 +62,7 @@ export class Agent {
         break;
       }
 
-      const tool = TOOLS[call.name];
+      const tool = getTool(call.name);
       if (!tool) {
         messages.push({ role: 'assistant', content: reply });
         messages.push({ role: 'user', content: `ไม่มีเครื่องมือชื่อ "${call.name}" — เลือกจากรายการที่มีเท่านั้น` });

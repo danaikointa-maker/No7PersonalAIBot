@@ -349,3 +349,19 @@ kbd {
 .storage-row .bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
 .storage-row span:first-child { min-width: 120px; color: var(--muted); }
 .storage-row span:last-child { min-width: 62px; text-align: right; color: var(--muted); }
+
+/* ---- MCP servers (settings) ---- */
+.mcp-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.mcp-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 10px; border: 1px solid var(--line, #2a2a35); border-radius: 10px;
+  background: var(--bg2); font-size: 12.5px;
+}
+.mcp-row .mcp-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.mcp-row .mcp-main strong { font-size: 13px; }
+.mcp-row .mcp-main .hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 42ch; }
+.mcp-row .row { margin: 0; flex-wrap: nowrap; }
+@media (max-width: 640px) {
+  .mcp-row { flex-direction: column; align-items: stretch; }
+  .mcp-row .mcp-main .hint { max-width: 100%; }
+}

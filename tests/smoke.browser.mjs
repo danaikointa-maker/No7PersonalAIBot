@@ -81,6 +81,16 @@ window.fetch = async (url, opts = {}) => {
     if (last.includes('เปิดเว็บ')) return reply('```tool\n{"tool":"open_url","args":{"url":"https://example.com"}}\n```');
     return reply('สวัสดีครับ ผมชื่อ No7');
   }
+  if (u.includes('/api/mcp')) {
+    const payload = JSON.parse(opts.body || '{}').payload || {};
+    const ok = (result) => ({ ok: true, json: async () => ({ status: 200, headers: {}, body: JSON.stringify({ jsonrpc: '2.0', id: payload.id, result }) }) });
+    if (payload.method === 'initialize') return ok({ protocolVersion: '2024-11-05', serverInfo: { name: 'Demo' } });
+    if (payload.method === 'tools/list') {
+      return ok({ tools: [{ name: 'send_email', description: 'ส่งอีเมลผ่าน MCP', inputSchema: { type: 'object', properties: { to: { type: 'string' }, subject: { type: 'string' } } } }] });
+    }
+    if (payload.method === 'tools/call') return ok({ content: [{ type: 'text', text: 'ส่งอีเมลแล้ว' }] });
+    return { ok: true, json: async () => ({ status: 202, headers: {}, body: '' }) };
+  }
   if (u.includes('gold-api')) return { ok: true, json: async () => ({ price: 2412.5, updatedAt: new Date().toISOString() }) };
   return { ok: true, json: async () => ({}) };
 };
@@ -216,6 +226,17 @@ await wait(20);
 check('persona: custom created', $('#persona-list').children.length === 9, String($('#persona-list').children.length));
 check('persona: selected header updated', $('#persona-name').textContent.includes('น้องสโมค'), $('#persona-name').textContent);
 check('persona: appears in dropdown', [...$('#set-persona').options].some((o) => o.textContent.includes('น้องสโมค')));
+
+// MCP: add server → discover tools → tools appear in grid
+check('mcp: empty state shown', $('#mcp-status').textContent.includes('ยังไม่มี server'), $('#mcp-status').textContent);
+$('#mcp-name').value = 'Demo';
+$('#mcp-url').value = 'http://localhost:3100/mcp';
+$('#mcp-add').click();
+await wait(150);
+check('mcp: server listed', $('#mcp-list').textContent.includes('Demo'), $('#mcp-list').textContent.slice(0, 80));
+check('mcp: tool count reported', $('#mcp-list').textContent.includes('1 เครื่องมือ'), $('#mcp-list').textContent.slice(0, 120));
+check('mcp: dynamic tool in tools grid', [...$('#tools-grid').children].some((b) => b.textContent.includes('send_email')));
+check('mcp: permission category listed', $('#perm-list').children.length === 6, String($('#perm-list').children.length));
 
 // voice & streaming settings
 $('#nav button[data-view="settings"]').click();

@@ -139,7 +139,7 @@ async function handleApi(req, res, url) {
       hasDist: fs.existsSync(path.join(DIST, 'index.html')),
       sync: { enabled: true, requiresToken: !!SYNC_TOKEN, hasData: !!readSync() },
       endpoints: ['/api/health', '/api/chat', '/api/tools', '/api/tools/run', '/api/pair', '/api/sync', '/api/fetch',
-        '/api/link/command', '/api/link/poll', '/api/link/status', '/api/link/results', '/api/tts'],
+        '/api/link/command', '/api/link/poll', '/api/link/status', '/api/link/results', '/api/tts', '/api/mcp'],
       aiKeys: {
         gemini: !!process.env.GEMINI_API_KEY,
         openai: !!process.env.OPENAI_API_KEY,
@@ -208,6 +208,41 @@ async function handleApi(req, res, url) {
       json(res, 502, { error: e.message });
     }
     return;
+  }
+
+  // ---- MCP proxy: JSON-RPC 2.0 ไปยัง MCP server (เลี่ยง CORS) ----
+  if (url.pathname === '/api/mcp' && req.method === 'POST') {
+    const body = await readBody(req);
+    const target = String(body.url || '');
+    let parsed;
+    try { parsed = new URL(target); } catch { return json(res, 400, { error: 'url ไม่ถูกต้อง' }); }
+    if (!/^https?:$/.test(parsed.protocol)) return json(res, 400, { error: 'รองรับเฉพาะ http/https' });
+    const headers = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+      ...(body.headers && typeof body.headers === 'object' ? Object.fromEntries(
+        Object.entries(body.headers).filter(([k, v]) => typeof k === 'string' && typeof v === 'string')
+      ) : {}),
+    };
+    const key = body.apiKey || '';
+    if (key) headers.Authorization = `Bearer ${key}`;
+    if (body.sessionId) headers['mcp-session-id'] = String(body.sessionId);
+    try {
+      const r = await fetch(target, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body.payload || {}),
+      });
+      const text = await r.text();
+      return json(res, 200, {
+        status: r.status,
+        contentType: r.headers.get('content-type') || '',
+        headers: { 'mcp-session-id': r.headers.get('mcp-session-id') || '' },
+        body: text.slice(0, 400000),
+      });
+    } catch (e) {
+      return json(res, 502, { error: e.message, status: 0, body: '' });
+    }
   }
 
   // ---- Phone-Link endpoints (HMAC signed) ----

@@ -30,6 +30,7 @@ export const DEFAULT_SETTINGS = {
   ttsBaseUrl: '',
   ttsApiKey: '',
   bargeIn: 'keyword',      // off | keyword | any
+  mcpServers: [],          // [{id, name, url, apiKey, transport, enabled}]
   serverUrl: 'http://localhost:8787',   // companion server (AI proxy / tools / sync)
   syncToken: '',
 };

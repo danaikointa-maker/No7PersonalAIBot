@@ -78,7 +78,7 @@
 |---|---|---|---|
 | R1 | ความเสถียรบนมือถือ (Mobile hardening) | 1.1–1.4 | ✅ ปิดเฟส |
 | R2 | Barge-in + TTS ระดับพรีเมียม | 2.1–2.4 | ✅ |
-| R3 | MCP / Integrations | 3.1–3.4 | ⬜ |
+| R3 | MCP / Integrations | 3.1–3.4 | ✅ |
 | R4 | Reliability & Performance | 4.1–4.4 | ⬜ |
 | R5 | Release 1.3 | 5.1–5.3 | ⬜ |
 
@@ -98,10 +98,10 @@
 
 ## R3 — MCP
 
-- 3.1 MCP client (JSON-RPC 2.0 over HTTP) + discovery (`initialize`, `tools/list`, `tools/call`)
-- 3.2 Dynamic tool registry: รวม tool จาก MCP เข้ากับ tools ในเครื่อง
-- 3.3 Permission หมวดใหม่ `mcp` (risk 2) + UI จัดการ server/tool
-- 3.4 Tests + docs/MCP.md
+- [x] 3.1 MCP client (JSON-RPC 2.0 over HTTP) + discovery (`initialize`, `tools/list`, `tools/call`) — `core/mcp.js`, proxy `POST /api/mcp`, รองรับ JSON + SSE + `mcp-session-id`
+- [x] 3.2 Dynamic tool registry: `registerDynamicTools()` รวม tool จาก MCP เข้ากับ 24 tools ในเครื่อง (prompt + tools grid + agent)
+- [x] 3.3 Permission หมวดใหม่ `mcp` (risk 2) + UI เพิ่ม/เปิดปิด/ค้นหา server + cache `no7.mcp.tools.v1`
+- [x] 3.4 Tests (`tests/mcp.test.js` 9) + `docs/MCP.md`
 
 ## R4 — Reliability & Performance
 

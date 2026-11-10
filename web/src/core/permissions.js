@@ -8,6 +8,7 @@ export const CATEGORIES = {
   act: { emoji: '⚡', label: 'ทำงานในเครื่อง', desc: 'ตั้งเตือน คัดลอกข้อความ เปิดลิงก์', risk: 1 },
   message: { emoji: '✉️', label: 'ร่างข้อความ', desc: 'เปิดหน้าต่างอีเมล/SMS/LINE พร้อมร่าง (คุณกดส่งเอง)', risk: 2 },
   control: { emoji: '🎛️', label: 'ควบคุมอุปกรณ์', desc: 'เปิดโปรแกรม สั่งงานเครื่อง/บอร์ด', risk: 3 },
+  mcp: { emoji: '🔌', label: 'MCP / บริการภายนอก', desc: 'เรียกเครื่องมือจาก MCP server ที่คุณเพิ่มเอง (อีเมล ปฏิทิน ไฟล์)', risk: 2 },
 };
 
 export const AUTONOMY = {
@@ -18,7 +19,7 @@ export const AUTONOMY = {
 
 export const DEFAULT_PERMISSIONS = {
   autonomy: 'ask-risky',
-  allow: { read: true, memory: true, act: true, message: true, control: true },
+  allow: { read: true, memory: true, act: true, message: true, control: true, mcp: true },
 };
 
 export function normalizePermissions(p) {

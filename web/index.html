@@ -353,6 +353,28 @@
             <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> — push-to-talk ระดับระบบ (เดสก์ท็อป)</li>
           </ul>
 
+          <h3>ปลั๊กอิน MCP</h3>
+          <p class="hint">ต่อ No7 เข้ากับ MCP server ของคุณเอง (Gmail, ปฏิทิน, ไฟล์) — เรียกผ่าน companion server <code>POST /api/mcp</code></p>
+          <div id="mcp-list" class="mcp-list"></div>
+          <p class="hint" id="mcp-status">ยังไม่มี server</p>
+          <div class="grid2">
+            <label>ชื่อ <input id="mcp-name" placeholder="Gmail" /></label>
+            <label>URL <input id="mcp-url" placeholder="http://localhost:3100/mcp" /></label>
+          </div>
+          <div class="grid2">
+            <label>API key (ไม่บังคับ) <input id="mcp-apikey" type="password" /></label>
+            <label>ช่องทาง
+              <select id="mcp-transport">
+                <option value="proxy">ผ่าน server (แนะนำ)</option>
+                <option value="direct">ตรงจากเบราว์เซอร์</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <button id="mcp-add">➕ เพิ่ม server</button>
+            <button id="mcp-refresh">🔄 ค้นหาเครื่องมือ</button>
+          </div>
+
           <h3>เชื่อมต่อ (Phone-Link / ESP32)</h3>
           <p class="hint">โปรโตคอลจับคู่ HMAC — ดู <code>docs/PHONE_LINK.md</code></p>
           <div class="row">
