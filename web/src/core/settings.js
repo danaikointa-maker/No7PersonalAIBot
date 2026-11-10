@@ -18,6 +18,12 @@ export const DEFAULT_SETTINGS = {
   costMode: 'mixed', // free | quality | private | mixed
   permissions: DEFAULT_PERMISSIONS,
   memoryLLM: false,       // ใช้ AI ช่วยสรุปความจำ (opt-in เพื่อคุมโควตา)
+  streaming: true,        // แสดงคำตอบแบบไหลทีละคำ
+  speakWhileStreaming: true, // เริ่มพูดก่อนคำตอบจบ
+  wake: false,            // ปลุกด้วยคำว่า "No7"
+  voiceRate: 1,
+  voicePitch: 1,
+  voiceName: '',
 };
 
 const KEY = 'no7.settings.v1';

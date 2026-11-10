@@ -5,7 +5,7 @@
 | เฟส | ชื่อ | งานย่อย | สถานะ |
 |---|---|---|---|
 | 1 | ความจำอัจฉริยะ (Memory 2.0) | 1.1–1.4 | ✅ ปิดเฟส |
-| 2 | เสียงไว + ปลุกด้วยชื่อ (Voice 2.0) | 2.1–2.5 | ⬜ |
+| 2 | เสียงไว + ปลุกด้วยชื่อ (Voice 2.0) | 2.1–2.5 | ✅ ปิดเฟส |
 | 3 | Persona Studio | 3.1–3.4 | ⬜ |
 | 4 | Connectors & Sync | 4.1–4.4 | ⬜ |
 | 5 | Device Hub (Phone-Link ครบวงจร) | 5.1–5.4 | ⬜ |
@@ -20,11 +20,11 @@
 
 ## เฟส 2 — เสียงไว + ปลุกด้วยชื่อ
 
-- 2.1 SentenceSplitter + คิว TTS พูดทีละประโยค
-- 2.2 Provider streaming (SSE): pollinations / openai-compatible / ollama, fallback เป็น non-stream
-- 2.3 Wake word "No7" (Web Speech ต่อเนื่อง) + ตั้งค่า + ตัวชี้สถานะ
-- 2.4 Agent → UI แบบสตรีม (บับเบิลโตขึ้นเรื่อยๆ) + หยุดพูดได้
-- 2.5 Tests + docs/VOICE.md
+- [x] 2.1 SentenceSplitter + คิว TTS พูดทีละประโยค
+- [x] 2.2 Provider streaming (SSE): pollinations / openai / openai-compatible / ollama / gemini + fallback
+- [x] 2.3 Wake word "No7" (Web Speech ต่อเนื่อง) + ตั้งค่า + ตัวชี้สถานะ + pause ขณะพูด
+- [x] 2.4 Agent → UI แบบสตรีม + หยุดพูดได้ + กันพูดตอนเป็น tool call
+- [x] 2.5 Tests (7 stream + 7 provider streaming + 7 wake) + docs/VOICE.md
 
 ## เฟส 3 — Persona Studio
 

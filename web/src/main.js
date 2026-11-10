@@ -2,13 +2,15 @@ import './styles.css';
 import { StateMachine, STATES } from './core/state.js';
 import { PERSONAS, getPersona } from './core/personas.js';
 import { MemoryStore } from './core/memory.js';
-import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback } from './core/ai-providers.js';
+import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatWithFallbackStream } from './core/ai-providers.js';
 import { TOOLS, TOOL_IDS, runTool, toolMeta, restoreReminders } from './core/tools.js';
 import { Agent } from './core/agent.js';
 import { MODES, MODE_IDS, getMode, toolsForMode } from './core/modes.js';
 import { CATEGORIES, AUTONOMY, DEFAULT_PERMISSIONS, normalizePermissions, riskLabel } from './core/permissions.js';
 import { consolidate, shouldConsolidate, startDailyConsolidation } from './core/consolidate.js';
 import { Voice } from './core/voice.js';
+import { SentenceSplitter, SpeechQueue, withCursor } from './core/stream.js';
+import { WakeWord } from './core/wake.js';
 import { EyeAvatar } from './ui/avatar.js';
 import { renderCard, renderError } from './ui/cards.js';
 import { loadSettings, saveSettings, resetSettings, hasProviderConfigured, loadPermissions } from './core/settings.js';
@@ -124,10 +126,26 @@ function setSubtitle(text) {
   globalThis.no7?.native?.sendSubtitle?.(text);
 }
 
+function voiceOptions() {
+  return {
+    lang: settings.language === 'en' ? 'en-US' : 'th-TH',
+    rate: Number(settings.voiceRate) || 1,
+    pitch: Number(settings.voicePitch) || 1,
+    voiceName: settings.voiceName || undefined,
+  };
+}
+
 async function speak(text) {
   if (!settings.tts || !text) return;
   setSubtitle(text);
-  await voice.speak(text, { lang: settings.language === 'en' ? 'en-US' : 'th-TH' });
+  $('#stop-btn').hidden = false;
+  wakeWord.pause();
+  try {
+    await voice.speak(text, voiceOptions());
+  } finally {
+    $('#stop-btn').hidden = true;
+    wakeWordResume();
+  }
 }
 
 /** Add one visible agent step (tool call / denial / error) into the chat. */
@@ -167,7 +185,9 @@ function askConfirm(req) {
   });
 }
 
-/** One chat turn: Agent loop (multi-step) + fallback chain + memory + TTS. */
+let activeQueue = null;
+
+/** One chat turn: agent loop + streaming tokens + speak-while-generating. */
 async function respond(userText) {
   if (busy) return;
   busy = true;
@@ -177,11 +197,24 @@ async function respond(userText) {
   const persona = getPersona(settings.persona);
   const chain = resolveProviderChain(settings);
   const botEl = addMessage('bot', '…');
-  let botText = '';
   const cards = [];
+  const splitter = new SentenceSplitter();
+  const queue = new SpeechQueue(voice);
+  activeQueue = queue;
+
+  const streaming = !!settings.streaming;
+  let speakLive = streaming && !!settings.tts && !!settings.speakWhileStreaming;
+  let streamBuf = '';
+  let toolLikely = false;
+  let botText = '';
+
+  wakeWord.pause();
+  $('#stop-btn').hidden = false;
 
   const agent = new Agent({
-    chat: (messages) => chatWithFallback(messages, chain, { fallback }),
+    chat: (messages, { onToken } = {}) => (streaming
+      ? chatWithFallbackStream(messages, chain, { fallback, onToken })
+      : chatWithFallback(messages, chain, { fallback })),
     memory,
     settings,
     confirm: askConfirm,
@@ -189,9 +222,25 @@ async function respond(userText) {
     onEvent: (e) => {
       if (e.type === 'thinking') {
         sm.set({ requestInFlight: true, toolRunning: false });
-        if (e.step > 1) botEl.textContent = 'กำลังคิดต่อ…';
+        if (e.step > 1 && !streamBuf) botEl.textContent = 'กำลังคิดต่อ…';
+      }
+      if (e.type === 'token') {
+        streamBuf += e.delta;
+        if (streamBuf.includes('```') || /^\s*\{/.test(streamBuf)) toolLikely = true;
+        botEl.textContent = withCursor(streamBuf, !toolLikely);
+        $('#messages').scrollTop = $('#messages').scrollHeight;
+        if (speakLive && !toolLikely) {
+          for (const sentence of splitter.push(e.delta)) queue.enqueue(sentence);
+        }
       }
       if (e.type === 'tool') {
+        // ข้อความที่ไหลมาเป็นเจตนาเรียกเครื่องมือ ไม่ใช่คำตอบ → ล้างและหยุดเสียง
+        streamBuf = '';
+        toolLikely = false;
+        botEl.textContent = '';
+        splitter.reset();
+        speakLive = false;
+        queue.stop();
         sm.set({ requestInFlight: false, toolRunning: true });
         addStep(`เรียก ${e.emoji || '🧰'} ${e.label || e.tool}`);
         setSubtitle(`กำลังใช้ ${e.label || e.tool}…`);
@@ -214,9 +263,15 @@ async function respond(userText) {
       persona,
       modeId: settings.mode,
     });
-
     botText = result.text || '(ไม่มีคำตอบ)';
-    botEl.textContent = botText;
+
+    if (speakLive) {
+      queue.resume();
+      for (const sentence of splitter.flush()) queue.enqueue(sentence);
+      setSubtitle(botText);
+    } else {
+      botEl.textContent = botText;
+    }
     for (const c of cards) renderCard(botEl, c.tool, c.data);
 
     memory.logTurn('assistant', botText);
@@ -225,14 +280,17 @@ async function respond(userText) {
     learnFrom(userText);
 
     sm.set({ requestInFlight: false, toolRunning: false });
-    await speak(botText);
+    if (!speakLive) await speak(botText);
   } catch (err) {
+    queue.stop();
     botEl.textContent = `⚠️ ${err.message}`;
     sm.set({ error: err.message, requestInFlight: false, toolRunning: false });
     setSubtitle('มีปัญหาการเชื่อมต่อ ลองตรวจสอบการตั้งค่า');
     setTimeout(() => sm.set({ error: null }), 4000);
   } finally {
     busy = false;
+    $('#stop-btn').hidden = true;
+    wakeWordResume();
     avatar.setEmotion(stateEmotion(sm.current));
   }
 }
@@ -259,12 +317,15 @@ $('#composer').addEventListener('submit', (e) => {
   respond(text);
 });
 
-$('#mic-btn').addEventListener('click', async () => {
+/** ฟังหนึ่งครั้ง → ส่งข้อความ (ใช้ร่วมกันทั้งปุ่มไมค์และ wake word) */
+async function triggerListen() {
+  if (busy) return;
   if (voice.listening) { voice.stopListening(); return; }
   if (!settings.stt) { alert('เปิด "ใช้ไมค์พูด" ในตั้งค่าก่อน'); return; }
   try {
+    wakeWord.pause();
     setSubtitle('กำลังฟัง… 🎤');
-    const text = await voice.listenOnce();
+    const text = await voice.listenOnce({ lang: settings.language === 'en' ? 'en-US' : 'th-TH' });
     if (text) {
       addMessage('user', text);
       respond(text);
@@ -273,8 +334,52 @@ $('#mic-btn').addEventListener('click', async () => {
     }
   } catch (e) {
     setSubtitle(e.message);
+  } finally {
+    wakeWordResume();
   }
+}
+
+$('#mic-btn').addEventListener('click', triggerListen);
+
+/* ------------------------------------------------------------- wake word */
+const wakeWord = new WakeWord({
+  lang: settings.language === 'en' ? 'en-US' : 'th-TH',
+  onWake: () => { setSubtitle('ได้ยินชื่อแล้ว กำลังฟัง…'); triggerListen(); },
+  onState: (st) => {
+    const badge = $('#wake-badge');
+    badge.hidden = st !== 'listening';
+    if (st === 'denied') {
+      settings = saveSettings({ wake: false });
+      $('#set-wake') && ($('#set-wake').checked = false);
+      $('#voice-status').textContent = '⚠️ เบราว์เซอร์ไม่อนุญาตไมค์ — ปลุกด้วยชื่อถูกปิด';
+    }
+  },
 });
+
+function wakeWordResume() {
+  if (settings.wake && wakeWord.active) wakeWord.resume();
+  else if (settings.wake && !wakeWord.active) syncWake();
+}
+
+function syncWake() {
+  if (!settings.wake) { wakeWord.stop(); return; }
+  if (!wakeWord.supported) {
+    settings = saveSettings({ wake: false });
+    $('#voice-status').textContent = '⚠️ อุปกรณ์นี้ไม่รองรับการฟังเบื้องหลัง';
+    return;
+  }
+  try { wakeWord.start(); } catch (e) { $('#voice-status').textContent = e.message; }
+}
+
+/* ---------------------------------------------------------- stop speaking */
+function stopSpeaking() {
+  activeQueue?.stop();
+  activeQueue = null;
+  voice.stopSpeaking();
+  $('#stop-btn').hidden = true;
+  setSubtitle('หยุดแล้ว');
+}
+$('#stop-btn').addEventListener('click', stopSpeaking);
 
 function updateMicUi() {
   $('#mic-btn').classList.toggle('listening', sm.current === STATES.LISTENING);
@@ -545,6 +650,14 @@ function renderSettingsForm() {
   $('#set-costmode').value = settings.costMode || 'mixed';
   renderPermList();
 
+  $('#set-streaming').checked = settings.streaming !== false;
+  $('#set-speakstream').checked = settings.speakWhileStreaming !== false;
+  $('#set-wake').checked = !!settings.wake;
+  $('#set-rate').value = settings.voiceRate || 1;
+  $('#set-pitch').value = settings.voicePitch || 1;
+  $('#out-rate').textContent = Number(settings.voiceRate || 1).toFixed(2);
+  $('#out-pitch').textContent = Number(settings.voicePitch || 1).toFixed(2);
+  renderVoiceOptions();
   $('#set-language').value = settings.language;
   $('#set-polite').checked = settings.polite;
   $('#set-tts').checked = settings.tts;
@@ -560,6 +673,17 @@ function updatePersonaHeader() {
   const p = getPersona(settings.persona);
   $('#persona-name').textContent = p.name;
   $('#persona-desc').textContent = p.desc;
+}
+
+function renderVoiceOptions() {
+  const sel = $('#set-voice');
+  if (!sel) return;
+  const voices = voice.ttsSupported ? window.speechSynthesis.getVoices() : [];
+  const thai = voices.filter((v) => /^th/i.test(v.lang));
+  const list = thai.length ? thai : voices.slice(0, 20);
+  sel.innerHTML = '<option value="">อัตโนมัติ (เสียงไทยของเครื่อง)</option>'
+    + list.map((v) => `<option value="${v.name}">${v.name} (${v.lang})</option>`).join('');
+  sel.value = settings.voiceName || '';
 }
 
 function collectSettings() {
@@ -580,6 +704,12 @@ function collectSettings() {
       autonomy: $('#set-autonomy').value,
       allow: { ...(permDraft?.allow || DEFAULT_PERMISSIONS.allow) },
     },
+    streaming: $('#set-streaming').checked,
+    speakWhileStreaming: $('#set-speakstream').checked,
+    wake: $('#set-wake').checked,
+    voiceRate: Number($('#set-rate').value) || 1,
+    voicePitch: Number($('#set-pitch').value) || 1,
+    voiceName: $('#set-voice').value,
   };
 }
 
@@ -589,6 +719,7 @@ $('#save-settings-btn').addEventListener('click', () => {
   updatePersonaHeader();
   renderModeChips();
   renderToolsGrid();
+  syncWake();
   $('#settings-status').textContent = '✅ บันทึกแล้ว (เก็บในเครื่องนี้เท่านั้น)';
 });
 
@@ -610,6 +741,24 @@ $('#test-ai-btn').addEventListener('click', async () => {
     $('#settings-status').textContent = `❌ ${e.message}`;
   }
 });
+
+$('#set-rate').addEventListener('input', (e) => { $('#out-rate').textContent = Number(e.target.value).toFixed(2); });
+$('#set-pitch').addEventListener('input', (e) => { $('#out-pitch').textContent = Number(e.target.value).toFixed(2); });
+$('#test-voice-btn').addEventListener('click', async () => {
+  $('#voice-status').textContent = 'กำลังพูดทดสอบ…';
+  await voice.speak('สวัสดีครับ ผมคือ No7 ผู้ช่วยส่วนตัวของคุณ', {
+    ...voiceOptions(),
+    rate: Number($('#set-rate').value) || 1,
+    pitch: Number($('#set-pitch').value) || 1,
+    voiceName: $('#set-voice').value || undefined,
+  });
+  $('#voice-status').textContent = 'พูดจบแล้ว';
+});
+$('#stop-voice-btn').addEventListener('click', stopSpeaking);
+
+if (voice.ttsSupported) {
+  window.speechSynthesis.onvoiceschanged = renderVoiceOptions;
+}
 
 $('#set-provider').addEventListener('change', () => {
   const p = PROVIDERS[$('#set-provider').value];
@@ -738,6 +887,7 @@ renderToolsGrid();
 restoreReminders();
 addMessage('bot', 'สวัสดีครับ ผม No7 👋\nพิมพ์คุยได้เลย หรือกด 🎤 เพื่อพูด\n\nลองถาม: "อากาศกรุงเทพวันนี้", "ราคาบิทคอยน์", "ตั้งเวลา 5 นาที"');
 setSubtitle('สวัสดีครับ ผม No7 พร้อมช่วยแล้ว');
+syncWake();
 if (!hasProviderConfigured(settings)) {
   setSubtitle('เริ่มต้น: ไปที่ ⚙️ ตั้งค่า เพื่อเลือกสมอง AI');
 }

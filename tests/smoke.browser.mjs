@@ -170,6 +170,17 @@ $('#pair-btn').click();
 await wait(50);
 check('pairing: handled (code or clear warning)', /รหัสจับคู่|ต้องเปิดผ่าน https|สร้างไม่สำเร็จ/.test($('#pair-output').textContent), $('#pair-output').textContent.slice(0, 60));
 
+// voice & streaming settings
+$('#nav button[data-view="settings"]').click();
+check('voice: thai voice listed', $('#set-voice').options.length >= 2, `${$('#set-voice').options.length} options`);
+$('#set-streaming').checked = false;
+$('#set-speakstream').checked = false;
+$('#save-settings-btn').click();
+await wait(20);
+$('#nav button[data-view="chat"]').click();
+$('#stop-btn').click();
+check('voice: stop button halts speech', $('#subtitle').textContent.includes('หยุดแล้ว'), $('#subtitle').textContent);
+
 // permission gate: risky tool must ask first
 submit('เปิดเว็บ example.com ให้หน่อย');
 await wait(150);

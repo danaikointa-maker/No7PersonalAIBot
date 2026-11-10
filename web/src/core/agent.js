@@ -52,7 +52,9 @@ export class Agent {
     while (steps < this.maxSteps) {
       steps++;
       this.onEvent({ type: 'thinking', step: steps, maxSteps: this.maxSteps });
-      const reply = await this.chat(messages);
+      const reply = await this.chat(messages, {
+        onToken: (delta) => this.onEvent({ type: 'token', step: steps, delta }),
+      });
       const call = extractToolCall(reply);
 
       if (!call) {

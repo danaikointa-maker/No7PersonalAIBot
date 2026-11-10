@@ -41,6 +41,8 @@
             <small id="state-label">IDLE</small>
           </div>
           <div class="topbar-actions">
+            <span id="wake-badge" class="wake-badge" hidden title="กำลังฟังคำว่า No7">🎙 No7</span>
+            <button id="stop-btn" title="หยุดพูด" hidden>⏹</button>
             <button id="companion-btn" title="โหมดเพื่อนบนจอ (Desktop)">🖥️</button>
             <button id="mic-btn" title="พูด (Push to talk)">🎤</button>
           </div>
@@ -176,6 +178,25 @@
             <button id="test-ai-btn">ทดสอบ AI</button>
           </div>
           <p id="settings-status" class="hint"></p>
+
+          <h3>เสียงและการตอบ</h3>
+          <label><input type="checkbox" id="set-streaming" checked /> สตรีมคำตอบ (เห็นข้อความไหลทีละคำ)</label>
+          <label><input type="checkbox" id="set-speakstream" checked /> เริ่มพูดก่อนคำตอบจบ (ไวขึ้น)</label>
+          <label><input type="checkbox" id="set-wake" /> ปลุกด้วยคำว่า "No7" (ฟังเบื้องหลัง)</label>
+          <label>ความเร็วเสียง: <output id="out-rate">1.0</output>
+            <input id="set-rate" type="range" min="0.6" max="1.6" step="0.05" value="1" />
+          </label>
+          <label>ระดับเสียง (pitch): <output id="out-pitch">1.0</output>
+            <input id="set-pitch" type="range" min="0.6" max="1.6" step="0.05" value="1" />
+          </label>
+          <label>เสียงที่ใช้
+            <select id="set-voice"><option value="">อัตโนมัติ (เสียงไทยของเครื่อง)</option></select>
+          </label>
+          <div class="row">
+            <button id="test-voice-btn">🔊 ทดสอบเสียง</button>
+            <button id="stop-voice-btn">⏹ หยุด</button>
+          </div>
+          <p id="voice-status" class="hint"></p>
 
           <h3>อุปกรณ์ / แพลตฟอร์ม</h3>
           <p class="hint" id="device-info">—</p>
