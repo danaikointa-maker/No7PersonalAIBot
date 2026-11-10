@@ -16,6 +16,11 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
+const APP_VERSION = (() => {
+  try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version || '0.0.0'; }
+  catch { return '0.0.0'; }
+})();
+
 const DIST = path.join(ROOT, 'dist');
 const PORT = Number(process.env.NO7_PORT || 8787);
 const HOST = process.env.NO7_HOST || '0.0.0.0';
@@ -134,7 +139,7 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === '/api/health') {
     return json(res, 200, {
-      ok: true, app: 'no7-personal-ai-bot', version: '1.0.0',
+      ok: true, app: 'no7-personal-ai-bot', version: APP_VERSION,
       platform: process.platform, node: process.version,
       hasDist: fs.existsSync(path.join(DIST, 'index.html')),
       sync: { enabled: true, requiresToken: !!SYNC_TOKEN, hasData: !!readSync() },

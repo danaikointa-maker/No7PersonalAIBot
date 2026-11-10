@@ -35,17 +35,24 @@
 - [x] Phone-Link HMAC + Device Hub + ESP32 client
 - [x] CI + accessibility + เอกสารครบ
 
-## v0.4 — เชื่อมโลกภายนอก
+## v1.3 — ใช้จริงบนมือถือ + ต่อโลกภายนอก ✅
 
-- [ ] MCP client (Gmail / Calendar / Drive / Notion)
+- [x] Mobile hardening: PWA shortcuts, capability report, storage management, offline banner
+- [x] Barge-in (keyword/any) + TTS router (system / OpenAI-compatible / off) พร้อม fallback
+- [x] MCP client (JSON-RPC 2.0 over HTTP) + proxy + dynamic tool registry + สิทธิ์หมวด `mcp`
+- [x] Reliability: retry/backoff, offline outbox, metrics (first token/p95), diagnostics ที่ปิดข้อมูลอ่อนไหว
+
+## v1.4 — เชื่อมโลกภายนอกให้ลึกขึ้น
+
+- [ ] MCP transport เพิ่มเติม: stdio ผ่าน proxy + OAuth flow
 - [ ] Telegram / LINE bot ผ่าน `server/`
 - [ ] Computer control (Electron: accessibility / UI automation) พร้อม allowlist
 - [ ] ตารางงาน + แจ้งเตือนข้ามอุปกรณ์ (server sync แบบ self-host)
 - [ ] ESP32 Phone-Link ครบวงจร (เสียงขึ้น-ลง, eyes บนจอ)
 
-## v0.5 — คุณภาพและการกระจาย
+## v2.0 — คุณภาพและการกระจาย
 
-- [ ] เลือกเสียง TTS ระดับพรีเมียม (Edge TTS / Kokoro in-app / ElevenLabs)
+- [ ] เลือกเสียง TTS ระดับพรีเมียมเพิ่ม (Edge TTS / Kokoro in-app / ElevenLabs)
 - [ ] โมเดลในเครื่องเต็มรูปแบบ (Ollama/Llama.cpp) สำหรับโหมดออฟไลน์
 - [ ] Auto-update (electron-updater), CI build ทั้ง 3 แพลตฟอร์ม
 - [ ] E2E test (Playwright) + performance budget

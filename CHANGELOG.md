@@ -2,6 +2,49 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [1.3.0] — 2026-11-10
+
+รอบที่สอง: เสียงสองทาง (พูดขัดจังหวะได้ + TTS ระดับพรีเมียม), MCP, ความเสถียรบนมือถือ
+และการวัดผล/รายงานปัญหาที่ปลอดภัย — ยังคงโค้ดชุดเดียวสำหรับมือถือและ PC
+
+### เพิ่ม
+**R1 — ความเสถียรบนมือถือ**
+- PWA `shortcuts` 4 ทางลัด (`?view=chat|memory|calendar|devices`) + `id`/`categories` ใน manifest
+- `core/capabilities.js`: ตรวจ 15 ความสามารถ + ขอสิทธิ์ไมโครโฟน/แจ้งเตือน + แผงสถานะในหน้าตั้งค่า
+- `core/storage.js`: สรุปการใช้พื้นที่, ขอ persistent storage, ล้างข้อมูลเป็นกลุ่ม, ตรวจจับ quota
+- แถบออฟไลน์ + แจ้งเตือนเมื่อเขียน localStorage ไม่สำเร็จ (`no7:storage-error`)
+- `docs/MOBILE.md`
+
+**R2 — Barge-in + TTS**
+- `core/bargein.js`: พูดขัดจังหวะได้ (`off` / `keyword` / `any`) พร้อมกันเสียงสะท้อนของตัวเอง (`isEcho`)
+- `core/tts.js`: router 3 ผู้ให้บริการ — เสียงเครื่อง / OpenAI-compatible / ปิดเสียง พร้อม fallback อัตโนมัติ
+- `POST /api/tts` ที่ companion server (ใช้ `OPENAI_API_KEY` ของ server หรือ key ในเครื่อง)
+- ตั้งค่า `ttsProvider`, `ttsVoice`, `ttsModel`, `ttsBaseUrl`, `ttsApiKey`, `bargeIn` + UI
+
+**R3 — MCP**
+- `core/mcp.js`: MCP client JSON-RPC 2.0 (`initialize`, `tools/list`, `tools/call`) รองรับ JSON + SSE + `mcp-session-id`
+- Dynamic tool registry: MCP tools เข้า agent loop / prompt / tools grid ในชื่อ `mcp__<server>__<tool>`
+- หมวดสิทธิ์ใหม่ `mcp` (risk 2 = ถามก่อน) + UI เพิ่ม/เปิดปิด/ค้นหา server + cache `no7.mcp.tools.v1`
+- `POST /api/mcp` proxy (allow-list headers) + `docs/MCP.md`
+
+**R4 — Reliability & Performance**
+- `core/retry.js`: classify error + exponential backoff พร้อม jitter, retry เฉพาะก่อน token แรก
+- Offline outbox `no7.outbox.v1`: เก็บข้อความตอนออฟไลน์แล้วส่งอัตโนมัติเมื่อกลับมาออนไลน์
+- `core/metrics.js`: first token / total / tool / tts + p50/p95 + แผงสถิติในหน้าตั้งค่า
+- `core/diagnostics.js`: รายงาน markdown ที่ปิด key/token/อีเมล/เบอร์โทร + คัดลอก/ดาวน์โหลด
+- `docs/RELIABILITY.md`
+
+### เปลี่ยน
+- `GET /api/health` อ่านเวอร์ชันจาก `package.json` (ไม่ต้องแก้สองที่)
+- เครื่องมือทั้งหมดเรียกผ่าน `getTool()`/`allToolIds()` เพื่อรองรับเครื่องมือ dynamic
+- `Agent` มี hook `onToolTiming` สำหรับวัดเวลาต่อเครื่องมือ
+
+### แก้ไข
+- เทสต์ `memory: importance boosts ranking` เปราะเพราะใช้ localStorage ร่วมกันและ timestamp ชนกัน — เคลียร์ store และหาข้อเท็จจริงตามเนื้อหาแทน
+
+### ตัวเลข
+- 177 unit tests · 60 end-to-end checks · 59 JS files · 24 tools ในเครื่อง + MCP tools ตามที่ server ประกาศ
+
 ## [1.0.0] — 2026-11-10
 
 รุ่นแรกที่ครบวงจร: โค้ดชุดเดียวรันบนมือถือและ PC พร้อมความจำ เสียง เครื่องมือ การซิงก์ และการสั่งงานอุปกรณ์

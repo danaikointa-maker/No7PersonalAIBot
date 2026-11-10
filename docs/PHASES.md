@@ -80,7 +80,7 @@
 | R2 | Barge-in + TTS ระดับพรีเมียม | 2.1–2.4 | ✅ |
 | R3 | MCP / Integrations | 3.1–3.4 | ✅ |
 | R4 | Reliability & Performance | 4.1–4.4 | ✅ |
-| R5 | Release 1.3 | 5.1–5.3 | ⬜ |
+| R5 | Release 1.3 | 5.1–5.3 | ✅ |
 
 ## R1 — ความเสถียรบนมือถือ
 
@@ -112,6 +112,6 @@
 
 ## R5 — Release 1.3
 
-- 5.1 version 1.3.0 + CHANGELOG
-- 5.2 README + PHASES ปิดครบ
-- 5.3 ตรวจรับรวม + PR
+- [x] 5.1 version 1.3.0 (`package.json`, `/api/health` อ่านจาก package.json) + CHANGELOG
+- [x] 5.2 README ปรับเป็น v1.3 + ตารางสรุป Round 2 ปิดครบ
+- [x] 5.3 ตรวจรับรวม: `npm run check` 59 ไฟล์ · `npm test` 177 · `npm run test:browser` 60/60 · `vite build` ผ่าน → เปิด PR
