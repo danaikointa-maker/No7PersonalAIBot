@@ -129,10 +129,11 @@ check('settings: test AI', $('#settings-status').textContent.includes('OK'), $('
 $('#mem-new').value = 'ฉันชอบกาแฟดำ';
 $('#mem-add-btn').click();
 await wait(20);
-check('memory: fact added', $('#mem-facts').textContent.includes('กาแฟดำ'));
+check('memory: fact added', $('#mem-results').textContent.includes('กาแฟดำ'), $('#mem-results').textContent.slice(0, 60));
 $('#mem-query').value = 'กาแฟ';
 $('#mem-search-btn').click();
 check('memory: BM25 search', $('#mem-results').textContent.includes('กาแฟ'));
+check('memory: stats rendered', $('#mem-stats').textContent.includes('ข้อเท็จจริง'), $('#mem-stats').textContent.slice(0, 40));
 
 submit('สวัสดี No7');
 await wait(120);
@@ -150,10 +151,19 @@ $('#mic-btn').click();
 await wait(80);
 check('voice: transcript sent', [...$('#messages').querySelectorAll('.msg.user')].some((m) => m.textContent.includes('ทดสอบเสียง')));
 
+await wait(400);          // รอให้คิวก่อนหน้าจบ (busy guard)
 submit('จำไว้ว่า ฉันมีแมวชื่อมีโจ');
-await wait(120);
+await wait(300);
 $('#nav button[data-view="memory"]').click();
-check('memory: learned from chat', $('#mem-facts').textContent.includes('มีโจ'), $('#mem-facts').textContent.slice(0, 80));
+check('memory: learned from chat', $('#mem-results').textContent.includes('มีโจ'), $('#mem-results').textContent.slice(0, 80));
+
+// memory 2.0: pin + consolidate run
+$('#mem-results').querySelector('.fact button')?.click();      // ปุ่ม 📍 ตัวแรก
+await wait(20);
+check('memory: pin toggles', $('#mem-results').textContent.includes('📌'), $('#mem-results').textContent.slice(0, 40));
+$('#mem-consolidate-btn').click();
+await wait(200);
+check('memory: consolidate runs', $('#mem-status').textContent.includes('สรุปเสร็จ'), $('#mem-status').textContent);
 
 $('#nav button[data-view="settings"]').click();
 $('#pair-btn').click();

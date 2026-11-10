@@ -60,3 +60,79 @@ test('clearAll empties facts and log', () => {
   assert.equal(mem.listFacts().length, 0);
   assert.equal(mem.recentLog().length, 0);
 });
+
+/* ---------------- Memory 2.0 ---------------- */
+
+const fresh = () => { globalThis.localStorage.clear(); return new MemoryStore(); };
+
+test('pin keeps a fact on top regardless of recency', () => {
+  const mem = fresh();
+  mem.addFact('ผู้ใช้มีแมวชื่อมีโจ');
+  const old = mem.addFact('ชื่อผู้ใช้คือ ต้า');
+  mem.togglePin(old.id);
+  assert.equal(mem.listFacts()[0].text, 'ชื่อผู้ใช้คือ ต้า');
+  assert.equal(mem.stats().pinned, 1);
+});
+
+test('updateFact edits text and retokenizes', () => {
+  const mem = fresh();
+  const f = mem.addFact('ผู้ใช้ชอบกาแฟดำ');
+  mem.updateFact(f.id, { text: 'ผู้ใช้ชอบชาเขียว', importance: 4 });
+  const hit = mem.search('ชาเขียว');
+  assert.equal(hit[0].text, 'ผู้ใช้ชอบชาเขียว');
+  assert.equal(hit[0].importance, 4);
+  assert.equal(mem.search('กาแฟ').length, 0);
+});
+
+test('decay lowers importance of stale unused facts only', () => {
+  const mem = fresh();
+  const stale = mem.addFact('ผู้ใช้เคยชอบฟุตบอล', 3);
+  const pinned = mem.addFact('ชื่อผู้ใช้คือ ต้า', 3);
+  mem.togglePin(pinned.id);
+  stale.ts = Date.now() - 90 * 24 * 60 * 60 * 1000;
+  const changed = mem.decay();
+  assert.equal(changed, 1);
+  assert.equal(mem.getFact(stale.id).importance, 2);
+  assert.equal(mem.getFact(pinned.id).importance, 3);
+});
+
+test('export → import round-trips facts', () => {
+  const a = fresh();
+  a.addFact('ผู้ใช้มีแมวชื่อมีโจ', 3);
+  a.addFact('ผู้ใช้อยู่กรุงเทพ');
+  const dump = a.exportData();
+  localStorage.clear();
+  const b = new MemoryStore();
+  const res = b.importData(dump);
+  assert.equal(res.added, 2);
+  assert.equal(b.listFacts().length, 2);
+  assert.ok(b.search('แมว').length > 0);
+});
+
+test('import merges duplicates instead of doubling', () => {
+  const mem = fresh();
+  mem.addFact('ผู้ใช้อยู่กรุงเทพ', 2);
+  const res = mem.importData({ facts: [{ text: 'ผู้ใช้อยู่กรุงเทพ', importance: 5 }] });
+  assert.equal(res.merged, 1);
+  assert.equal(mem.listFacts().length, 1);
+  assert.equal(mem.listFacts()[0].importance, 5);
+});
+
+test('stats reports facts, pinned, log and average importance', () => {
+  const mem = fresh();
+  mem.addFact('a b c', 2);
+  mem.addFact('d e f', 4);
+  mem.logTurn('user', 'hi');
+  const s = mem.stats();
+  assert.equal(s.facts, 2);
+  assert.equal(s.logTurns, 1);
+  assert.equal(s.avgImportance, 3);
+});
+
+test('search increments usage counters', () => {
+  const mem = fresh();
+  const f = mem.addFact('ผู้ใช้ชอบกาแฟดำ');
+  mem.search('กาแฟ');
+  mem.search('กาแฟ');
+  assert.equal(mem.getFact(f.id).used, 2);
+});

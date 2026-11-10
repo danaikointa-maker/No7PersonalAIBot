@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS = {
   maxSteps: 4,
   costMode: 'mixed', // free | quality | private | mixed
   permissions: DEFAULT_PERMISSIONS,
+  memoryLLM: false,       // ใช้ AI ช่วยสรุปความจำ (opt-in เพื่อคุมโควตา)
 };
 
 const KEY = 'no7.settings.v1';

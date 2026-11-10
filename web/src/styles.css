@@ -244,3 +244,27 @@ label input[type="checkbox"] { width: auto; }
 
 /* ---------- Tools filter note ---------- */
 #tools-note { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+
+/* ---------- Memory view ---------- */
+.stats { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 10px; }
+.stat {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 8px 12px; min-width: 92px;
+}
+.stat b { display: block; font-size: 18px; }
+.stat small { color: var(--muted); font-size: 11px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 10px; }
+.chips button { padding: 5px 11px; font-size: 12.5px; border-radius: 999px; color: var(--muted); }
+.chips button.active { color: var(--accent); border-color: var(--accent); background: rgba(34,211,238,0.1); }
+.fact { display: flex; gap: 8px; align-items: flex-start; }
+.fact .fact-text { flex: 1; cursor: text; }
+.fact .fact-meta { display: flex; gap: 6px; align-items: center; }
+.fact .pill {
+  font-size: 10.5px; padding: 2px 7px; border-radius: 999px;
+  background: rgba(255,255,255,0.06); color: var(--muted);
+}
+.fact .pill.hot { color: #fbbf24; border: 1px solid rgba(251,191,36,0.4); }
+.fact button { padding: 3px 8px; font-size: 12px; }
+.fact input.edit { flex: 1; }
+label.inline { flex-direction: row; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+label.inline input { width: auto; }

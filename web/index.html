@@ -78,18 +78,36 @@
 
         <section id="view-memory" class="view">
           <h2>🧠 ความจำระยะยาว</h2>
-          <p class="hint">GraphRAG-lite (BM25) + บันทึกบทสนทนา — เก็บในเครื่องเท่านั้น</p>
+          <p class="hint">GraphRAG-lite (BM25) + บันทึกบทสนทนา — เก็บในเครื่องนี้เท่านั้น</p>
+
+          <div id="mem-stats" class="stats"></div>
+
           <div class="row">
-            <input id="mem-query" placeholder="ค้นหาความจำ…" />
+            <input id="mem-query" placeholder="ค้นหาความจำ…" autocomplete="off" />
             <button id="mem-search-btn">ค้นหา</button>
+            <button id="mem-clear-search" hidden>ล้าง</button>
           </div>
-          <div id="mem-results"></div>
-          <h3>ข้อเท็จจริงที่จำได้</h3>
-          <div id="mem-facts"></div>
+
+          <div id="mem-filters" class="chips"></div>
+
           <div class="row">
-            <input id="mem-new" placeholder="สอนความจำใหม่ เช่น: ชื่อฉันคือ…" />
+            <input id="mem-new" placeholder="สอนความจำใหม่ เช่น: ชื่อฉันคือ…" autocomplete="off" />
             <button id="mem-add-btn">จำไว้</button>
           </div>
+
+          <div id="mem-results"></div>
+
+          <div class="row">
+            <button id="mem-consolidate-btn">🔄 สรุปความจำเดี๋ยวนี้</button>
+            <button id="mem-export-btn">⬇️ ส่งออก</button>
+            <button id="mem-import-btn">⬆️ นำเข้า</button>
+            <input id="mem-import-file" type="file" accept="application/json" hidden />
+          </div>
+          <label class="inline">
+            <input type="checkbox" id="mem-llm-toggle" />
+            ใช้ AI ช่วยสรุปความจำ (แม่นขึ้น แต่ใช้โควตา)
+          </label>
+          <p id="mem-status" class="hint"></p>
         </section>
 
         <section id="view-settings" class="view">

@@ -7,6 +7,7 @@ import { TOOLS, TOOL_IDS, runTool, toolMeta, restoreReminders } from './core/too
 import { Agent } from './core/agent.js';
 import { MODES, MODE_IDS, getMode, toolsForMode } from './core/modes.js';
 import { CATEGORIES, AUTONOMY, DEFAULT_PERMISSIONS, normalizePermissions, riskLabel } from './core/permissions.js';
+import { consolidate, shouldConsolidate, startDailyConsolidation } from './core/consolidate.js';
 import { Voice } from './core/voice.js';
 import { EyeAvatar } from './ui/avatar.js';
 import { renderCard, renderError } from './ui/cards.js';
@@ -67,7 +68,14 @@ function showView(name) {
   $('#view-title').textContent = { chat: 'แชทกับ No7', tools: 'เครื่องมือ', memory: 'ความจำ', settings: 'ตั้งค่า' }[name] || name;
   $('#sidebar').classList.remove('open');
   if (name === 'tools') renderToolsGrid();
-  if (name === 'memory') renderMemory();
+  if (name === 'memory') {
+    memQuery = '';                       // เข้าหน้าความจำ = ดูทั้งหมดก่อน
+    const q = $('#mem-query');
+    if (q) q.value = '';
+    const c = $('#mem-clear-search');
+    if (c) c.hidden = true;
+    renderMemory();
+  }
 }
 document.querySelectorAll('#nav button').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
 $('#menu-btn').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
@@ -327,43 +335,170 @@ function renderToolsGrid() {
 }
 
 /* ----------------------------------------------------------------- memory */
-function renderMemory() {
-  const factsEl = $('#mem-facts');
-  const list = memory.listFacts().slice(0, 30);
-  factsEl.innerHTML = list.length ? '' : '<p class="hint">ยังไม่มีความจำ — ลองพิมพ์ "จำไว้ว่า ฉันชอบกาแฟดำ"</p>';
-  for (const f of list) {
-    const div = document.createElement('div');
-    div.className = 'fact';
-    div.textContent = f.text;
-    const del = document.createElement('button');
-    del.textContent = 'ลบ';
-    del.style.cssText = 'float:right;padding:2px 8px;font-size:12px';
-    del.addEventListener('click', () => { memory.removeFact(f.id); renderMemory(); });
-    div.appendChild(del);
-    factsEl.appendChild(div);
+let memFilter = 'all';
+let memQuery = '';
+
+const MEM_FILTERS = [
+  { id: 'all', label: 'ทั้งหมด' },
+  { id: 'pinned', label: '📌 ปักหมุด' },
+  { id: 'frequent', label: '🔥 ใช้บ่อย' },
+  { id: 'new', label: '🆕 ใหม่' },
+];
+
+function llmChat(messages) {
+  return chatWithFallback(messages, resolveProviderChain(settings), { fallback });
+}
+
+function renderMemStats() {
+  const st = memory.stats();
+  const last = st.lastConsolidated
+    ? new Date(st.lastConsolidated).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
+    : 'ยังไม่เคย';
+  $('#mem-stats').innerHTML = [
+    [st.facts, 'ข้อเท็จจริง'], [st.pinned, 'ปักหมุด'], [st.logTurns, 'บทสนทนา'],
+    [st.addedThisWeek, 'ใหม่สัปดาห์นี้'], [st.avgImportance, 'importance เฉลี่ย'],
+  ].map(([v, k]) => `<div class="stat"><b>${v}</b><small>${k}</small></div>`).join('')
+    + `<div class="stat"><b style="font-size:12px">${last}</b><small>สรุปครั้งล่าสุด</small></div>`;
+}
+
+function renderMemFilters() {
+  const box = $('#mem-filters');
+  box.innerHTML = '';
+  for (const f of MEM_FILTERS) {
+    const b = document.createElement('button');
+    b.textContent = f.label;
+    b.classList.toggle('active', memFilter === f.id);
+    b.addEventListener('click', () => { memFilter = f.id; renderMemory(); });
+    box.appendChild(b);
   }
 }
 
-$('#mem-search-btn').addEventListener('click', () => {
-  const q = $('#mem-query').value.trim();
-  const res = q ? memory.search(q, 10) : memory.listFacts().slice(0, 10);
-  const el = $('#mem-results');
-  el.innerHTML = res.length ? '' : '<p class="hint">ไม่พบความจำที่เกี่ยวข้อง</p>';
-  for (const f of res) {
-    const div = document.createElement('div');
-    div.className = 'fact';
-    div.textContent = f.text;
-    el.appendChild(div);
+function renderMemory() {
+  renderMemStats();
+  renderMemFilters();
+
+  const opts = { sort: memFilter === 'frequent' ? 'used' : 'recent', pinnedOnly: memFilter === 'pinned' };
+  let list = memQuery ? memory.search(memQuery, 50) : memory.listFacts(opts);
+  if (memFilter === 'new') list = [...list].sort((a, b) => b.created - a.created).slice(0, 20);
+
+  const box = $('#mem-results');
+  box.innerHTML = list.length ? '' : '<p class="hint">ยังไม่มีความจำ — ลองพิมพ์ "จำไว้ว่า ฉันชอบกาแฟดำ" หรือกดปุ่มสรุปความจำ</p>';
+
+  for (const f of list) {
+    const row = document.createElement('div');
+    row.className = 'fact';
+
+    const text = document.createElement('span');
+    text.className = 'fact-text';
+    text.textContent = f.text;
+    text.title = 'คลิกเพื่อแก้ไข';
+    text.addEventListener('click', () => startEdit(row, f));
+
+    const meta = document.createElement('span');
+    meta.className = 'fact-meta';
+    if (f.pinned) meta.innerHTML += '<span class="pill hot">📌</span>';
+    if ((f.used || 0) > 0) meta.innerHTML += `<span class="pill">ใช้ ${f.used}×</span>`;
+    meta.innerHTML += `<span class="pill">★${f.importance}</span>`;
+
+    const pin = document.createElement('button');
+    pin.textContent = f.pinned ? '📌' : '📍';
+    pin.title = f.pinned ? 'เอาปักหมุดออก' : 'ปักหมุด';
+    pin.addEventListener('click', () => { memory.togglePin(f.id); renderMemory(); });
+
+    const del = document.createElement('button');
+    del.textContent = 'ลบ';
+    del.addEventListener('click', () => { memory.removeFact(f.id); renderMemory(); });
+
+    row.append(text, meta, pin, del);
+    box.appendChild(row);
   }
+}
+
+function startEdit(row, fact) {
+  row.innerHTML = '';
+  const input = document.createElement('input');
+  input.className = 'edit';
+  input.value = fact.text;
+  const save = document.createElement('button');
+  save.textContent = 'บันทึก';
+  const cancel = document.createElement('button');
+  cancel.textContent = 'ยกเลิก';
+  const commit = () => {
+    if (input.value.trim()) memory.updateFact(fact.id, { text: input.value.trim() });
+    renderMemory();
+  };
+  save.addEventListener('click', commit);
+  cancel.addEventListener('click', renderMemory);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') renderMemory(); });
+  row.append(input, save, cancel);
+  input.focus();
+}
+
+$('#mem-search-btn').addEventListener('click', () => {
+  memQuery = $('#mem-query').value.trim();
+  $('#mem-clear-search').hidden = !memQuery;
+  renderMemory();
+});
+$('#mem-query').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#mem-search-btn').click(); });
+$('#mem-clear-search').addEventListener('click', () => {
+  memQuery = ''; $('#mem-query').value = ''; $('#mem-clear-search').hidden = true; renderMemory();
 });
 
 $('#mem-add-btn').addEventListener('click', () => {
   const v = $('#mem-new').value.trim();
   if (!v) return;
-  memory.addFact(v, 2);
+  memory.addFact(v, { importance: 3, source: 'user' });
   $('#mem-new').value = '';
+  $('#mem-status').textContent = 'จำไว้แล้ว ✅';
   renderMemory();
 });
+
+$('#mem-consolidate-btn').addEventListener('click', async () => {
+  const useLLM = $('#mem-llm-toggle').checked;
+  $('#mem-status').textContent = useLLM ? 'กำลังสรุปด้วย AI…' : 'กำลังสรุป…';
+  try {
+    const res = await consolidate(memory, { chat: llmChat, useLLM, force: true });
+    $('#mem-status').textContent = `สรุปเสร็จ: เพิ่ม ${res.extracted} · รวมซ้ำ ${res.mergeCandidates} · ลดความสำคัญ ${res.decayed}`
+      + (useLLM ? (res.usedLLM ? ' · ใช้ AI ✅' : ' · AI ไม่ได้ใช้ (ไม่มีสมองหรือผลว่าง)') : '');
+    renderMemory();
+  } catch (e) {
+    $('#mem-status').textContent = `สรุปไม่สำเร็จ: ${e.message}`;
+  }
+});
+
+$('#mem-export-btn').addEventListener('click', () => {
+  downloadJson(memory.exportData(), `no7-memory-${Date.now()}.json`);
+  $('#mem-status').textContent = 'ส่งออกแล้ว';
+});
+
+$('#mem-import-btn').addEventListener('click', () => $('#mem-import-file').click());
+$('#mem-import-file').addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  try {
+    const payload = JSON.parse(await file.text());
+    const res = memory.importData(payload, { merge: true });
+    $('#mem-status').textContent = `นำเข้าแล้ว: เพิ่ม ${res.added} · รวม ${res.merged} · ข้าม ${res.skipped}`;
+    renderMemory();
+  } catch (err) {
+    $('#mem-status').textContent = `ไฟล์ไม่ถูกต้อง: ${err.message}`;
+  }
+  e.target.value = '';
+});
+
+$('#mem-llm-toggle').checked = !!settings.memoryLLM;
+$('#mem-llm-toggle').addEventListener('change', (e) => {
+  settings = saveSettings({ memoryLLM: e.target.checked });
+});
+
+function downloadJson(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 /* --------------------------------------------------------------- settings */
 let permDraft = null;
@@ -493,12 +628,7 @@ $('#export-btn').addEventListener('click', () => {
     todos: JSON.parse(localStorage.getItem('no7.todos.v1') || '[]'),
     notes: JSON.parse(localStorage.getItem('no7.notes.v1') || '[]'),
   };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `no7-backup-${Date.now()}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  downloadJson(data, `no7-backup-${Date.now()}.json`);
 });
 
 $('#reset-btn').addEventListener('click', () => {
@@ -600,6 +730,8 @@ if ('Notification' in window && Notification.permission === 'default') {
 }
 
 /* -------------------------------------------------------------- startup */
+startDailyConsolidation(memory, () => consolidate(memory, { chat: llmChat, useLLM: !!settings.memoryLLM }));
+
 renderSettingsForm();
 renderModeChips();
 renderToolsGrid();
@@ -610,6 +742,10 @@ if (!hasProviderConfigured(settings)) {
   setSubtitle('เริ่มต้น: ไปที่ ⚙️ ตั้งค่า เพื่อเลือกสมอง AI');
 }
 sm.recompute();
+
+if (shouldConsolidate(memory)) {
+  setTimeout(() => consolidate(memory, { chat: llmChat, useLLM: !!settings.memoryLLM }).catch(() => {}), 4000);
+}
 
 // re-check derived state periodically (sleep/idle)
 setInterval(() => sm.recompute(), 15000);
