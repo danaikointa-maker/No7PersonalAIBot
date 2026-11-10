@@ -5,6 +5,8 @@ import { buildSystemPrompt } from './prompt.js';
 import { getMode, detectMode } from './modes.js';
 import { isAllowed, needsConfirm, permissionSummary } from './permissions.js';
 
+const clock = () => (globalThis.performance?.now ? performance.now() : Date.now());
+
 /**
  * @param {object} deps
  * @param {(messages: object[]) => Promise<string>} deps.chat   AI call (มี fallback อยู่ข้างนอก)
@@ -12,9 +14,11 @@ import { isAllowed, needsConfirm, permissionSummary } from './permissions.js';
  * @param {object} deps.settings
  * @param {(evt: object) => void} [deps.onEvent]                thinking / tool / result / denied / error
  * @param {(req: object) => Promise<boolean>} [deps.confirm]    UI ยืนยัน (default = ไม่อนุญาต)
+ * @param {(m: {tool: string, ms: number, ok: boolean}) => void} [deps.onToolTiming]  วัดเวลาต่อเครื่องมือ
  */
 export class Agent {
-  constructor({ chat, memory, settings, onEvent = () => {}, confirm = async () => false, maxSteps = 4 }) {
+  constructor({ chat, memory, settings, onEvent = () => {}, confirm = async () => false, maxSteps = 4, onToolTiming = null }) {
+    this.onToolTiming = onToolTiming;
     this.chat = chat;
     this.memory = memory;
     this.settings = settings;
@@ -102,12 +106,14 @@ export class Agent {
 
       // ---- run ----
       this.onEvent({ type: 'tool', step: steps, tool: call.name, label: tool.label, emoji: tool.emoji, args: call.args });
+      const toolStart = clock();
       try {
         const res = await runTool(call.name, call.args, {
           memory: this.memory,
           chat: this.chat,
           settings: this.settings,
         });
+        this.onToolTiming?.({ tool: call.name, ms: clock() - toolStart, ok: true });
         trace.push({ step: steps, ...res });
         this.onEvent({ type: 'result', step: steps, tool: res.tool, data: res.data });
         messages.push({ role: 'assistant', content: reply });
@@ -118,6 +124,7 @@ export class Agent {
             + 'ถ้าเพียงพอแล้วให้สรุปเป็นคำตอบสุดท้ายสำหรับผู้ใช้ (ภาษาไทย ไม่มี JSON)',
         });
       } catch (err) {
+        this.onToolTiming?.({ tool: call.name, ms: clock() - toolStart, ok: false });
         this.onEvent({ type: 'error', step: steps, tool: call.name, message: err.message });
         messages.push({ role: 'assistant', content: reply });
         messages.push({ role: 'user', content: `เครื่องมือ ${call.name} ผิดพลาด: ${err.message}\nบอกผู้ใช้ตรงๆ แล้วเสนอทางเลือกอื่น` });

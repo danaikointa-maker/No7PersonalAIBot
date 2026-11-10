@@ -277,6 +277,26 @@ $('#tools-grid').children[4].click();
 await wait(80);
 check('tools view: direct run card', $('#tool-result').children.length > 0);
 
+// reliability: metrics, diagnostics, offline queue
+$('#nav button[data-view="settings"]').click();
+await wait(20);
+check('metrics: summary rendered', $('#metrics-summary').textContent.length > 0, $('#metrics-summary').textContent);
+$('#diag-run').click();
+await wait(80);
+check('diagnostics: report generated', $('#diag-output').textContent.includes('# No7 Diagnostics'), $('#diag-output').textContent.slice(0, 40));
+check('diagnostics: no api keys in report', !/sk-[A-Za-z0-9]{8,}/.test($('#diag-output').textContent));
+check('diagnostics: settings section present', $('#diag-output').textContent.includes('## สถิติ'));
+
+$('#nav button[data-view="chat"]').click();
+Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+submit('ทดสอบคิวออฟไลน์');
+await wait(30);
+check('offline: message queued', $('#outbox-badge').hidden === false && $('#outbox-badge').textContent.includes('1'), $('#outbox-badge').textContent);
+Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
+window.dispatchEvent(new window.Event('online'));
+await wait(250);
+check('offline: queue flushed when back online', $('#messages').textContent.includes('ส่งข้อความที่ค้างไว้'), $('#messages').textContent.slice(-120));
+
 const failed = results.filter((r) => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✓' : '✗'} ${r.name}${r.ok ? '' : `  → ${r.extra}`}`);
 console.log(`\n${results.length - failed.length}/${results.length} passed`);

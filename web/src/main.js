@@ -10,6 +10,9 @@ import { MemoryStore } from './core/memory.js';
 import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatWithFallbackStream } from './core/ai-providers.js';
 import { getTool, TOOL_IDS, runTool, toolMeta, restoreReminders, registerDynamicTools } from './core/tools.js';
 import { McpRegistry } from './core/mcp.js';
+import { withRetry, classifyError, OfflineQueue } from './core/retry.js';
+import { Metrics, formatMs, METRIC_KINDS } from './core/metrics.js';
+import { buildDiagnosticsReport, diagnosticsFilename, redact } from './core/diagnostics.js';
 import { Agent } from './core/agent.js';
 import { MODES, MODE_IDS, getMode, toolsForMode } from './core/modes.js';
 import { CATEGORIES, AUTONOMY, DEFAULT_PERMISSIONS, normalizePermissions, riskLabel } from './core/permissions.js';
@@ -94,6 +97,16 @@ async function refreshMcp({ quiet = false } = {}) {
 function saveMcpServers(next) {
   settings = saveSettings({ mcpServers: next });
   renderMcp();
+}
+
+/* ------------------------------------------------------- metrics / outbox */
+const metrics = new Metrics();
+const outbox = new OfflineQueue();
+const recentErrors = [];
+
+function noteError(err, where) {
+  recentErrors.push({ at: Date.now(), where, message: redact(err?.message || String(err)).slice(0, 300) });
+  if (recentErrors.length > 10) recentErrors.shift();
 }
 
 /* ------------------------------------------------------------------ boot */
@@ -226,8 +239,13 @@ async function speak(text) {
   bargeIn.mode = settings.bargeIn || 'keyword';
   bargeIn.setSpoken(text);
   bargeIn.start();
+  const ttsStart = performance.now();
   try {
     await tts.speak(text, voiceOptions());
+    metrics.record({ kind: 'tts', label: settings.ttsProvider || 'system', totalMs: performance.now() - ttsStart });
+  } catch (err) {
+    metrics.record({ kind: 'tts', label: settings.ttsProvider || 'system', totalMs: performance.now() - ttsStart, ok: false });
+    noteError(err, 'tts');
   } finally {
     bargeIn.stop();
     $('#stop-btn').hidden = true;
@@ -300,6 +318,10 @@ async function respond(userText) {
   let streamBuf = '';
   let toolLikely = false;
   let botText = '';
+  const chatStart = performance.now();
+  let firstTokenAt = 0;
+  let chatOk = true;
+  let retriedOnce = false;
 
   wakeWord.pause();
   bargeIn.mode = settings.bargeIn || 'keyword';
@@ -307,19 +329,37 @@ async function respond(userText) {
   $('#stop-btn').hidden = false;
 
   const agent = new Agent({
-    chat: (messages, { onToken } = {}) => (streaming
-      ? chatWithFallbackStream(messages, chain, { fallback, onToken })
-      : chatWithFallback(messages, chain, { fallback })),
+    chat: (messages, { onToken } = {}) => {
+      let emitted = false;
+      const tap = onToken ? (delta) => { emitted = true; onToken(delta); } : undefined;
+      // ลองใหม่เฉพาะเมื่อยังไม่มี token ไหลออกมา (กันข้อความซ้ำ)
+      return withRetry(
+        () => (streaming
+          ? chatWithFallbackStream(messages, chain, { fallback, onToken: tap })
+          : chatWithFallback(messages, chain, { fallback })),
+        {
+          retries: 1,
+          baseMs: 400,
+          isRetryable: (err) => !emitted && classifyError(err).retryable,
+          onRetry: ({ delay, kind }) => {
+            retriedOnce = true;
+            setSubtitle(`เชื่อมต่อสะดุด (${kind}) — กำลังลองใหม่ใน ${Math.round(delay / 100) / 10}s`);
+          },
+        },
+      );
+    },
     memory,
     settings,
     confirm: askConfirm,
     maxSteps: Number(settings.maxSteps) || 4,
+    onToolTiming: ({ tool, ms, ok }) => metrics.record({ kind: 'tool', label: tool, totalMs: ms, ok }),
     onEvent: (e) => {
       if (e.type === 'thinking') {
         sm.set({ requestInFlight: true, toolRunning: false });
         if (e.step > 1 && !streamBuf) botEl.textContent = 'กำลังคิดต่อ…';
       }
       if (e.type === 'token') {
+        if (!firstTokenAt) firstTokenAt = performance.now();
         streamBuf += e.delta;
         if (streamBuf.includes('```') || /^\s*\{/.test(streamBuf)) toolLikely = true;
         botEl.textContent = withCursor(streamBuf, !toolLikely);
@@ -377,6 +417,8 @@ async function respond(userText) {
     sm.set({ requestInFlight: false, toolRunning: false });
     if (!speakLive) await speak(botText);
   } catch (err) {
+    chatOk = false;
+    noteError(err, retriedOnce ? 'chat(retry)' : 'chat');
     queue.stop();
     botEl.textContent = `⚠️ ${err.message}`;
     sm.set({ error: err.message, requestInFlight: false, toolRunning: false });
@@ -388,6 +430,15 @@ async function respond(userText) {
     $('#stop-btn').hidden = true;
     wakeWordResume();
     avatar.setEmotion(stateEmotion(sm.current));
+    metrics.record({
+      kind: 'chat',
+      label: settings.provider || 'auto',
+      firstTokenMs: firstTokenAt ? firstTokenAt - chatStart : null,
+      totalMs: performance.now() - chatStart,
+      ok: chatOk,
+      error: chatOk ? null : 'chat failed',
+    });
+    renderMetrics();
   }
 }
 
@@ -410,8 +461,35 @@ $('#composer').addEventListener('submit', (e) => {
   if (!text) return;
   $('#input').value = '';
   addMessage('user', text);
+
+  if (!navigator.onLine) {
+    outbox.enqueue(text);
+    addMessage('bot', `📥 ออฟไลน์อยู่ — เก็บข้อความไว้ในคิวแล้ว (${outbox.size()} รายการ) จะส่งให้ทันทีที่กลับมาออนไลน์`);
+    setSubtitle('ออฟไลน์ — เก็บข้อความไว้ในคิว');
+    updateOutboxBadge();
+    return;
+  }
   respond(text);
 });
+
+/** ส่งข้อความที่ค้างในคิวเมื่อกลับมาออนไลน์ */
+async function flushOutbox() {
+  if (!outbox.size() || !navigator.onLine) { updateOutboxBadge(); return; }
+  const { sent, left } = await outbox.drain(async (item) => {
+    if (busy) throw new Error('busy');
+    await respond(item.text);
+  });
+  if (sent) addMessage('bot', `📤 ส่งข้อความที่ค้างไว้ให้แล้ว ${sent} รายการ${left ? ` (เหลือ ${left})` : ''}`);
+  updateOutboxBadge();
+}
+
+function updateOutboxBadge() {
+  const n = outbox.size();
+  const el = $('#outbox-badge');
+  if (!el) return;
+  el.hidden = n === 0;
+  el.textContent = `📥 ค้างส่ง ${n}`;
+}
 
 /** ฟังหนึ่งครั้ง → ส่งข้อความ (ใช้ร่วมกันทั้งปุ่มไมค์และ wake word) */
 async function triggerListen() {
@@ -980,6 +1058,8 @@ function renderSettingsForm() {
   bargeSel.value = BARGE_MODES[settings.bargeIn] ? settings.bargeIn : 'keyword';
 
   renderMcp();
+  renderMetrics();
+  updateOutboxBadge();
 
   $('#set-streaming').checked = settings.streaming !== false;
   $('#set-speakstream').checked = settings.speakWhileStreaming !== false;
@@ -1256,6 +1336,88 @@ $('#pf-preview').addEventListener('click', async () => {
   $('#pf-status').textContent = 'กำลังพูด…';
   await voice.speak(line, { lang: 'th-TH', rate: Number($('#pf-rate').value) || 1, pitch: 1 });
   $('#pf-status').textContent = 'พูดจบแล้ว';
+});
+
+/* ------------------------------------------------- metrics + diagnostics */
+function renderMetrics() {
+  const box = $('#metrics-list');
+  if (!box) return;
+  const sum = metrics.summary();
+  $('#metrics-summary').textContent = sum.total
+    ? `เก็บ ${sum.total} ตัวอย่าง (ในเครื่องนี้เท่านั้น)`
+    : 'ยังไม่มีข้อมูล — ลองคุยหรือใช้เครื่องมือสักครั้ง';
+  const rows = [];
+  for (const [kind, meta] of Object.entries(METRIC_KINDS)) {
+    const k = sum.kinds[kind];
+    if (!k.count) continue;
+    rows.push(`<div class="metric-row"><span>${meta.emoji} ${meta.label}</span><span>${k.count} ครั้ง · เฉลี่ย ${formatMs(k.avg)} · p95 ${formatMs(k.p95)}`
+      + `${k.firstTokenAvg ? ` · token แรก ${formatMs(k.firstTokenAvg)}` : ''} · สำเร็จ ${Math.round((k.okRate || 0) * 100)}%</span></div>`);
+  }
+  for (const l of sum.labels.slice(0, 5)) {
+    rows.push(`<div class="metric-row"><span>${METRIC_KINDS[l.kind]?.emoji || '•'} ${esc(l.label)}</span><span>${l.count} ครั้ง · เฉลี่ย ${formatMs(l.avg)}</span></div>`);
+  }
+  box.innerHTML = rows.join('') || '<p class="hint">ยังไม่มีข้อมูล</p>';
+}
+
+async function renderDiagnostics() {
+  const out = $('#diag-output');
+  if (!out) return '';
+  const caps = await detectCapabilities(window);
+  const { rows, total } = usageBreakdown(window);
+  const persisted = await isPersisted(window);
+  const report = buildDiagnosticsReport({
+    app: {
+      name: 'No7 Personal AI',
+      version: window.NO7_VERSION || '1.3.0',
+      platform: platformLabel(platform),
+      userAgent: navigator.userAgent,
+    },
+    settings,
+    capabilities: caps,
+    metrics: metrics.summary(),
+    mcp: mcp.status(),
+    storage: {
+      rows: rows.filter((r) => r.bytes > 0).map((r) => ({ label: r.label, pretty: formatBytes(r.bytes) })),
+      total: formatBytes(total),
+      persisted,
+    },
+    errors: recentErrors,
+  });
+  out.textContent = report;
+  return report;
+}
+
+$('#metrics-reset')?.addEventListener('click', () => {
+  metrics.reset();
+  renderMetrics();
+  $('#metrics-summary').textContent = 'ล้างสถิติแล้ว';
+});
+
+$('#diag-run')?.addEventListener('click', async () => {
+  $('#diag-status').textContent = 'กำลังสร้างรายงาน…';
+  const report = await renderDiagnostics();
+  $('#diag-status').textContent = report ? '✅ สร้างรายงานแล้ว (ตรวจซ้ำก่อนแชร์)' : 'สร้างไม่สำเร็จ';
+});
+
+$('#diag-copy')?.addEventListener('click', async () => {
+  const report = $('#diag-output').textContent || await renderDiagnostics();
+  try {
+    await navigator.clipboard.writeText(report);
+    $('#diag-status').textContent = '📋 คัดลอกแล้ว';
+  } catch {
+    $('#diag-status').textContent = 'คัดลอกไม่ได้ — เลือกข้อความในกล่องแล้วคัดลอกเอง';
+  }
+});
+
+$('#diag-download')?.addEventListener('click', async () => {
+  const report = $('#diag-output').textContent || await renderDiagnostics();
+  const blob = new Blob([report], { type: 'text/markdown;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = diagnosticsFilename();
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  $('#diag-status').textContent = `⬇️ ดาวน์โหลด ${a.download}`;
 });
 
 /* -------- MCP UI -------- */
@@ -1596,7 +1758,7 @@ function syncOnlineState() {
     banner.hidden = true;
   }
 }
-window.addEventListener('online', syncOnlineState);
+window.addEventListener('online', () => { syncOnlineState(); flushOutbox(); });
 window.addEventListener('offline', syncOnlineState);
 syncOnlineState();
 

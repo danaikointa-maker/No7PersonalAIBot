@@ -79,7 +79,7 @@
 | R1 | ความเสถียรบนมือถือ (Mobile hardening) | 1.1–1.4 | ✅ ปิดเฟส |
 | R2 | Barge-in + TTS ระดับพรีเมียม | 2.1–2.4 | ✅ |
 | R3 | MCP / Integrations | 3.1–3.4 | ✅ |
-| R4 | Reliability & Performance | 4.1–4.4 | ⬜ |
+| R4 | Reliability & Performance | 4.1–4.4 | ✅ |
 | R5 | Release 1.3 | 5.1–5.3 | ⬜ |
 
 ## R1 — ความเสถียรบนมือถือ
@@ -105,10 +105,10 @@
 
 ## R4 — Reliability & Performance
 
-- 4.1 Retry/backoff สำหรับ transient error + offline queue
-- 4.2 Metrics: latency (first token / total / tool time) + หน้าดูสถิติ
-- 4.3 Diagnostics: รายงานปัญหาแบบปิดข้อมูลอ่อนไหว (redacted) + คัดลอก/ดาวน์โหลด
-- 4.4 Tests + docs/RELIABILITY.md
+- [x] 4.1 Retry/backoff (`core/retry.js`) + offline outbox `no7.outbox.v1` ส่งอัตโนมัติเมื่อกลับมาออนไลน์
+- [x] 4.2 Metrics: first token / total / tool time / tts + แผงสถิติในหน้าตั้งค่า (`core/metrics.js`)
+- [x] 4.3 Diagnostics: รายงาน markdown ที่ปิดข้อมูลอ่อนไหว + คัดลอก/ดาวน์โหลด (`core/diagnostics.js`)
+- [x] 4.4 Tests (`retry` 11, `metrics` 5, `diagnostics` 6) + `docs/RELIABILITY.md`
 
 ## R5 — Release 1.3
 

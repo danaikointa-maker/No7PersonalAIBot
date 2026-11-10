@@ -68,6 +68,7 @@
         <!-- Views -->
         <section id="view-chat" class="view active">
           <div id="messages" aria-live="polite"></div>
+          <span id="outbox-badge" class="pill" hidden></span>
           <form id="composer">
             <input id="input" type="text" placeholder="พิมพ์หรือพูดกับ No7…" autocomplete="off" />
             <button type="submit" id="send-btn">ส่ง</button>
@@ -352,6 +353,22 @@
             <li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> — ส่งข้อความ</li>
             <li><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> — push-to-talk ระดับระบบ (เดสก์ท็อป)</li>
           </ul>
+
+          <h3>สถิติการทำงาน</h3>
+          <p class="hint">วัดเวลา token แรก, เวลารวม, เวลาต่อเครื่องมือ — เก็บในเครื่องนี้เท่านั้น</p>
+          <div id="metrics-summary" class="hint"></div>
+          <div id="metrics-list" class="metric-list"></div>
+          <div class="row"><button id="metrics-reset">ล้างสถิติ</button></div>
+
+          <h3>รายงานปัญหา (Diagnostics)</h3>
+          <p class="hint">สร้างรายงานที่ปิดข้อมูลอ่อนไหว (key, token, อีเมล, เบอร์โทร) แล้วคัดลอก/ดาวน์โหลดส่งให้ผู้ดูแลได้</p>
+          <div class="row">
+            <button id="diag-run">🧪 สร้างรายงาน</button>
+            <button id="diag-copy">📋 คัดลอก</button>
+            <button id="diag-download">⬇️ ดาวน์โหลด .md</button>
+          </div>
+          <p class="hint" id="diag-status"></p>
+          <pre id="diag-output" class="code diag"></pre>
 
           <h3>ปลั๊กอิน MCP</h3>
           <p class="hint">ต่อ No7 เข้ากับ MCP server ของคุณเอง (Gmail, ปฏิทิน, ไฟล์) — เรียกผ่าน companion server <code>POST /api/mcp</code></p>
