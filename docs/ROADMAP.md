@@ -42,13 +42,19 @@
 - [x] MCP client (JSON-RPC 2.0 over HTTP) + proxy + dynamic tool registry + สิทธิ์หมวด `mcp`
 - [x] Reliability: retry/backoff, offline outbox, metrics (first token/p95), diagnostics ที่ปิดข้อมูลอ่อนไหว
 
-## v1.4 — เชื่อมโลกภายนอกให้ลึกขึ้น
+## v1.4 — เชื่อมโลกภายนอกให้ลึกขึ้น ✅
 
-- [ ] MCP transport เพิ่มเติม: stdio ผ่าน proxy + OAuth flow
-- [ ] Telegram / LINE bot ผ่าน `server/`
-- [ ] Computer control (Electron: accessibility / UI automation) พร้อม allowlist
-- [ ] ตารางงาน + แจ้งเตือนข้ามอุปกรณ์ (server sync แบบ self-host)
+- [x] MCP transport เพิ่มเติม: stdio ผ่าน proxy + OAuth 2.0 PKCE
+- [x] Telegram / LINE bot ผ่าน `server/`
+- [x] Computer control (Electron) พร้อม allowlist 3 ชั้น + audit
+- [x] งาน + แจ้งเตือนข้ามอุปกรณ์ (self-host sync, LWW + tombstone)
+
+## v1.5 — ลงลึกที่อุปกรณ์และออฟไลน์
+
+- [ ] UI automation (Electron accessibility) ต่อจาก `control_run`
 - [ ] ESP32 Phone-Link ครบวงจร (เสียงขึ้น-ลง, eyes บนจอ)
+- [ ] MCP OAuth: dynamic client registration + device code flow
+- [ ] recurring tasks + แจ้งเตือนข้ามเครื่องอัตโนมัติ (push)
 
 ## v2.0 — คุณภาพและการกระจาย
 

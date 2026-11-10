@@ -1,4 +1,4 @@
-# No7 Personal AI Bot `v1.3`
+# No7 Personal AI Bot `v1.4`
 
 > ผู้ช่วย AI ส่วนตัวที่ **โค้ดชุดเดียวกันรันได้ทั้งมือถือและ PC** — พูดไทยก่อน ฟังได้ด้วยเสียง มีความจำระยะยาว
 > เรียกเครื่องมือจริง ทำงานหลายก้าวได้ ซิงก์ข้ามเครื่อง และสั่งงานอุปกรณ์ผ่าน HMAC
@@ -22,14 +22,14 @@ npm run build         # dist/ ชุดเดียวสำหรับ PWA + E
 npm run server        # companion server: static + AI proxy + tools + sync + phone-link
 npm run desktop       # เปิดเป็นแอปเดสก์ท็อป (Electron)
 npm run mobile:sync   # ซิงก์ dist/ เข้าโปรเจค Android/iOS
-npm test              # 177 unit tests
-npm run test:browser  # 60 end-to-end checks (รันแอปจริงใน jsdom)
+npm test              # 232 unit tests
+npm run test:browser  # 72 end-to-end checks (รันแอปจริงใน jsdom)
 npm run check         # syntax + structure check
 ```
 
 ---
 
-## ทำอะไรได้ (v1.3)
+## ทำอะไรได้ (v1.4)
 
 ### 🎭 เลือกได้ทั้งหมด — 5 บทบาทในที่เดียว
 `✨ ทั้งหมด` (สลับบทบาทเองตามคำขอ) · `💛 เพื่อนคุย` · `💼 งาน` · `📅 ชีวิตประจำวัน` · `🏠 อุปกรณ์`
@@ -56,8 +56,24 @@ npm run check         # syntax + structure check
 
 ### 🔌 MCP / เครื่องมือภายนอก
 - ต่อ MCP server (JSON-RPC 2.0 over HTTP) ได้เอง — Gmail, ปฏิทิน, ไฟล์, ฐานข้อมูล
-- `initialize` → `tools/list` → `tools/call`, รองรับ JSON + SSE + `mcp-session-id`, แคชเครื่องมือไว้ใช้ตอนเปิดแอป
+- **stdio ในเครื่อง**: companion server spawn MCP process ตาม allowlist `MCP_STDIO_SERVERS` (ไม่ให้เบราว์เซอร์สั่งรันคำสั่งเอง)
+- **OAuth 2.0 + PKCE**: ล็อกอิน Gmail/Drive ได้จากหน้าตั้งค่า, ต่ออายุ token อัตโนมัติ, token อยู่ในเครื่องเท่านั้น
 - เครื่องมือที่ค้นพบกลายเป็น `mcp__<server>__<tool>` ใช้ผ่าน agent loop และประตูอนุญาต (หมวด `mcp`, risk 2 = ถามก่อน)
+
+### 💬 บอทแชท (Telegram / LINE)
+- Telegram webhook (ตรวจ secret token) + LINE webhook (ตรวจ `X-Line-Signature` แบบ constant-time)
+- จำบริบทต่อห้อง 16 ข้อความ (TTL 2 ชม.) + คำสั่ง `/start` `/help` `/clear` `/tools`
+- token/secret อยู่ที่ server เท่านั้น — หน้าเว็บแค่แสดงสถานะและคัดลอก webhook URL
+
+### 🖥️ ควบคุมคอมพิวเตอร์ (เดสก์ท็อป)
+- tool `control_run` (risk 3) เปิดโปรแกรม/ลิงก์ คัดลอกข้อความ หรือรันคำสั่ง — **ปิดไว้เป็นค่าเริ่มต้น**
+- allowlist แบบ glob 3 ชั้น: permission gate → policy ในเบราว์เซอร์ → main process (`NO7_CONTROL_ALLOW_COMMANDS`)
+- deny patterns (rm -rf, sudo, curl|sh …), ปฏิเสธ shell operator, จำกัดต่อนาที + audit log
+
+### ✅ งาน + เตือนข้ามเครื่อง
+- เพิ่มงานด้วยเสียง/ข้อความ ("เตือนส่งรายงานพรุ่งนี้ 9 โมง"), priority 0–3, เตือนตามเวลา
+- ซิงก์ข้ามเครื่องแบบ last-write-wins + tombstone (การลบตามไปทุกเครื่อง)
+- `parseDue` เข้าใจ ISO, `+30m`, `+2h`, `วันนี้ 18:00`, `พรุ่งนี้ 09:30`
 
 ### 🧯 ความเสถียรและความเร็ว
 - Retry แบบ exponential + jitter เฉพาะ error ชั่วคราว (429/5xx/network) และไม่ลองซ้ำถ้าเริ่มพูดไปแล้ว
@@ -108,7 +124,7 @@ mobile/              ที่สำหรับ native project (Capacitor)
 server/              companion server (zero deps): static · AI proxy · tools · sync · phone-link
 devices/esp32/       reference client (no7_link.h) + คู่มือ
 tests/               unit tests + jsdom end-to-end
-docs/                เอกสาร 18 ไฟล์
+docs/                เอกสาร 19 ไฟล์
 ```
 
 ## เอกสาร
@@ -122,7 +138,8 @@ docs/                เอกสาร 18 ไฟล์
 | [docs/VOICE.md](docs/VOICE.md) | สตรีมมิ่ง, พูดก่อนจบ, wake word |
 | [docs/PERSONA.md](docs/PERSONA.md) | Persona Studio |
 | [docs/CONNECTORS.md](docs/CONNECTORS.md) | ปฏิทิน, RSS, sync |
-| [docs/MCP.md](docs/MCP.md) | MCP client, proxy, สิทธิ์, ข้อจำกัด |
+| [docs/MCP.md](docs/MCP.md) | MCP client, stdio bridge, proxy, สิทธิ์, ข้อจำกัด |
+| [docs/OAUTH.md](docs/OAUTH.md) | OAuth 2.0 + PKCE, token store, ความปลอดภัย |
 | [docs/MOBILE.md](docs/MOBILE.md) | PWA, offline, capability, storage บนมือถือ |
 | [docs/RELIABILITY.md](docs/RELIABILITY.md) | retry/backoff, offline queue, metrics, diagnostics |
 | [docs/BOTS.md](docs/BOTS.md) | Telegram / LINE bot ผ่าน server |

@@ -2,6 +2,52 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [1.4.0] — 2026-11-10
+
+รอบที่สาม: ให้ No7 ออกไปทำงานนอกแอป — MCP แบบ local process + OAuth, บอท Telegram/LINE,
+ควบคุมคอมพิวเตอร์แบบมี allowlist และงาน/แจ้งเตือนที่ตามข้ามเครื่องได้
+
+### เพิ่ม
+**R6 — MCP ลึกขึ้น**
+- stdio bridge ที่ companion server: ประกาศ `MCP_STDIO_SERVERS`, spawn/cache process, newline JSON-RPC,
+  timeout 25 วิ, stderr tail, `GET /api/mcp/stdio`
+- client รองรับ `transport: 'stdio'` + UI เลือก server ที่ประกาศไว้
+- OAuth 2.0 + PKCE (`core/oauth.js`): authorize URL builder, token exchange/refresh, `TokenStore`,
+  `OAuthSession` (single-flight refresh), `/api/oauth/token` proxy, `oauth-callback.html`, ปุ่ม 🔑 ในหน้าตั้งค่า
+- `docs/OAUTH.md` + อัปเดต `docs/MCP.md`
+
+**R7 — บอทแชท**
+- `server/bots.js`: normalize Telegram/LINE, ตรวจ signature, `BotSessions` (TTL 2 ชม.),
+  คำสั่ง `/start` `/help` `/clear` `/tools`, ตัดข้อความยาวเป็นก้อน
+- `POST /api/telegram/webhook` (secret header, ACK ก่อนแล้วตอบ async), `POST /api/line/webhook`,
+  `GET /api/bots/status`
+- หน้าตั้งค่า: แผงบอท + ปุ่มคัดลอก webhook URL · `docs/BOTS.md`
+
+**R8 — Computer control**
+- `core/control.js`: policy ปิดโดยค่าเริ่มต้น, allowlist แบบ glob, deny patterns, กัน shell operator,
+  rate limit ต่อนาที, `ControlAudit` (`no7.control.audit.v1`)
+- tool ใหม่ `control_run` (risk 3) — 26 tools
+- Electron: preload expose `openApp`/`copyText`/`notify`/`runCommand`/`controlInfo`,
+  main process รัน `execFile` แบบไม่มี shell ภายใต้ `NO7_CONTROL_ALLOW_COMMANDS`
+- หน้าตั้งค่า: switch, allowlist 2 ชุด, rate, audit log · `docs/CONTROL.md`
+
+**R9 — งาน + เตือนข้ามเครื่อง**
+- `core/tasks.js`: `TaskStore`, `parseDue` (ISO/±เวลา/คำไทย), `mergeTaskLists` (LWW + tombstone),
+  `TaskScheduler` (ทุก 30 วิ → Notification + แชท) + `no7.tasks.v1`
+- tool ใหม่ `task` (risk 1) + แผงงานในแท็บตารางนัด (เพิ่ม/เสร็จ/ลบ/กรอง/สถิติ)
+- ซิงก์งานผ่าน `collectBundle`/`mergeBundle` · `docs/TASKS.md`
+
+### เปลี่ยน
+- `MCP_CLIENT_INFO.version` = 1.4.0 และ diagnostics ใช้ 1.4.0
+- tool ทั้งหมด **26 ตัว** (auto mode 26, hub 19) — อัปเดตเทสต์/smoke ตามจำนวนจริง
+
+### แก้ไข
+- คุณภาพโค้ด: กัน `${...}` ในเทมเพลตไปรบกวน regex escape ของ `matchesGlob` (ใช้ค่าคงที่นอกเทมเพลต)
+- `replyLine`/`sendTelegramMessage` ส่ง arguments ครบเมื่อไม่ inject fetch (เดิม fallback ตัด options ทิ้ง)
+
+### ตัวเลข
+- 232 unit tests · 72 end-to-end checks · 70 JS files · 26 tools + MCP tools แบบ dynamic
+
 ## [1.3.0] — 2026-11-10
 
 รอบที่สอง: เสียงสองทาง (พูดขัดจังหวะได้ + TTS ระดับพรีเมียม), MCP, ความเสถียรบนมือถือ
