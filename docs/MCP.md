@@ -14,7 +14,42 @@ No7 พูดภาษาเดียวกับ [Model Context Protocol](https
 - **ไม่ต้องแก้โค้ดเมื่อเพิ่มเครื่องมือ** — server ประกาศ `tools/list` มาเท่าไร No7 ก็ได้เท่านั้น
 - **ผ่าน companion server เป็นค่าเริ่มต้น** (`transport: 'proxy'`) เพื่อเลี่ยง CORS และไม่ให้ API key ไปโผล่ในหน้าเว็บ
   ถ้า server เปิด CORS เอง ใช้ `transport: 'direct'` ได้
+- **stdio** (`transport: 'stdio'`) สำหรับ MCP server ที่เป็น process ในเครื่อง — ประกาศที่ server เท่านั้น (ดูหัวข้อถัดไป)
+- **OAuth 2.0 + PKCE** สำหรับ server ที่ต้องล็อกอิน (Gmail/Drive) — ดู [`docs/OAUTH.md`](./OAUTH.md)
 - **ผลลัพธ์ถูกแปลงเป็นการ์ด** แบบเดียวกับเครื่องมืออื่น (`title`, `big`, `lines`) พร้อม `text` สำหรับให้ LLM อ่านต่อ
+
+## stdio server (process ในเครื่อง)
+
+MCP หลายตัวแจกมาแบบ stdio (ไม่ใช่ HTTP) — companion server spawn ให้และแปลงเป็น JSON-RPC ผ่าน `/api/mcp`
+
+```bash
+# ประกาศ server ที่อนุญาต (เท่านั้น — เบราว์เซอร์สั่งรันคำสั่งเองไม่ได้)
+MCP_STDIO_SERVERS='{"everything":{"command":"npx","args":["-y","@modelcontextprotocol/server-everything"]},"gmail":{"command":"npx","args":["-y","@modelcontextprotocol/server-gmail"],"env":{"GMAIL_TOKEN":"…"}}}' \
+  npm run server
+```
+
+- `GET /api/mcp/stdio` → รายชื่อ id/command/args + `running` (ไม่ส่ง env ออกมา)
+- `POST /api/mcp` ด้วย `{ "transport": "stdio", "server": "everything", "payload": { …jsonrpc… } }`
+- process ถูก cache ไว้ (spawn ครั้งเดียว), stderr เก็บ 2KB ท้ายไว้ใน error message, timeout 25 วินาที
+- หน้าตั้งค่า → ปลั๊กอิน MCP → ช่องทาง **stdio** → เลือก server จากรายการที่ server ประกาศไว้
+
+## OAuth 2.0 (PKCE)
+
+server ที่ต้องล็อกอิน ใส่ค่าในหน้าตั้งค่า (ช่อง OAuth) แล้วกด **🔑 ล็อกอิน**:
+
+| ช่อง | ตัวอย่าง |
+|---|---|
+| Authorize URL | `https://accounts.google.com/o/oauth2/v2/auth` |
+| Token URL | `https://oauth2.googleapis.com/token` |
+| Client ID | `xxx.apps.googleusercontent.com` |
+| Scopes | `https://www.googleapis.com/auth/gmail.readonly` |
+
+- ใช้ Authorization Code + **PKCE (S256)**, `state` กัน CSRF
+- แลก/ต่ออายุ token ผ่าน `POST /api/oauth/token` ของ companion server (เลี่ยง CORS)
+- token เก็บใน `localStorage` key `no7.oauth.v1` แยกตาม server, ต่ออายุอัตโนมัติก่อนหมดอายุ 60 วินาที
+- หน้ากลับ (`oauth-callback.html`) ส่งผลกลับหน้าหลักด้วย `postMessage` แล้วปิดตัวเอง — ไม่มีข้อมูลลับใน URL ของแอป
+
+ดูรายละเอียดที่ [`docs/OAUTH.md`](./OAUTH.md)
 
 ## วิธีเพิ่ม server
 
@@ -60,9 +95,8 @@ id ในระบบคือ `mcp__<server>__<tool>` เช่น `mcp__gmail_
 
 ## ข้อจำกัด
 
-- ยังไม่รองรับ stdio transport (MCP server แบบ process local) — ต้องมี HTTP endpoint
-  (ใช้ `npx @modelcontextprotocol/inspector` หรือ proxy แบบ `mcp-proxy` ห่อ stdio เป็น HTTP ได้)
-- ยังไม่มี OAuth flow ของ MCP (ใช้ API key/token ที่ผู้ใช้ใส่เอง)
+- stdio ต้องประกาศ server ที่ `MCP_STDIO_SERVERS` ของ companion server — ยังเพิ่มจากหน้าเว็บไม่ได้ (เจตนา: กันการสั่งรันคำสั่งจากเบราว์เซอร์)
+- OAuth flow เป็นแบบ client-side (PKCE) ไม่มี refresh token rotation แบบเข้มงวด และยังไม่รองรับ dynamic client registration ของ MCP
 - SSE แบบ long-lived stream ที่ server push เอง (server-initiated) ยังไม่รองรับ — เรียกเป็น request/response
 - ต้องมี companion server เว้นแต่ MCP server จะเปิด CORS ให้เบราว์เซอร์โดยตรง
 

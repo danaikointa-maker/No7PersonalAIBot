@@ -10,6 +10,7 @@ import { MemoryStore } from './core/memory.js';
 import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatWithFallbackStream } from './core/ai-providers.js';
 import { getTool, TOOL_IDS, runTool, toolMeta, restoreReminders, registerDynamicTools } from './core/tools.js';
 import { McpRegistry } from './core/mcp.js';
+import { createPkcePair, randomState, buildAuthorizeUrl, parseCallback } from './core/oauth.js';
 import { withRetry, classifyError, OfflineQueue } from './core/retry.js';
 import { Metrics, formatMs, METRIC_KINDS } from './core/metrics.js';
 import { buildDiagnosticsReport, diagnosticsFilename, redact } from './core/diagnostics.js';
@@ -61,9 +62,10 @@ function renderMcp() {
       <div class="mcp-main">
         <strong>${esc(s.name || s.id || 'MCP')}</strong>
         <span class="hint">${esc(s.url)}</span>
-        <span class="hint">${row ? `${row.tools} เครื่องมือ${row.error ? ` · ⚠️ ${esc(row.error)}` : ''}` : 'ยังไม่ได้เชื่อม'}</span>
+        <span class="hint">${esc(s.transport || 'proxy')} · ${row ? `${row.tools} เครื่องมือ${row.error ? ` · ⚠️ ${esc(row.error)}` : ''}` : 'ยังไม่ได้เชื่อม'}</span>
       </div>
       <div class="row">
+        ${s.oauth ? '<button data-mcp-oauth>🔑 ล็อกอิน</button>' : ''}
         <label class="switch"><input type="checkbox" data-mcp-toggle ${on ? 'checked' : ''} /> เปิด</label>
         <button data-mcp-remove>ลบ</button>
       </div>
@@ -1428,17 +1430,36 @@ function mcpSlug(name, url) {
 
 $('#mcp-add').addEventListener('click', () => {
   const name = $('#mcp-name').value.trim();
-  const url = $('#mcp-url').value.trim();
-  if (!/^https?:\/\//.test(url)) {
+  const transport = $('#mcp-transport').value;
+  const stdioId = $('#mcp-stdio-id').value;
+  const url = transport === 'stdio' ? '' : $('#mcp-url').value.trim();
+  if (transport === 'stdio' && !stdioId) {
+    $('#mcp-status').textContent = 'ยังไม่มี stdio server — ประกาศ MCP_STDIO_SERVERS ที่ server ก่อน';
+    return;
+  }
+  if (transport !== 'stdio' && !/^https?:\/\//.test(url)) {
     $('#mcp-status').textContent = 'URL ต้องขึ้นต้นด้วย http:// หรือ https://';
     return;
   }
+  const oauth = (() => {
+    const tokenUrl = $('#mcp-oauth-token').value.trim();
+    const authorizeUrl = $('#mcp-oauth-authorize').value.trim();
+    if (!tokenUrl || !authorizeUrl) return null;
+    return {
+      authorizeUrl,
+      tokenUrl,
+      clientId: $('#mcp-oauth-client').value.trim(),
+      scopes: $('#mcp-oauth-scopes').value.trim(),
+    };
+  })();
+  const id = transport === 'stdio' ? stdioId : mcpSlug(name, url);
   const next = [...(Array.isArray(settings.mcpServers) ? settings.mcpServers : []), {
-    id: mcpSlug(name, url),
-    name: name || new URL(url).host,
+    id,
+    name: name || (transport === 'stdio' ? stdioId : new URL(url).host),
     url,
     apiKey: $('#mcp-apikey').value.trim(),
-    transport: $('#mcp-transport').value === 'direct' ? 'direct' : 'proxy',
+    transport,
+    oauth,
     enabled: true,
   }];
   saveMcpServers(next);
@@ -1448,6 +1469,90 @@ $('#mcp-add').addEventListener('click', () => {
   refreshMcp();
 });
 
+$('#mcp-transport').addEventListener('change', () => {
+  const stdio = $('#mcp-transport').value === 'stdio';
+  $('#mcp-stdio-wrap').hidden = !stdio;
+  $('#mcp-url').closest('label').hidden = stdio;
+  if (stdio) loadStdioServers();
+});
+
+/** รายการ stdio MCP server ที่ประกาศไว้ที่ companion server */
+async function loadStdioServers() {
+  const sel = $('#mcp-stdio-id');
+  if (!sel) return;
+  const base = String(settings.serverUrl || 'http://localhost:8787').replace(/\/$/, '');
+  sel.innerHTML = '<option value="">กำลังโหลด…</option>';
+  try {
+    const res = await fetch(`${base}/api/mcp/stdio`);
+    const data = await res.json();
+    const list = Array.isArray(data.servers) ? data.servers : [];
+    sel.innerHTML = list.length
+      ? list.map((s) => `<option value="${esc(s.id)}">${esc(s.id)} — ${esc(s.command)} ${esc((s.args || []).join(' ')).slice(0, 40)}</option>`).join('')
+      : '<option value="">— ไม่มี (ตั้ง MCP_STDIO_SERVERS) —</option>';
+  } catch {
+    sel.innerHTML = '<option value="">เชื่อม server ไม่ได้</option>';
+  }
+}
+
+/* ------------------------------- OAuth (PKCE) ------------------------------- */
+const OAUTH_PENDING_KEY = 'no7.oauth.pending';
+
+async function startOAuth(serverCfg) {
+  if (!serverCfg?.oauth?.authorizeUrl || !serverCfg?.oauth?.tokenUrl) {
+    $('#mcp-status').textContent = 'server นี้ยังไม่มีค่า OAuth (authorize/token URL)';
+    return;
+  }
+  try {
+    const { verifier, challenge } = await createPkcePair();
+    const state = randomState();
+    const redirectUri = `${location.origin}${location.pathname.replace(/[^/]*$/, '')}oauth-callback.html`;
+    sessionStorage.setItem(OAUTH_PENDING_KEY, JSON.stringify({
+      id: serverCfg.id, verifier, state, redirectUri,
+    }));
+    const url = buildAuthorizeUrl({
+      authorizeUrl: serverCfg.oauth.authorizeUrl,
+      clientId: serverCfg.oauth.clientId,
+      redirectUri,
+      scopes: String(serverCfg.oauth.scopes || '').split(/\s+/).filter(Boolean),
+      state,
+      codeChallenge: challenge,
+    });
+    const popup = window.open(url, 'no7-oauth', 'width=520,height=680');
+    if (!popup) $('#mcp-status').textContent = 'เบราว์เซอร์บล็อกหน้าต่างล็อกอิน — อนุญาต popup แล้วลองใหม่';
+    else $('#mcp-status').textContent = 'เปิดหน้าต่างล็อกอินแล้ว — ทำต่อในหน้าต่างนั้น';
+  } catch (e) {
+    $('#mcp-status').textContent = `เริ่ม OAuth ไม่ได้: ${e.message}`;
+  }
+}
+
+window.addEventListener('message', async (event) => {
+  if (event.origin !== location.origin || event.data?.type !== 'no7-oauth') return;
+  const pending = (() => {
+    try { return JSON.parse(sessionStorage.getItem(OAUTH_PENDING_KEY) || 'null'); } catch { return null; }
+  })();
+  const cb = parseCallback(event.data.url || '');
+  if (!pending) { $('#mcp-status').textContent = 'ไม่พบข้อมูล OAuth ที่ค้างไว้ — เริ่มใหม่'; return; }
+  if (cb.error) {
+    $('#mcp-status').textContent = `ผู้ให้บริการปฏิเสธ: ${cb.error} ${cb.errorDescription || ''}`.trim();
+    return;
+  }
+  if (!cb.code || cb.state !== pending.state) {
+    $('#mcp-status').textContent = 'ผลลัพธ์ OAuth ไม่ถูกต้อง (state ไม่ตรง) — ลองใหม่';
+    return;
+  }
+  $('#mcp-status').textContent = 'แลก token…';
+  try {
+    const session = mcp.oauthSession(pending.id);
+    if (!session) throw new Error('server นี้ไม่ได้ตั้ง OAuth');
+    await session.exchange({ code: cb.code, codeVerifier: pending.verifier, redirectUri: pending.redirectUri });
+    sessionStorage.removeItem(OAUTH_PENDING_KEY);
+    $('#mcp-status').textContent = '✅ ล็อกอินแล้ว — กำลังดึงเครื่องมือ';
+    await refreshMcp();
+  } catch (e) {
+    $('#mcp-status').textContent = `แลก token ไม่ได้: ${e.message}`;
+  }
+});
+
 $('#mcp-refresh').addEventListener('click', () => { refreshMcp(); });
 
 $('#mcp-list').addEventListener('click', (e) => {
@@ -1455,6 +1560,11 @@ $('#mcp-list').addEventListener('click', (e) => {
   if (!row) return;
   const id = row.dataset.id;
   const list = Array.isArray(settings.mcpServers) ? settings.mcpServers : [];
+  if (e.target.matches('[data-mcp-oauth]')) {
+    const cfg = mcp.configFor(id) || (Array.isArray(settings.mcpServers) ? settings.mcpServers.find((x) => (x.id || x.name || x.url) === id) : null);
+    startOAuth(cfg ? { ...cfg, oauth: cfg.oauth || mcp.configFor(id)?.oauth } : null);
+    return;
+  }
   if (e.target.matches('[data-mcp-remove]')) {
     saveMcpServers(list.filter((s) => (s.id || s.name || s.url) !== id));
     mcp.hydrateFromCache();

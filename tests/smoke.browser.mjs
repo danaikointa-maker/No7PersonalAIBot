@@ -81,6 +81,9 @@ window.fetch = async (url, opts = {}) => {
     if (last.includes('เปิดเว็บ')) return reply('```tool\n{"tool":"open_url","args":{"url":"https://example.com"}}\n```');
     return reply('สวัสดีครับ ผมชื่อ No7');
   }
+  if (u.includes('/api/mcp/stdio')) {
+    return { ok: true, json: async () => ({ servers: [{ id: 'fixture', command: 'node', args: ['fixture.mjs'], running: false }] }) };
+  }
   if (u.includes('/api/mcp')) {
     const payload = JSON.parse(opts.body || '{}').payload || {};
     const ok = (result) => ({ ok: true, json: async () => ({ status: 200, headers: {}, body: JSON.stringify({ jsonrpc: '2.0', id: payload.id, result }) }) });
@@ -237,6 +240,14 @@ check('mcp: server listed', $('#mcp-list').textContent.includes('Demo'), $('#mcp
 check('mcp: tool count reported', $('#mcp-list').textContent.includes('1 เครื่องมือ'), $('#mcp-list').textContent.slice(0, 120));
 check('mcp: dynamic tool in tools grid', [...$('#tools-grid').children].some((b) => b.textContent.includes('send_email')));
 check('mcp: permission category listed', $('#perm-list').children.length === 6, String($('#perm-list').children.length));
+check('mcp: transport offers stdio', [...$('#mcp-transport').options].some((o) => o.value === 'stdio'));
+$('#mcp-transport').value = 'stdio';
+$('#mcp-transport').dispatchEvent(new window.Event('change'));
+await wait(80);
+check('mcp: stdio select reveals server list', $('#mcp-stdio-wrap').hidden === false && $('#mcp-stdio-id').value === 'fixture', $('#mcp-stdio-id').value);
+check('mcp: oauth section present', !!$('#mcp-oauth-token'));
+$('#mcp-transport').value = 'proxy';
+$('#mcp-transport').dispatchEvent(new window.Event('change'));
 
 // voice & streaming settings
 $('#nav button[data-view="settings"]').click();

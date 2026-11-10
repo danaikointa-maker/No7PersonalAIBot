@@ -384,9 +384,25 @@
               <select id="mcp-transport">
                 <option value="proxy">ผ่าน server (แนะนำ)</option>
                 <option value="direct">ตรงจากเบราว์เซอร์</option>
+                <option value="stdio">stdio (process ในเครื่อง server)</option>
               </select>
             </label>
           </div>
+          <label id="mcp-stdio-wrap" hidden>stdio server ที่ประกาศไว้ที่ server
+            <select id="mcp-stdio-id"></select>
+          </label>
+          <details id="mcp-oauth-wrap">
+            <summary>OAuth 2.0 (ถ้า server ต้องล็อกอิน)</summary>
+            <div class="grid2">
+              <label>Authorize URL <input id="mcp-oauth-authorize" placeholder="https://accounts.google.com/o/oauth2/v2/auth" /></label>
+              <label>Token URL <input id="mcp-oauth-token" placeholder="https://oauth2.googleapis.com/token" /></label>
+            </div>
+            <div class="grid2">
+              <label>Client ID <input id="mcp-oauth-client" /></label>
+              <label>Scopes (คั่นด้วยช่องว่าง) <input id="mcp-oauth-scopes" placeholder="https://www.googleapis.com/auth/gmail.readonly" /></label>
+            </div>
+            <p class="hint">ต้องเปิดผ่าน https:// หรือ localhost · token เก็บในเครื่องนี้เท่านั้น</p>
+          </details>
           <div class="row">
             <button id="mcp-add">➕ เพิ่ม server</button>
             <button id="mcp-refresh">🔄 ค้นหาเครื่องมือ</button>
