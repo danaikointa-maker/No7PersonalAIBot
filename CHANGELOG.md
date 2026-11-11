@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.29.0] — 2026-11-10
+
+- Full-backup restore now applies notes/todos as a guarded transaction before health/memory commits. If a list write or later health/memory step fails, prior list values are restored and the UI reports failure.
+
 ## [2.28.0] — 2026-11-10
 
 - Full-backup restore now commits health summaries before memory, aborts if that write fails, and rolls the summary back if the subsequent memory commit fails; restore errors are reported instead of appearing successful.

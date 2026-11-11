@@ -5,6 +5,7 @@ import { mountConversationArchive } from './ui/conversation-archive.js';
 import { bindMemoryImport } from './ui/memory-import.js';
 import { getCalendar, formatWhen } from './core/calendar.js';
 import { collectBundle, pushBundle, pullBundle, mergeBundle } from './core/sync.js';
+import { withBackupListsRestore } from './core/backup-restore.js';
 import { SYNC_STRATEGIES, summarizeSync, describeConflicts } from './core/sync-merge.js';
 import {
   weeklyCsv, digestCsv, reportMarkdown, datedFilename, downloadText,
@@ -1944,7 +1945,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.28.0',
+      version: window.NO7_VERSION || '2.29.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -3073,13 +3074,10 @@ $('#export-btn').addEventListener('click', () => {
 /** เขียนข้อมูลตามแผนกู้คืน (เรียกหลังผู้ใช้ยืนยันแล้วเท่านั้น) */
 function applyRestore(plan) {
   const replace = plan.mode === 'replace';
-  withHealthHistoryRestore(plan.values.healthHistory, () => memory.importData(
-    { facts: plan.values.facts, log: plan.values.log }, { merge: !replace },
+  withBackupListsRestore(plan.values, () => withHealthHistoryRestore(
+    plan.values.healthHistory,
+    () => memory.importData({ facts: plan.values.facts, log: plan.values.log }, { merge: !replace }),
   ));
-  try {
-    localStorage.setItem('no7.notes.v1', JSON.stringify(plan.values.notes || []));
-    localStorage.setItem('no7.todos.v1', JSON.stringify(plan.values.todos || []));
-  } catch { /* พื้นที่เต็ม */ }
   if (replace) tasks.clear();
   if (plan.values.tasks?.length) tasks.merge(plan.values.tasks);
   calendar.replaceAll(plan.values.events || []);
