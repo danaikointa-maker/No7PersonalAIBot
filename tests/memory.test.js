@@ -178,6 +178,23 @@ test('planImport previews fact/log outcomes without mutating memory or storage u
   assert.equal(mem.applyImportPlan(plan), null, 'the same preview cannot be applied twice');
 });
 
+test('import plans are private to their store and reject stale state without overwriting it', () => {
+  const mem = fresh();
+  const plan = mem.planImport({ facts: [{ text: 'planned import' }] });
+  assert.ok(Object.isFrozen(plan));
+  assert.ok(Object.isFrozen(plan.result));
+  assert.equal(mem.applyImportPlan({ result: plan.result }), null, 'a lookalike object is not an issued plan');
+  const otherStore = new MemoryStore();
+  assert.equal(otherStore.applyImportPlan(plan), null, 'plans cannot move between stores');
+
+  mem.logTurn('assistant', 'concurrent local write');
+  const afterConcurrentWrite = localStorage.getItem('no7.memory.v2');
+  assert.equal(mem.applyImportPlan(plan), null);
+  assert.equal(localStorage.getItem('no7.memory.v2'), afterConcurrentWrite, 'stale plan does not write storage');
+  assert.equal(mem.facts.some((fact) => fact.text === 'planned import'), false);
+  assert.equal(mem.log.at(-1).text, 'concurrent local write');
+});
+
 test('replace import plans stay read-only until explicitly applied', () => {
   const mem = fresh();
   mem.addFact('keep me until replacement is confirmed');

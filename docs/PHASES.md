@@ -893,21 +893,21 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AQ1 | ทำ import plan ให้ opaque และผูกกับ store ต้นทาง | 89.1–89.3 | ⬜ |
-| AQ2 | ปฏิเสธ plan ที่ stale/tampered ก่อน persist | 90.1–90.3 | ⬜ |
-| AQ3 | Release 2.23 | 91.1–91.3 | ⬜ |
+| AQ1 | ทำ import plan ให้ opaque และผูกกับ store ต้นทาง | 89.1–89.3 | ✅ |
+| AQ2 | ปฏิเสธ plan ที่ stale/tampered ก่อน persist | 90.1–90.3 | ✅ |
+| AQ3 | Release 2.23 | 91.1–91.3 | ✅ |
 
 ## AQ1 — ทำ import plan ให้ opaque และผูกกับ store ต้นทาง
 
-- [ ] 89.1 เก็บ payload/result จริงใน WeakMap; consumer เห็นเฉพาะ preview counts
-- [ ] 89.2 อนุญาต apply เฉพาะ plan ที่สร้างจาก MemoryStore instance นี้และยังไม่เคยใช้
-- [ ] 89.3 Unit tests สำหรับ plan ที่ปลอม/แก้ไข/ย้ายข้าม instance และ apply ซ้ำ
+- [x] 89.1 เก็บ payload/result จริงใน WeakMap; consumer เห็นเฉพาะ preview counts
+- [x] 89.2 อนุญาต apply เฉพาะ plan ที่สร้างจาก MemoryStore instance นี้และยังไม่เคยใช้
+- [x] 89.3 Unit tests สำหรับ plan ที่ปลอม/แก้ไข/ย้ายข้าม instance และ apply ซ้ำ
 
 ## AQ2 — ปฏิเสธ plan ที่ stale ก่อน persist
 
-- [ ] 90.1 ตรวจ snapshot ของ facts/log/meta ก่อน apply; state เปลี่ยนแล้วให้ reject แบบ no-write
-- [ ] 90.2 UI แจ้งให้ผู้ใช้เริ่ม import ใหม่เมื่อ preview หมดอายุ
-- [ ] 90.3 Browser smoke ครอบคลุมการเปลี่ยน memory ระหว่าง plan/apply โดยไม่ทิ้งข้อมูล
+- [x] 90.1 ตรวจ snapshot ของ facts/log/meta ก่อน apply; state เปลี่ยนแล้วให้ reject แบบ no-write
+- [x] 90.2 UI แจ้งให้ผู้ใช้เริ่ม import ใหม่เมื่อ preview หมดอายุ
+- [x] 90.3 Browser smoke ครอบคลุมการเปลี่ยน memory ระหว่าง plan/apply โดยไม่ทิ้งข้อมูล
 
 ## AQ3 — Release 2.23
 

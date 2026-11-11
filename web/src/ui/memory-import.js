@@ -27,7 +27,7 @@ export function bindMemoryImport(input, {
       }
       const result = memory.applyImportPlan(plan);
       if (!result) {
-        setStatus(english ? 'Import failed: invalid plan' : 'นำเข้าไม่สำเร็จ: แผนไม่ถูกต้อง');
+        setStatus(english ? 'Memory changed after preview; choose the file again to review a fresh plan' : 'ความจำเปลี่ยนหลังแสดงตัวอย่าง กรุณาเลือกไฟล์อีกครั้งเพื่อตรวจแผนใหม่');
         return;
       }
       setStatus(english
