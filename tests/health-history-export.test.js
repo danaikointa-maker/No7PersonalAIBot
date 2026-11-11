@@ -1,0 +1,43 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { healthHistoryCsv, healthHistoryMarkdown } from '../web/src/core/health-history-export.js';
+import { recordHealthSnapshot } from '../web/src/core/health-history.js';
+
+const at = (day) => Date.parse(`2026-11-${String(day).padStart(2, '0')}T12:00:00Z`);
+
+test('CSV exports BOM, localized columns and summary counts only', () => {
+  const history = recordHealthSnapshot(null, { score: 72, grade: 'C', issues: [
+    { severity: 'high', count: 2 }, { severity: 'low', count: 1 },
+  ] }, at(10));
+  const csv = healthHistoryCsv(history);
+  assert.ok(csv.startsWith('\ufeffวันที่,คะแนน,เกรด,ปัญหาระดับสูง,ปัญหาระดับกลาง,ปัญหาระดับต่ำ,ปัญหารวม\r\n'));
+  assert.match(csv, /2026-11-10,72,C,2,0,1,3/);
+  assert.doesNotMatch(csv, /private|title|text/i);
+  assert.match(healthHistoryCsv(history, { lang: 'en' }), /Date,Score,Grade,High issues/);
+});
+
+test('Markdown includes trend, table, and privacy note in both languages', () => {
+  let history = recordHealthSnapshot(null, { score: 70, grade: 'C', issues: [] }, at(10));
+  history = recordHealthSnapshot(history, { score: 85, grade: 'B', issues: [{ severity: 'medium', count: 2 }] }, at(11));
+  const md = healthHistoryMarkdown(history, { lang: 'en', now: at(11) });
+  assert.match(md, /^# Data health history/);
+  assert.match(md, /Change since previous scan: \+15 points/);
+  assert.match(md, /2026-11-11 \| 85 \| B \| 0 \| 2 \| 0 \| 2/);
+  assert.match(md, /no personal item text/i);
+  assert.match(healthHistoryMarkdown(history), /ประวัติสุขภาพข้อมูล/);
+});
+
+test('CSV drops formula-like dates and private payload fields before export', () => {
+  const csv = healthHistoryCsv({ schema: 1, snapshots: [
+    { date: '=1+1', score: 100, grade: 'A', text: 'secret note', issues: { high: 0, medium: 0, low: 0 } },
+    { date: '2026-11-10', score: 90, grade: 'A', title: 'private event', issues: { high: 0, medium: 0, low: 0 }, privateText: 'secret' },
+  ] });
+  assert.doesNotMatch(csv, /=1\+1|secret|private event/);
+  assert.match(csv, /2026-11-10,90,A,0,0,0,0/);
+});
+
+test('empty reports still return localized safe output', () => {
+  assert.match(healthHistoryCsv(null), /^\ufeffวันที่,/);
+  assert.match(healthHistoryMarkdown(null), /ยังไม่มีประวัติสุขภาพ/);
+  assert.match(healthHistoryMarkdown(null, { lang: 'en' }), /No saved health history/);
+});

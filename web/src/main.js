@@ -53,6 +53,7 @@ import { analyzeHealth, healthMarkdown, applyCleanup } from './core/health.js';
 import { healthUiCopy, healthSuggestion } from './core/health-i18n.js';
 import { readHealthHistory, writeHealthHistory, clearHealthHistory, recordHealthSnapshot } from './core/health-history.js';
 import { renderHealthHistory } from './ui/health-history.js';
+import { healthHistoryCsv, healthHistoryMarkdown } from './core/health-history-export.js';
 import {
   customToolDefs, validateCustomTools, PLUGIN_EXAMPLE, PLUGIN_LIMITS,
 } from './core/custom-tools.js';
@@ -1054,6 +1055,16 @@ async function deliverReport(filename, text, type) {
   }
 }
 
+function exportHealthHistory(format) {
+  const history = readHealthHistory();
+  if (!history.snapshots.length) return Promise.resolve(false);
+  const now = Date.now();
+  const lang = langOf(settings.uiLang);
+  return format === 'csv'
+    ? deliverReport(datedFilename('no7-health-history', 'csv', now), healthHistoryCsv(history, { lang }), 'text/csv;charset=utf-8')
+    : deliverReport(datedFilename('no7-health-history', 'md', now), healthHistoryMarkdown(history, { lang, now }), 'text/markdown;charset=utf-8');
+}
+
 function exportDigest(format) {
   if (!lastDigest) return Promise.resolve(false);
   const now = Date.now();
@@ -1283,6 +1294,9 @@ function renderHealthCard(report) {
       return;
     }
     renderHealthCard(lastHealth);
+  });
+  card.querySelectorAll('[data-health-export]').forEach((button) => {
+    button.addEventListener('click', () => exportHealthHistory(button.dataset.healthExport));
   });
   card.querySelector('#health-undo-btn')?.addEventListener('click', undoHealthCleanup);
   card.querySelector('#health-clean-btn')?.addEventListener('click', () => {
@@ -1917,7 +1931,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.7.0',
+      version: window.NO7_VERSION || '2.8.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },

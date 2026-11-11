@@ -2,6 +2,20 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.8.0] — 2026-11-10
+
+รอบที่สิบสาม: ส่งออกประวัติสุขภาพในเครื่องเป็น CSV หรือ Markdown ได้เอง
+
+### เพิ่ม
+- ส่งออกเฉพาะ snapshot คะแนน/เกรด/จำนวนปัญหา ด้วย CSV (BOM) หรือ Markdown ไทย/อังกฤษ
+- ชื่อไฟล์มีวันที่; ดาวน์โหลดผ่าน browser และใช้ clipboard fallback เมื่อดาวน์โหลดไม่ได้
+- CSV สร้างจาก schema ที่ normalize แล้วและใช้ escape/formula guard; ไม่มีข้อความความจำ/โน้ต/งาน/นัดหมาย
+- เพิ่ม `healthHistoryCsv` / `healthHistoryMarkdown`; tests รูปแบบ, ภาษา, privacy, malformed/formula-like data
+
+### ตรวจรับ
+- 431 unit tests · 156 browser checks · `npm run check` 112 JS files
+- Performance/build ผ่าน; source ใหญ่สุด 148.8 KB; main gzip 103.0 KB
+
 ## [2.7.0] — 2026-11-10
 
 รอบที่สิบสอง: ดูแนวโน้มคะแนนสุขภาพข้อมูลย้อนหลัง โดยเก็บเฉพาะข้อมูลสรุปไว้ในเครื่อง

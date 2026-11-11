@@ -390,6 +390,10 @@ check('health: report card rendered with cleanup preview', !$('#health-card').hi
 const healthHistory = JSON.parse(window.localStorage.getItem('no7.health.history.v1') || '{}');
 check('health history: stores only one score summary', healthHistory.snapshots?.length === 1 && Object.keys(healthHistory.snapshots[0]).sort().join(',') === 'date,grade,issues,score');
 check('health history: chart is accessible', !!$('#health-card svg[role="img"][aria-label]'));
+check('health history: export buttons are available', $('#health-card').querySelectorAll('[data-health-export]').length === 2);
+$('#health-card').querySelector('[data-health-export="csv"]').click();
+await wait(10);
+check('health history: export click keeps the card active', !$('#health-card').hidden);
 check('health: report posted to chat', $('#messages').textContent.includes('สุขภาพข้อมูล'));
 window.confirm = () => true;
 $('#health-clean-btn').click();
