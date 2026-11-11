@@ -44,3 +44,27 @@ test('conversation archive reports when source log exceeds the 800-entry display
   assert.equal(result.total, 850);
   assert.equal(result.hasMore, true);
 });
+
+test('conversation archive date bounds include both local calendar days', () => {
+  const start = new Date(2026, 10, 10).getTime();
+  const nextStart = new Date(2026, 10, 11).getTime();
+  const dated = [
+    { role: 'user', text: 'previous day', ts: start - 1 },
+    { role: 'assistant', text: 'start boundary', ts: start },
+    { role: 'user', text: 'same day', ts: start + 12 * 60 * 60 * 1000 },
+    { role: 'assistant', text: 'end boundary', ts: nextStart - 1 },
+    { role: 'user', text: 'next day', ts: nextStart },
+  ];
+  const result = filterConversationLog(dated, { dateFrom: '2026-11-10', dateTo: '2026-11-10' });
+  assert.equal(result.total, 3);
+  assert.deepEqual(result.items.map((item) => item.text), ['end boundary', 'same day', 'start boundary']);
+  assert.equal(filterConversationLog(dated, { dateFrom: '2026-11-10' }).total, 4);
+  assert.equal(filterConversationLog(dated, { dateTo: '2026-11-10' }).total, 4);
+});
+
+test('conversation archive returns no records for invalid or reversed date ranges', () => {
+  const dated = [{ role: 'user', text: 'private message', ts: new Date(2026, 10, 10, 12).getTime() }];
+  assert.equal(filterConversationLog(dated, { dateFrom: '2026-02-30' }).total, 0);
+  assert.equal(filterConversationLog(dated, { dateTo: 'not-a-date' }).total, 0);
+  assert.equal(filterConversationLog(dated, { dateFrom: '2026-11-11', dateTo: '2026-11-10' }).total, 0);
+});

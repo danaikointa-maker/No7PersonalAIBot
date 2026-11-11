@@ -781,24 +781,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AM1 | เพิ่มตัวกรองวันที่ inclusive ตาม local calendar day | 77.1–77.3 | ⬜ |
-| AM2 | เชื่อม UI ไทย/อังกฤษและทดสอบ privacy | 78.1–78.3 | ⬜ |
-| AM3 | Release 2.19 | 79.1–79.3 | ⬜ |
+| AM1 | เพิ่มตัวกรองวันที่ inclusive ตาม local calendar day | 77.1–77.3 | ✅ |
+| AM2 | เชื่อม UI ไทย/อังกฤษและทดสอบ privacy | 78.1–78.3 | ✅ |
+| AM3 | Release 2.19 | 79.1–79.3 | ✅ |
 
 ## AM1 — เพิ่มตัวกรองวันที่ inclusive ตาม local calendar day
 
-- [ ] 77.1 filter helper รองรับวันที่เริ่ม/สิ้นสุดแบบรวมวันนั้นและจัดการวันผิดรูป/DST
-- [ ] 77.2 รวม date range กับค้นข้อความ/role และ reset pagination เมื่อเปลี่ยนเงื่อนไข
-- [ ] 77.3 Unit tests สำหรับขอบวัน, ช่วงเดียว, ช่วงว่าง/กลับด้าน และ invalid dates
+- [x] 77.1 filter helper รองรับวันที่เริ่ม/สิ้นสุดแบบรวมวันนั้นและจัดการวันผิดรูป/DST
+- [x] 77.2 รวม date range กับค้นข้อความ/role และ reset pagination เมื่อเปลี่ยนเงื่อนไข
+- [x] 77.3 Unit tests สำหรับขอบวัน, ช่วงเดียว, ช่วงว่าง/กลับด้าน และ invalid dates
 
 ## AM2 — เชื่อม UI ไทย/อังกฤษและทดสอบ privacy
 
-- [ ] 78.1 เพิ่ม date inputs ที่ติดป้ายชัดเจนและ localize ใน archive
-- [ ] 78.2 Browser smoke ช่วงวันที่เปลี่ยนผลค้นหา แต่ไม่เขียน memory storage
-- [ ] 78.3 อัปเดต `docs/MEMORY.md`
+- [x] 78.1 เพิ่ม date inputs ที่ติดป้ายชัดเจนและ localize ใน archive
+- [x] 78.2 Browser smoke ช่วงวันที่เปลี่ยนผลค้นหา แต่ไม่เขียน memory storage
+- [x] 78.3 อัปเดต `docs/MEMORY.md`
 
 ## AM3 — Release 2.19
 
-- [ ] 79.1 version 2.19.0 + CHANGELOG
-- [ ] 79.2 README + PHASES ปิดครบ
-- [ ] 79.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 79.1 version 2.19.0 + CHANGELOG
+- [x] 79.2 README (32 docs, 458 unit / 172 checks) + PHASES ปิดครบ
+- [x] 79.3 ตรวจรับรวม: check 118 files · unit 458 · browser 172 · perf · build → PR
