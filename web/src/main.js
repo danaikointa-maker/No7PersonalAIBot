@@ -1879,13 +1879,17 @@ function readPersonaForm() {
 }
 
 $('#persona-new').addEventListener('click', () => openPersonaForm(null));
-$('#persona-dup').addEventListener('click', () => {
+const withPersonaStorage = (operation) => {
+  try { operation(); } catch (error) { $('#pf-status').textContent = `⚠️ ${error.message}`; }
+};
+const refreshPersonaUi = () => { renderPersonaList(); renderSettingsForm(); updatePersonaHeader(); };
+$('#persona-dup').addEventListener('click', () => withPersonaStorage(() => {
   const copy = duplicatePersona(settings.persona);
-  if (!copy) return;
+  if (!copy) { $('#pf-status').textContent = 'สร้างสำเนาไม่สำเร็จ'; return; }
   renderPersonaList();
   openPersonaForm(copy.id);
   $('#pf-status').textContent = 'สร้างสำเนาแล้ว — แก้ได้เลย';
-});
+}));
 $('#pf-rate').addEventListener('input', (e) => { $('#pf-rate-out').textContent = Number(e.target.value).toFixed(2); });
 $('#pf-cancel').addEventListener('click', () => { $('#persona-form').hidden = true; });
 $('#pf-save').addEventListener('click', () => {
@@ -1894,26 +1898,26 @@ $('#pf-save').addEventListener('click', () => {
     $('#pf-status').textContent = '⚠️ ต้องมีชื่อและตัวตน (system prompt)';
     return;
   }
-  const saved = editingPersonaId ? updatePersona(editingPersonaId, data) : createPersona(data);
-  if (!saved) { $('#pf-status').textContent = 'บันทึกไม่สำเร็จ'; return; }
-  settings = saveSettings({ persona: saved.id });
-  editingPersonaId = saved.id;
-  $('#persona-form').hidden = true;
-  renderPersonaList();
-  renderSettingsForm();
-  updatePersonaHeader();
-  $('#settings-status').textContent = `✅ บันทึก persona "${saved.name}" แล้ว`;
+  withPersonaStorage(() => {
+    const saved = editingPersonaId ? updatePersona(editingPersonaId, data) : createPersona(data);
+    if (!saved) { $('#pf-status').textContent = 'บันทึกไม่สำเร็จ'; return; }
+    settings = saveSettings({ persona: saved.id });
+    editingPersonaId = saved.id;
+    $('#persona-form').hidden = true;
+    refreshPersonaUi();
+    $('#settings-status').textContent = `✅ บันทึก persona "${saved.name}" แล้ว`;
+  });
 });
 $('#pf-delete').addEventListener('click', () => {
   if (!editingPersonaId) return;
   if (!confirm('ลบ persona นี้?')) return;
-  deletePersona(editingPersonaId);
-  editingPersonaId = null;
-  $('#persona-form').hidden = true;
-  if (!allPersonas().some((p) => p.id === settings.persona)) settings = saveSettings({ persona: 'no7' });
-  renderPersonaList();
-  renderSettingsForm();
-  updatePersonaHeader();
+  withPersonaStorage(() => {
+    if (!deletePersona(editingPersonaId)) { $('#pf-status').textContent = 'ไม่พบ persona ที่ต้องการลบ'; return; }
+    editingPersonaId = null;
+    $('#persona-form').hidden = true;
+    if (!allPersonas().some((p) => p.id === settings.persona)) settings = saveSettings({ persona: 'no7' });
+    refreshPersonaUi();
+  });
 });
 $('#pf-preview').addEventListener('click', async () => {
   const data = readPersonaForm();
@@ -1952,7 +1956,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.32.0',
+      version: window.NO7_VERSION || '2.33.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },

@@ -1173,24 +1173,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| BA1 | ทำ persona writes แบบ fail-loud และ persist-before-success | 119.1–119.3 | ⬜ |
-| BA2 | จัดการ UI errors สำหรับ create/update/delete/duplicate | 120.1–120.3 | ⬜ |
-| BA3 | Release 2.33 | 121.1–121.3 | ⬜ |
+| BA1 | ทำ persona writes แบบ fail-loud และ persist-before-success | 119.1–119.3 | ✅ |
+| BA2 | จัดการ UI errors สำหรับ create/update/delete/duplicate | 120.1–120.3 | ✅ |
+| BA3 | Release 2.33 | 121.1–121.3 | ✅ |
 
 ## BA1 — ทำ persona writes แบบ fail-loud และ persist-before-success
 
-- [ ] 119.1 storage error โยน `PersonaStorageError` และคง raw personas เดิม
-- [ ] 119.2 create/update/delete/duplicate/restore รายงาน success เฉพาะเมื่อเขียนสำเร็จ
-- [ ] 119.3 Unit tests จำลอง quota failure ครอบคลุม CRUD และ restore
+- [x] 119.1 storage error โยน `PersonaStorageError` และคง raw personas เดิม
+- [x] 119.2 create/update/delete/duplicate/restore รายงาน success เฉพาะเมื่อเขียนสำเร็จ
+- [x] 119.3 Unit tests จำลอง quota failure ครอบคลุม CRUD และ restore
 
 ## BA2 — จัดการ UI errors สำหรับ create/update/delete/duplicate
 
-- [ ] 120.1 create/update เก็บฟอร์มและข้อมูลเมื่อเขียนไม่ได้; success state หลัง commit เท่านั้น
-- [ ] 120.2 delete/duplicate แสดง error และคง persona เดิม
-- [ ] 120.3 Browser smoke จำลอง quota failure สำหรับ create/delete และตรวจ state เดิม
+- [x] 120.1 create/update เก็บฟอร์มและข้อมูลเมื่อเขียนไม่ได้; success state หลัง commit เท่านั้น
+- [x] 120.2 delete/duplicate แสดง error และคง persona เดิม
+- [x] 120.3 Browser smoke จำลอง quota failure สำหรับ create/delete และตรวจ state เดิม
 
 ## BA3 — Release 2.33
 
-- [ ] 121.1 version 2.33.0 + CHANGELOG
-- [ ] 121.2 README + PHASES ปิดครบ
-- [ ] 121.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 121.1 version 2.33.0 + CHANGELOG
+- [x] 121.2 README + PHASES ปิดครบ
+- [x] 121.3 ตรวจรับรวม (check/test/browser/perf/build) + PR

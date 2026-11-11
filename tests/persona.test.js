@@ -63,6 +63,32 @@ test('deletePersona removes it', () => {
   assert.equal(deletePersona('ไม่มียี่ห้อ'), false);
 });
 
+test('persona mutations preserve existing data and report storage failures', () => {
+  reset();
+  const existing = createPersona({ name: 'ต้องเก็บไว้', system: 'persona เดิม' });
+  const before = JSON.stringify(localStorage.getItem('no7.personas.v1'));
+  const beforeList = customPersonas();
+  const originalSetItem = localStorage.setItem;
+  localStorage.setItem = function (key, value) {
+    if (key === 'no7.personas.v1') throw new Error('quota exceeded');
+    return originalSetItem.call(this, key, value);
+  };
+  try {
+    for (const operation of [
+      () => createPersona({ name: 'ใหม่', system: 'ใหม่' }),
+      () => updatePersona(existing.id, { name: 'แก้แล้ว' }),
+      () => deletePersona(existing.id),
+      () => duplicatePersona('mira'),
+    ]) {
+      assert.throws(operation, { name: 'PersonaStorageError' });
+      assert.equal(localStorage.getItem('no7.personas.v1'), JSON.parse(before));
+      assert.deepEqual(customPersonas(), beforeList);
+    }
+  } finally {
+    localStorage.setItem = originalSetItem;
+  }
+});
+
 test('banned topics land in the system prompt', () => {
   reset();
   const p = createPersona({ name: 'Safe', system: 'คุณคือ Safe', banned: ['การพนัน', 'การเมือง'] });

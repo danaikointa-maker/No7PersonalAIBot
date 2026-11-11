@@ -52,6 +52,24 @@ test('replace restore includes only valid custom personas and legacy backups pre
   assert.deepEqual(replace.values.personas.map((p) => p.id), ['p-fromfile1']);
 });
 
+test('restoreCustomPersonas reports storage errors without replacing existing personas', () => {
+  localStorage.clear();
+  restoreCustomPersonas([custom('p-current1', 'Local', 1000)]);
+  const originalValue = localStorage.getItem('no7.personas.v1');
+  const originalSetItem = localStorage.setItem;
+  localStorage.setItem = function (key, value) {
+    if (key === 'no7.personas.v1') throw new Error('quota exceeded');
+    return originalSetItem.call(this, key, value);
+  };
+  try {
+    assert.throws(() => restoreCustomPersonas([custom('p-newitem1', 'Incoming', 2000)], 'p-newitem1'), { name: 'PersonaStorageError' });
+    assert.equal(localStorage.getItem('no7.personas.v1'), originalValue);
+    assert.deepEqual(customPersonas().map((persona) => persona.id), ['p-current1']);
+  } finally {
+    localStorage.setItem = originalSetItem;
+  }
+});
+
 test('restoreCustomPersonas replaces stored list with sanitized values', () => {
   localStorage.clear();
   assert.equal(restoreCustomPersonas([custom('p-restored1', 'Restored', 10, { admin: true })], 'p-restored1'), 'p-restored1');

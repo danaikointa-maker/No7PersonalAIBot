@@ -734,6 +734,34 @@ await wait(20);
 check('persona: custom created', $('#persona-list').children.length === 10, String($('#persona-list').children.length));
 check('persona: selected header updated', $('#persona-name').textContent.includes('น้องสโมค'), $('#persona-name').textContent);
 check('persona: appears in dropdown', [...$('#set-persona').options].some((o) => o.textContent.includes('น้องสโมค')));
+const personasBeforeQuotaFailure = window.localStorage.getItem('no7.personas.v1');
+const personaStoragePrototype = Object.getPrototypeOf(window.localStorage);
+const originalPersonaSetItem = personaStoragePrototype.setItem;
+const failPersonaWrites = function (key, value) {
+  if (key === 'no7.personas.v1') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalPersonaSetItem.call(this, key, value);
+};
+personaStoragePrototype.setItem = failPersonaWrites;
+$('#persona-new').click();
+$('#pf-name').value = 'persona ที่ยังไม่บันทึก';
+$('#pf-system').value = 'ตัวตนทดสอบ';
+$('#pf-save').click();
+check('persona: failed create keeps editor input and stored personas', !$('#persona-form').hidden && $('#pf-name').value === 'persona ที่ยังไม่บันทึก' && $('#pf-status').textContent.includes('บันทึก persona ไม่สำเร็จ') && window.localStorage.getItem('no7.personas.v1') === personasBeforeQuotaFailure);
+$('#persona-dup').click();
+check('persona: failed duplicate reports error and keeps original list', $('#pf-status').textContent.includes('บันทึก persona ไม่สำเร็จ') && window.localStorage.getItem('no7.personas.v1') === personasBeforeQuotaFailure);
+personaStoragePrototype.setItem = originalPersonaSetItem;
+$('#persona-dup').click();
+const personasBeforeDeleteFailure = window.localStorage.getItem('no7.personas.v1');
+const personaCountBeforeDeleteFailure = JSON.parse(personasBeforeDeleteFailure || '[]').length;
+personaStoragePrototype.setItem = failPersonaWrites;
+window.confirm = () => true;
+$('#pf-delete').click();
+check('persona: failed delete keeps editor open and persona stored', !$('#persona-form').hidden && JSON.parse(window.localStorage.getItem('no7.personas.v1') || '[]').length === personaCountBeforeDeleteFailure && window.localStorage.getItem('no7.personas.v1') === personasBeforeDeleteFailure);
+personaStoragePrototype.setItem = originalPersonaSetItem;
 
 // MCP: add server → discover tools → tools appear in grid
 check('mcp: empty state shown', $('#mcp-status').textContent.includes('ยังไม่มี server'), $('#mcp-status').textContent);
