@@ -37,6 +37,44 @@ npm run desktop:dist   # สร้างตัวติดตั้งใน rel
 
 หมายเหตุ: `electron` และ `electron-builder` โหลดไบนารีตอน `npm install` ถ้าติดตั้งด้วย `--ignore-scripts` จะยังไม่สามารถรันเดสก์ท็อปได้ (ต้อง `npm rebuild electron`)
 
+## 2.1) ออก release + auto-update
+
+### ออกเวอร์ชัน
+
+```bash
+# 1) bump version ใน package.json (และ CHANGELOG ถ้ามี)
+# 2) tag แล้ว push
+git tag v2.0.0 && git push origin v2.0.0
+```
+
+`.github/workflows/release.yml` จะทำ 3 อย่างอัตโนมัติ:
+
+| job | ทำอะไร |
+|---|---|
+| `verify` | check + unit + smoke + build + **perf budget** (ถ้าไม่ผ่าน = ไม่ปล่อย) |
+| `desktop` | matrix `ubuntu / macos / windows` → `electron-builder --publish never` แล้วเก็บ artifact |
+| `publish` | รวม artifact → GitHub Release (draft) ให้ตรวจก่อนกด publish |
+
+ไฟล์ที่ได้: `*.exe` (nsis + portable), `*.dmg`/`*.zip`, `*.AppImage`/`*.deb` + `latest*.yml` (metadata ของ updater)
+
+### Auto-update (opt-in, ปิดไว้เป็นค่าเริ่มต้น)
+
+`desktop/updater.js` ต่อ `electron-updater` เฉพาะเมื่อ **ติดตั้งแล้ว (packaged)** และผู้ใช้เปิดเอง:
+
+| env | ค่าเริ่มต้น | ความหมาย |
+|---|---|---|
+| `NO7_AUTO_UPDATE=1` | ปิด | เปิดระบบอัปเดต (ต้องเป็นแอปที่ติดตั้งแล้ว) |
+| `NO7_UPDATE_FEED` | จาก `build.publish` (GitHub repo) | generic feed URL ถ้าโฮสต์เอง |
+| `NO7_UPDATE_CHANNEL` | `latest` | `latest` / `beta` |
+| `NO7_UPDATE_AUTO_DOWNLOAD=0` | ดาวน์โหลด | แค่บอกว่ามีเวอร์ชันใหม่ |
+| `NO7_UPDATE_CHECK_MS` | `15000` | หน่วงก่อนเช็คครั้งแรก (clamp 3s–10min) |
+
+พฤติกรรม: เช็คครั้งแรกหลังเปิดแอป → แจ้งเตือนผ่าน OS notification ทุกขั้น (มีใหม่/ดาวน์โหลด %/พร้อมติดตั้ง)
+→ ติดตั้งเมื่อปิดแอป (`autoInstallOnAppQuit`) — **ไม่รีสตาร์ตเอง** และ tray มีเมนู "ตรวจอัปเดต"
+
+> signing: ไม่ตั้ง `MAC_CERT_P12`/`APPLE_ID` ก็ build ได้ แต่ macOS จะเตือน "unidentified developer"
+> Windows ไม่ต้องมี certificate สำหรับการใช้งานส่วนตัว (SmartScreen จะเตือนครั้งแรก)
+
 ## 3) มือถือ (Capacitor)
 
 ```bash

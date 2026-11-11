@@ -69,6 +69,16 @@
         "deb"
       ],
       "category": "Utility"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "danaikointa-maker",
+        "repo": "No7PersonalAIBot"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
   }
 }
