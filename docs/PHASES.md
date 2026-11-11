@@ -1250,3 +1250,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 127.1 version 2.35.0 + CHANGELOG
 - [x] 127.2 README + PHASES ปิดครบ
 - [x] 127.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 41 (v2.36)
+
+เป้าหมาย: ป้องกันสูตรอัตโนมัติที่ผู้ใช้บันทึกไว้สูญหายหรือ UI/tool รายงานสำเร็จทั้งที่ localStorage เขียนไม่ได้ โดย persist candidate ก่อนเปลี่ยน state และรักษาสูตร/ข้อมูลใน editor เมื่อเกิด storage failure
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| BD1 | ทำ RecipeStore แบบ persist-before-swap | 128.1–128.3 | ✅ |
+| BD2 | ส่งต่อ storage failure จาก recipe UI และ tool | 129.1–129.3 | ✅ |
+| BD3 | Release 2.36 | 130.1–130.3 | ✅ |
+
+## BD1 — ทำ RecipeStore แบบ persist-before-swap
+
+- [x] 128.1 เพิ่ม `RecipeStorageError` และ persist candidate ก่อนปรับ recipes ใน memory
+- [x] 128.2 save/remove/clear และ seed samples เปลี่ยน state ได้เมื่อ persist สำเร็จเท่านั้น
+- [x] 128.3 Unit tests จำลอง quota failure และยืนยันสูตรเดิมใน storage/memory ยังอยู่
+
+## BD2 — ส่งต่อ storage failure จาก recipe UI และ tool
+
+- [x] 129.1 Recipe editor แสดงข้อผิดพลาดและคงสูตรเดิม/ข้อมูลร่างเมื่อ save/delete ล้มเหลว
+- [x] 129.2 `run_recipe` ไม่รายงานสำเร็จหรือเริ่มรัน หากการสร้างสูตรใหม่บันทึกไม่ได้
+- [x] 129.3 Browser smoke จำลอง storage failure และยืนยัน UI ไม่แสดง success ปลอม
+
+## BD3 — Release 2.36
+
+- [x] 130.1 version 2.36.0 + CHANGELOG
+- [x] 130.2 README + PHASES ปิดครบ
+- [x] 130.3 ตรวจรับรวม (check/test/browser/perf/build) + PR

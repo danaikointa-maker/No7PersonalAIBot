@@ -1956,7 +1956,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.35.0',
+      version: window.NO7_VERSION || '2.36.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -2316,10 +2316,15 @@ $('#recipe-run')?.addEventListener('click', async () => {
 $('#recipe-delete')?.addEventListener('click', () => {
   const id = $('#recipe-select').value;
   if (!id) { setDesktopStatus('เลือกสูตรที่ต้องการลบก่อน'); return; }
-  const removed = recipes.remove(id);
-  renderRecipeOptions();
-  fillRecipeEditor(null);
-  setDesktopStatus(removed ? '🗑 ลบสูตรแล้ว' : 'ไม่พบสูตรนี้');
+  try {
+    const removed = recipes.remove(id);
+    if (!removed) { setDesktopStatus('ไม่พบสูตรนี้'); return; }
+    renderRecipeOptions();
+    fillRecipeEditor(null);
+    setDesktopStatus('🗑 ลบสูตรแล้ว');
+  } catch (e) {
+    setDesktopStatus(`⛔ ${e.message}`);
+  }
 });
 
 function setLinkStatus(text) {

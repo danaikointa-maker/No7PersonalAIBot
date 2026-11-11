@@ -708,6 +708,23 @@ $('#recipe-save').click();
 check('desktop: recipe saved from UI', /บันทึกสูตร/.test($('#recipe-status').textContent) && $('#recipe-select').options.length > 1, $('#recipe-status').textContent);
 $('#recipe-try').click();
 check('desktop: dry-run shows plan', $('#recipe-log').hidden === false && $('#recipe-log').textContent.includes('แจ้งเตือน'), $('#recipe-log').textContent.slice(0, 60));
+const recipesBeforeQuotaFailure = window.localStorage.getItem('no7.recipes.v1');
+const recipeStoragePrototype = Object.getPrototypeOf(window.localStorage);
+const originalRecipeSetItem = recipeStoragePrototype.setItem;
+recipeStoragePrototype.setItem = function (key, value) {
+  if (key === 'no7.recipes.v1') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalRecipeSetItem.call(this, key, value);
+};
+$('#recipe-steps').value = 'notify ร่างที่ยังไม่บันทึก';
+$('#recipe-save').click();
+check('desktop: failed recipe save preserves draft and persisted recipe', $('#recipe-status').textContent.includes('บันทึกสูตรอัตโนมัติไม่สำเร็จ') && $('#recipe-steps').value === 'notify ร่างที่ยังไม่บันทึก' && window.localStorage.getItem('no7.recipes.v1') === recipesBeforeQuotaFailure);
+$('#recipe-delete').click();
+check('desktop: failed recipe delete keeps selected recipe and editor', $('#recipe-status').textContent.includes('บันทึกสูตรอัตโนมัติไม่สำเร็จ') && $('#recipe-select').value !== '' && $('#recipe-steps').value === 'notify ร่างที่ยังไม่บันทึก' && window.localStorage.getItem('no7.recipes.v1') === recipesBeforeQuotaFailure);
+recipeStoragePrototype.setItem = originalRecipeSetItem;
 
 // capabilities + storage panels (R1)
 check('caps: list rendered', $('#caps-list').children.length > 3, String($('#caps-list').children.length));
