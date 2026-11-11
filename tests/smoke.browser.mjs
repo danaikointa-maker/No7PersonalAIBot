@@ -263,6 +263,35 @@ const stillOpen = [...$('#task-list').querySelectorAll('.fact')].some((r) => r.t
 check('journey: recurring task stays open', stillOpen, $('#task-list').textContent.slice(0, 60));
 $('#task-repeat').value = '';
 
+// backup / restore (schema 2)
+window.confirm = () => true;
+$('#nav button[data-view="settings"]').click();
+$('#export-btn').click();
+check('backup: export reports a schema-2 file', $('#backup-status').textContent.includes('schema 2'), $('#backup-status').textContent.slice(0, 80));
+const backupPayload = {
+  app: 'no7-personal-ai', schema: 2, version: '2.2.0', createdAt: new Date().toISOString(), includeSecrets: false,
+  data: {
+    settings: { language: 'th', uiLang: 'th' },
+    facts: [{ id: 'imp-1', text: 'ความจำจากการนำเข้า', ts: Date.now(), importance: 2 }],
+    log: [], notes: [{ text: 'โน้ตจากไฟล์สำรอง', ts: Date.now() }], todos: [], tasks: [], events: [],
+  },
+};
+const backupFile = new window.File([JSON.stringify(backupPayload)], 'no7-backup.json', { type: 'application/json' });
+Object.defineProperty($('#import-file'), 'files', { value: [backupFile], configurable: true });
+$('#import-file').dispatchEvent(new window.Event('change'));
+await wait(120);
+check('backup: import succeeded', $('#backup-status').textContent.includes('นำเข้าแล้ว'), $('#backup-status').textContent.slice(0, 80));
+$('#nav button[data-view="memory"]').click();
+$('#mem-query').value = 'นำเข้า';
+$('#mem-search-btn').click();
+check('backup: imported fact searchable', $('#mem-results').textContent.includes('ความจำจากการนำเข้า'), $('#mem-results').textContent.slice(0, 60));
+check('backup: imported note stored', JSON.parse(window.localStorage.getItem('no7.notes.v1') || '[]').some((n) => n.text.includes('โน้ตจากไฟล์สำรอง')));
+const badFile = new window.File(['{not json'], 'bad.json', { type: 'application/json' });
+Object.defineProperty($('#import-file'), 'files', { value: [badFile], configurable: true });
+$('#import-file').dispatchEvent(new window.Event('change'));
+await wait(80);
+check('backup: broken file rejected', $('#backup-status').textContent.includes('❌'), $('#backup-status').textContent.slice(0, 60));
+
 // command palette (Ctrl/⌘ K)
 window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
 await wait(30);

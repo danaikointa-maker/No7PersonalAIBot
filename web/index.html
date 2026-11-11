@@ -455,9 +455,12 @@
           <p class="hint" id="device-info">—</p>
           <div class="row">
             <button id="install-btn">ติดตั้งเป็นแอป (PWA)</button>
-            <button id="export-btn">ส่งออกข้อมูล</button>
+            <button id="export-btn" data-i18n="backup.export">ส่งออกข้อมูล</button>
+            <button id="import-btn" data-i18n="backup.import">นำเข้าข้อมูลสำรอง</button>
+            <input id="import-file" type="file" accept="application/json,.json" hidden />
             <button id="reset-btn">ล้างข้อมูลทั้งหมด</button>
           </div>
+          <p id="backup-status" class="hint"></p>
 
           <h3>🔄 ซิงก์ข้ามเครื่อง</h3>
           <p class="hint">ใช้ companion server ของคุณเอง (npm run server) — ไม่มีคลาวด์ ไม่มีบัญชี</p>

@@ -294,7 +294,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 | เฟส | ชื่อ | งานย่อย | สถานะ |
 |---|---|---|---|
 | V1 | ค้นหาทุกอย่าง (⌘K) | 26.1–26.4 | ✅ |
-| V2 | สำรอง/กู้คืนข้อมูล | 27.1–27.4 | ⬜ |
+| V2 | สำรอง/กู้คืนข้อมูล | 27.1–27.4 | ✅ |
 | V3 | Release 2.2 | 28.1–28.3 | ⬜ |
 
 ## V1 — ค้นหาทุกอย่าง (Command palette)
@@ -306,10 +306,10 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## V2 — สำรอง/กู้คืนข้อมูล
 
-- 27.1 `core/backup.js`: `createBackup` (schema 2, redact คีย์) / `validateBackup` / `summarizeBackup`
-- 27.2 `planRestore` + `mergeRecords` (merge vs replace, last-write-wins ตาม `updatedAt/ts`)
-- 27.3 UI: ปุ่มสำรองข้อมูลรูปแบบใหม่ + นำเข้าไฟล์ (dry-run แสดงจำนวนก่อนยืนยัน)
-- 27.4 Tests + smoke + `docs/BACKUP.md`
+- [x] 27.1 `core/backup.js`: `createBackup` (schema 2 + checksum + counts), `redactSettings`/`hasSecrets`, `validateBackup`, `summarizeBackup`, `migrateBackup` (export รุ่นเก่า)
+- [x] 27.2 `mergeRecords` (LWW ตาม `ts/updatedAt`) + `planRestore` (merge/replace, dry-run) + `describePlan` + `COLLECTIONS`
+- [x] 27.3 UI: `#export-btn` ใช้ schema 2, `#import-btn`/`#import-file` (FileReader → validate → confirm พร้อมสรุป → merge) + `#backup-status`
+- [x] 27.4 `tests/backup.test.js` (14) + smoke +5 (123 checks) + `docs/BACKUP.md`
 
 ## V3 — Release 2.2
 

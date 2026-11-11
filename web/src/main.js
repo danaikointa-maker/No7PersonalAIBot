@@ -51,6 +51,9 @@ import {
   buildIndex, searchIndex, groupResults, defaultPaletteExtras, highlightRanges,
 } from './core/search.js';
 import {
+  createBackup, validateBackup, summarizeBackup, planRestore, describePlan, BACKUP_SCHEMA,
+} from './core/backup.js';
+import {
   LOCAL_PRESETS, probeLocal, warmModel, pickBestModel, normalizeOfflineBrain,
   offlineChainSettings, describeLocalBrain, LocalModelCache,
 } from './core/local-models.js';
@@ -914,10 +917,15 @@ $('#mem-llm-toggle').addEventListener('change', (e) => {
 function downloadJson(data, filename) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
+  if (typeof URL.createObjectURL !== 'function') {
+    // สภาพแวดล้อมที่ไม่มี object URL (เช่น jsdom ในเทสต์) — ไม่ทำให้ทั้งฟังก์ชันล้ม
+    return { downloaded: false, bytes: blob.size, filename };
+  }
   a.href = URL.createObjectURL(blob);
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(a.href);
+  URL.revokeObjectURL?.(a.href);
+  return { downloaded: true, bytes: blob.size, filename };
 }
 
 /* ------------------------------------------------------- HTTP tool plugins */
@@ -2687,16 +2695,107 @@ $('#set-provider').addEventListener('change', () => {
   }
 });
 
-$('#export-btn').addEventListener('click', () => {
-  const data = {
-    exportedAt: new Date().toISOString(),
-    settings: { ...settings, apiKey: '' },
-    facts: memory.listFacts(),
+/* ------------------------------------------------- backup / restore (v2) */
+function collectBackupState() {
+  return {
+    settings,
+    facts: memory.listFacts({ sort: 'recent' }),
     log: memory.recentLog(500),
-    todos: JSON.parse(localStorage.getItem('no7.todos.v1') || '[]'),
-    notes: JSON.parse(localStorage.getItem('no7.notes.v1') || '[]'),
+    notes: readList('no7.notes.v1'),
+    todos: readList('no7.todos.v1'),
+    tasks: tasks.list({ done: null }),
+    events: calendar.all(),
+    personas: [],
   };
-  downloadJson(data, `no7-backup-${Date.now()}.json`);
+}
+
+function setBackupStatus(text) {
+  const el = $('#backup-status');
+  if (el) el.textContent = text;
+  return text;
+}
+
+$('#export-btn').addEventListener('click', () => {
+  const backup = createBackup(collectBackupState(), {
+    includeSecrets: false,
+    version: window.NO7_VERSION || '',
+  });
+  setBackupStatus(`⬇️ สำรองข้อมูลแล้ว (schema ${BACKUP_SCHEMA} · ${backup.counts.facts} ความจำ · ${backup.counts.tasks} งาน) — ไม่มีคีย์/โทเคนติดไป`);
+  try {
+    downloadJson(backup, `no7-backup-${new Date().toISOString().slice(0, 10)}.json`);
+  } catch (err) {
+    setBackupStatus(`⚠️ สร้างไฟล์ไม่สำเร็จในสภาพแวดล้อมนี้: ${err.message}`);
+  }
+});
+
+/** เขียนข้อมูลตามแผนกู้คืน (เรียกหลังผู้ใช้ยืนยันแล้วเท่านั้น) */
+function applyRestore(plan) {
+  const replace = plan.mode === 'replace';
+  if (replace) memory.clearAll();
+  memory.importData({ facts: plan.values.facts }, { merge: !replace });
+  try {
+    localStorage.setItem('no7.notes.v1', JSON.stringify(plan.values.notes || []));
+    localStorage.setItem('no7.todos.v1', JSON.stringify(plan.values.todos || []));
+  } catch { /* พื้นที่เต็ม */ }
+  if (replace) tasks.clear();
+  if (plan.values.tasks?.length) tasks.merge(plan.values.tasks);
+  calendar.replaceAll(plan.values.events || []);
+  if (plan.settings) {
+    settings = saveSettings({ ...plan.settings });
+    renderSettingsForm();
+    applyUiLang(settings.uiLang);
+  }
+  renderMemory();
+  renderCalendar();
+  renderTasks?.();
+  sm.set({ hasProvider: hasProviderConfigured(settings) });
+  return plan.totals;
+}
+
+function restoreFromText(text) {
+  const check = validateBackup(text);
+  if (!check.ok) {
+    setBackupStatus(`❌ ไฟล์ใช้ไม่ได้: ${check.errors.slice(0, 2).join(' · ')}`);
+    return null;
+  }
+  const summary = summarizeBackup(check.backup);
+  const plan = planRestore(check.backup, {
+    facts: memory.listFacts({ sort: 'recent' }),
+    notes: readList('no7.notes.v1'),
+    todos: readList('no7.todos.v1'),
+    tasks: tasks.list({ done: null }),
+    events: calendar.all(),
+  }, { mode: 'merge' });
+
+  const lines = [
+    `พบข้อมูลสำรอง ${summary.total} รายการ (schema ${summary.schema}${summary.version ? ` · v${summary.version}` : ''})`,
+    describePlan(plan),
+    ...check.warnings.map((w) => `⚠️ ${w}`),
+    '',
+    'กด OK เพื่อรวมข้อมูลนี้เข้ากับเครื่องนี้ (ของใหม่ทับตามเวลา)',
+  ];
+  if (!window.confirm(lines.join('\n'))) {
+    setBackupStatus('ยกเลิกการนำเข้าแล้ว');
+    return null;
+  }
+  const totals = applyRestore(plan);
+  setBackupStatus(`✅ นำเข้าแล้ว: +${totals.added} ใหม่ · ${totals.updated} อัปเดต${check.warnings.length ? ' (มีคำเตือน)' : ''}`);
+  return { check, plan, totals };
+}
+
+$('#import-btn')?.addEventListener('click', () => $('#import-file')?.click());
+
+$('#import-file')?.addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setBackupStatus('กำลังอ่านไฟล์…');
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { restoreFromText(String(reader.result || '')); } catch (err) { setBackupStatus(`❌ ${err.message}`); }
+    e.target.value = '';
+  };
+  reader.onerror = () => setBackupStatus('❌ อ่านไฟล์ไม่สำเร็จ');
+  reader.readAsText(file);
 });
 
 $('#reset-btn').addEventListener('click', () => {
