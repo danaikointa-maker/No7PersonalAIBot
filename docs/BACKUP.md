@@ -32,6 +32,8 @@
 - ค่าเริ่มต้นตัด `apiKey`, `ttsApiKey`, `syncToken` และ `mcpServers[].apiKey` ออก
 - `includeSecrets: true` = เก็บคีย์ไว้ (ใช้เฉพาะย้ายเครื่องเอง)
 
+ไฟล์นำเข้าต้องไม่เกิน 20 MiB; UI ปฏิเสธก่อนอ่านไฟล์หากเกิน และ API ตรวจ UTF-8 bytes ก่อน parse เช่นกัน คอลเลกชันที่ระบุในไฟล์ต้องเป็น array และไม่เกินเพดาน: facts 3,000 · log 500 · personas 100 · healthHistory 30 · notes/todos/tasks/events 50,000 ต่อชุด แถวที่ไม่ใช่ object จะถูกข้ามในแผน restore โดยไม่ทำให้ทั้งแผนล้ม
+
 ## 3) กู้คืนแบบ merge vs replace
 
 | โหมด | พฤติกรรม |

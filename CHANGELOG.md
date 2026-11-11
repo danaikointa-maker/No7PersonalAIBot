@@ -2,6 +2,19 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.15.0] — 2026-11-10
+
+รอบที่ยี่สิบ: ป้องกันการนำเข้าไฟล์สำรองที่ใหญ่หรือผิดรูปเกินไป
+
+### เพิ่ม
+- จำกัด full backup 20 MiB; UI ปฏิเสธก่อน FileReader และ `validateBackup` ตรวจ UTF-8 bytes ก่อน parse
+- ตรวจว่า collection เป็น array และอยู่ในขีดจำกัด (facts 3,000 · log 500 · personas 100 · healthHistory 30 · collections อื่น 50,000)
+- ข้าม row ที่ไม่ใช่ object ใน restore plan เพื่อไม่ให้ malformed rows ทำให้ทั้งแผน throw
+
+### ตรวจรับ
+- 451 unit tests · 166 browser checks · `npm run check` 116 JS files
+- Performance/build ผ่าน; source ใหญ่สุด 149.9 KB; main gzip 106.6 KB
+
 ## [2.14.0] — 2026-11-10
 
 รอบที่สิบเก้า: กู้คืน chat log จากไฟล์สำรองได้หลังยืนยัน พร้อม normalize ข้อมูล
