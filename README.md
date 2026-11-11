@@ -74,7 +74,7 @@ npm run perf          # performance budget (ขนาด bundle/source)
 
 ### ✅ งาน + เตือนข้ามเครื่อง
 - เพิ่มงานด้วยเสียง/ข้อความ ("เตือนส่งรายงานพรุ่งนี้ 9 โมง"), priority 0–3, เตือนตามเวลา
-- ซิงก์ข้ามเครื่องแบบ last-write-wins + tombstone (การลบตามไปทุกเครื่อง)
+- ซิงก์ข้ามเครื่องแบบ conflict-aware (newest / prefer-local / prefer-remote / keep-both) + รายงานความขัดแย้ง + tombstone (การลบตามไปทุกเครื่อง)
 - `parseDue` เข้าใจ ISO, `+30m`, `+2h`, `วันนี้ 18:00`, `พรุ่งนี้ 09:30`
 
 ### 🧩 ผลลัพธ์ทยอยขึ้นระหว่างทำงาน
@@ -150,6 +150,7 @@ npm run perf          # performance budget (ขนาด bundle/source)
 ### 🔗 อุปกรณ์ + 🔄 ซิงก์
 - Phone-Link: สั่งงาน PC/ESP32 ผ่าน HMAC-SHA256 (`/api/link/*`), มี ESP32 reference client ให้
 - ซิงก์มือถือ ↔ PC ผ่าน server ของคุณเอง (`/api/sync`, token) — ไม่มีคลาวด์ ไม่มีบัญชี
+- เลือกกลยุทธ์เมื่อข้อมูลชนกัน + ดูรายงาน "เพิ่ม/อัปเดต/คงเดิม/ชนกัน" (ดู [docs/SYNC.md](docs/SYNC.md))
 - **งาน + เตือนข้ามเครื่อง**: เพิ่มงานด้วยเสียง/ข้อความ, เตือนตามเวลา, ซิงก์แบบ last-write-wins (tombstone สำหรับการลบ)
 - **งานซ้ำ + เตือนแม้ปิดแอป**: `daily/weekdays/weekly/monthly/hourly`, server tick ส่ง Telegram, ปิดงานแล้วเลื่อนรอบถัดไปเอง
 
@@ -204,6 +205,7 @@ docs/                เอกสาร 29 ไฟล์
 | [docs/DEVICES.md](docs/DEVICES.md) | Phone-Link protocol + ESP32 |
 | [docs/PHONE_LINK.md](docs/PHONE_LINK.md) | HMAC canonical signing + ตัวอย่าง curl |
 | [docs/WEEKLY.md](docs/WEEKLY.md) | รายงานรายสัปดาห์ + ข้อเสนอโฟกัส |
+| [docs/SYNC.md](docs/SYNC.md) | ซิงก์ conflict-aware: กลยุทธ์, คีย์, รายงานความขัดแย้ง |
 | [docs/SEARCH.md](docs/SEARCH.md) | command palette ⌘K + การให้คะแนน/ไฮไลต์ |
 | [docs/BACKUP.md](docs/BACKUP.md) | สำรอง/กู้คืน schema 2 (dry-run, merge/replace) |
 | [docs/AGENT.md](docs/AGENT.md) | agent loop, event, timeline, การหยุดกลางทาง |

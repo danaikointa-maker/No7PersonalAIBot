@@ -356,16 +356,16 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 | --- | --- | --- | --- |
-| X1 | ซิงก์แบบ conflict-aware | 32.1–32.4 | ⬜ |
+| X1 | ซิงก์แบบ conflict-aware | 32.1–32.4 | ✅ |
 | X2 | ส่งออกรายงาน (MD/CSV) | 33.1–33.4 | ⬜ |
 | X3 | Release 2.4 | 34.1–34.3 | ⬜ |
 
 ## X1 — ซิงก์แบบ conflict-aware
 
-- 32.1 `core/sync-merge.js`: `mergeRecordSets` (newest / prefer-local / prefer-remote / keep-both) + `deviceId()` + report ความขัดแย้ง
-- 32.2 `mergeSyncBundle` สำหรับ facts/notes/todos/tasks/events → `{data, report}` (แทน merge แบบ additive)
-- 32.3 UI: เลือกกลยุทธ์ในหน้าซิงก์ + แสดงผล "เพิ่ม/อัปเดต/ชนกัน" + `docs/SYNC.md`
-- 32.4 Tests + smoke
+- 32.1 ✅ `core/sync-merge.js`: `mergeRecordSets` (newest / prefer-local / prefer-remote / keep-both) + `deviceId()` + report ความขัดแย้ง
+- 32.2 ✅ `mergeSyncBundle` สำหรับ facts/notes/todos/tasks/events → `{data, report}` (แทน merge แบบ additive)
+- 32.3 ✅ UI: เลือกกลยุทธ์ในหน้าซิงก์ + แสดงผล "เพิ่ม/อัปเดต/ชนกัน" + `docs/SYNC.md`
+- 32.4 ✅ Tests + smoke
 
 ## X2 — ส่งออกรายงาน (MD/CSV)
 

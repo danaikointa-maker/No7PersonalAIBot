@@ -433,6 +433,9 @@ check('offline banner hidden while online', $('#offline-banner').hidden === true
 // Persona Studio
 $('#nav button[data-view="settings"]').click();
 check('sync: controls present', !!$('#sync-push-btn') && !!$('#set-serverurl'));
+check('sync: strategy select has 4 options', $('#set-syncstrategy') && $('#set-syncstrategy').options.length === 4, String($('#set-syncstrategy')?.options.length));
+check('sync: strategy defaults to newest', $('#set-syncstrategy').value === 'newest', $('#set-syncstrategy').value);
+check('sync: conflict report hidden by default', $('#sync-report').hidden === true);
 check('persona: list rendered', $('#persona-list').children.length === 8, String($('#persona-list').children.length));
 $('#persona-new').click();
 $('#pf-name').value = 'น้องสโมค';
