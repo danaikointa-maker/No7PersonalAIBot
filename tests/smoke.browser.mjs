@@ -83,9 +83,15 @@ window.fetch = async (url, opts = {}) => {
   if (u.includes('text.pollinations.ai')) {
     const msgs = JSON.parse(opts.body).messages;
     const last = msgs[msgs.length - 1].content;
+    const history = msgs.map((m) => String(m.content)).join('\n');
     const reply = (content) => ({ ok: true, json: async () => ({ choices: [{ message: { content } }] }) });
+    // multi-tool: คำขอ "สองอย่าง" → gold แล้วต่อด้วย calc ในลูปเดียว (ดูกำลังจากประวัติ ไม่ใช้สถานะภายนอก)
+    if (history.includes('สองอย่าง') && last.includes('ผลลัพธ์จากเครื่องมือ gold') && !history.includes('ผลลัพธ์จากเครื่องมือ calc')) {
+      return reply('```tool\n{"tool":"calc","args":{"expression":"2412*2"}}\n```');
+    }
     if (last.includes('ผลลัพธ์จากเครื่องมือ')) return reply('ราคาทองตอนนี้ 2,412 ดอลลาร์ต่อออนซ์ครับ');
     if (last.includes('พิมพ์คำว่า OK')) return reply('OK');
+    if (last.includes('สองอย่าง')) return reply('```tool\n{"tool":"gold","args":{}}\n```');
     if (last.includes('ราคาทอง')) return reply('```tool\n{"tool":"gold","args":{}}\n```');
     if (last.includes('เปิดเว็บ')) return reply('```tool\n{"tool":"open_url","args":{"url":"https://example.com"}}\n```');
     return reply('สวัสดีครับ ผมชื่อ No7');
@@ -204,11 +210,22 @@ submit('ราคาทองวันนี้');
 await wait(220);
 const lastBot = [...$('#messages').querySelectorAll('.msg.bot')].at(-1);
 check('tool: card rendered', !!lastBot?.querySelector('.card'));
+check('progressive: card lands in .msg-cards', !!lastBot?.querySelector('.msg-cards .card'));
+check('progressive: answer stays in .msg-text', lastBot?.querySelector('.msg-text')?.textContent.includes('2,412'), lastBot?.querySelector('.msg-text')?.textContent?.slice(0, 40));
+check('progressive: card count recorded', lastBot?.querySelector('.msg-cards')?.dataset.count === '1', lastBot?.querySelector('.msg-cards')?.dataset.count);
 check('tool: provider API called', calls.some((c) => c.url.includes('gold-api')));
 check('tool: spoken summary', lastBot?.textContent.includes('2,412'), lastBot?.textContent.slice(0, 60));
 check('timeline: visible after a tool run', !$('#run-timeline').hidden, $('#run-timeline').hidden ? 'hidden' : 'shown');
 check('timeline: lists thinking + tool steps', $('#run-timeline').querySelectorAll('.tl-row').length >= 2, String($('#run-timeline').querySelectorAll('.tl-row').length));
 check('timeline: headline says finished', /เสร็จใน|Done in/.test($('#run-timeline').textContent), $('#run-timeline').textContent.slice(0, 70));
+
+// multi-tool in a single request → two cards in the same bubble, rendered as they arrive
+submit('ทำสองอย่างให้หน่อย');
+await wait(300);
+const multiBot = [...$('#messages').querySelectorAll('.msg.bot')].at(-1);
+check('progressive: two cards in one answer', multiBot?.querySelectorAll('.msg-cards .card').length === 2, `cards=${multiBot?.querySelectorAll('.msg-cards .card').length} txt=${multiBot?.textContent?.slice(0, 80)} calls=${calls.filter((c) => c.url.includes('gold-api')).length}`);
+check('progressive: count attribute matches', multiBot?.querySelector('.msg-cards')?.dataset.count === '2', multiBot?.querySelector('.msg-cards')?.dataset.count);
+check('progressive: cards survive final text', multiBot?.querySelectorAll('.msg-cards .card').length === 2 && !!multiBot?.querySelector('.msg-text')?.textContent);
 
 $('#mic-btn').click();
 await wait(80);

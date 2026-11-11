@@ -370,8 +370,24 @@ async function respond(userText) {
 
   const persona = getPersona(settings.persona);
   const chain = resolveProviderChain(offlineChainSettings(settings));
-  const botEl = addMessage('bot', '…');
-  const cards = [];
+  const botEl = addMessage('bot', '');
+  botEl.classList.add('streaming');
+  const textEl = document.createElement('div');
+  textEl.className = 'msg-text';
+  textEl.textContent = '…';
+  const cardsEl = document.createElement('div');
+  cardsEl.className = 'msg-cards';
+  botEl.append(textEl, cardsEl);
+  const setBotText = (text) => { textEl.textContent = text; };
+  let partialCards = 0;
+  /** การ์ดผลลัพธ์ถูกวาดทันทีที่เครื่องมือคืนค่า (ไม่รอคำตอบจบ) */
+  const pushCard = (tool, data) => {
+    partialCards++;
+    cardsEl.dataset.count = String(partialCards);
+    renderCard(cardsEl, tool, data);
+    $('#messages').scrollTop = $('#messages').scrollHeight;
+    return partialCards;
+  };
   const splitter = new SentenceSplitter();
   const queue = new SpeechQueue(speechVoice, {
     onSentence: (sentence) => { bargeIn.setSpoken(sentence); },
@@ -431,13 +447,13 @@ async function respond(userText) {
       renderTimeline(timeline);
       if (e.type === 'thinking') {
         sm.set({ requestInFlight: true, toolRunning: false });
-        if (e.step > 1 && !streamBuf) botEl.textContent = 'กำลังคิดต่อ…';
+        if (e.step > 1 && !streamBuf) setBotText('กำลังคิดต่อ…');
       }
       if (e.type === 'token') {
         if (!firstTokenAt) firstTokenAt = performance.now();
         streamBuf += e.delta;
         if (streamBuf.includes('```') || /^\s*\{/.test(streamBuf)) toolLikely = true;
-        botEl.textContent = withCursor(streamBuf, !toolLikely);
+        setBotText(withCursor(streamBuf, !toolLikely));
         $('#messages').scrollTop = $('#messages').scrollHeight;
         if (speakLive && !toolLikely) {
           for (const sentence of splitter.push(e.delta)) queue.enqueue(sentence);
@@ -447,7 +463,7 @@ async function respond(userText) {
         // ข้อความที่ไหลมาเป็นเจตนาเรียกเครื่องมือ ไม่ใช่คำตอบ → ล้างและหยุดเสียง
         streamBuf = '';
         toolLikely = false;
-        botEl.textContent = '';
+        setBotText('');
         splitter.reset();
         speakLive = false;
         queue.stop();
@@ -457,7 +473,12 @@ async function respond(userText) {
       }
       if (e.type === 'result') {
         addStep(`${e.data?.title || e.tool} — เสร็จแล้ว`, 'ok');
-        cards.push(e);
+        pushCard(e.tool, e.data);
+        if (!streamBuf) {
+          setBotText(partialCards > 1
+            ? `เก็บผลแล้ว ${partialCards} อย่าง — กำลังสรุป…`
+            : 'ได้ผลแล้ว — กำลังสรุป…');
+        }
       }
       if (e.type === 'denied') {
         addStep(e.reason === 'user-declined' ? `ไม่อนุญาต ${e.tool}` : `ถูกบล็อก: หมวด ${CATEGORIES[e.category]?.label || e.category}`, 'deny');
@@ -484,9 +505,9 @@ async function respond(userText) {
       for (const sentence of splitter.flush()) queue.enqueue(sentence);
       setSubtitle(botText);
     } else {
-      botEl.textContent = botText;
+      setBotText(botText);
     }
-    for (const c of cards) renderCard(botEl, c.tool, c.data);
+    botEl.classList.remove('streaming');
 
     memory.logTurn('assistant', botText);
     history.push({ role: 'user', content: userText }, { role: 'assistant', content: botText });
@@ -501,7 +522,8 @@ async function respond(userText) {
     renderTimeline(timeline);
     noteError(err, retriedOnce ? 'chat(retry)' : 'chat');
     queue.stop();
-    botEl.textContent = `⚠️ ${err.message}`;
+    setBotText(`⚠️ ${err.message}`);
+    botEl.classList.remove('streaming');
     sm.set({ error: err.message, requestInFlight: false, toolRunning: false });
     setSubtitle('มีปัญหาการเชื่อมต่อ ลองตรวจสอบการตั้งค่า');
     setTimeout(() => sm.set({ error: null }), 4000);

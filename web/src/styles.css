@@ -129,6 +129,12 @@ label input[type="checkbox"] { width: auto; }
 }
 
 /* ---------- Chat ---------- */
+/* คำตอบหลายส่วน: ข้อความ + การ์ดผลเครื่องมือ (วาดระหว่างลูปได้) */
+.msg .msg-text { white-space: pre-wrap; }
+.msg .msg-cards { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.msg .msg-cards:empty { display: none; }
+.msg.streaming .msg-text:empty { display: none; }
+
 /* command palette (⌘K) */
 .palette { position: fixed; inset: 0; background: rgba(4, 8, 16, .62); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; z-index: 60; }
 .palette[hidden] { display: none; }
