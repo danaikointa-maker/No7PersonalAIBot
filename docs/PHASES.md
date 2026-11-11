@@ -865,24 +865,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AP1 | เพิ่ม pure memory import plan | 86.1–86.3 | ⬜ |
-| AP2 | แสดง preview/ยืนยันก่อน apply | 87.1–87.3 | ⬜ |
-| AP3 | Release 2.22 | 88.1–88.3 | ⬜ |
+| AP1 | เพิ่ม pure memory import plan | 86.1–86.3 | ✅ |
+| AP2 | แสดง preview/ยืนยันก่อน apply | 87.1–87.3 | ✅ |
+| AP3 | Release 2.22 | 88.1–88.3 | ✅ |
 
 ## AP1 — เพิ่ม pure memory import plan
 
-- [ ] 86.1 plan นับ fact added/merged/skipped และ conversation added/skipped โดยไม่แก้ instance/storage
-- [ ] 86.2 apply ใช้ผล plan เดิมครั้งเดียว; merge รักษา history เก่าและ dedupe เฉพาะ identity ที่ตรงกัน
-- [ ] 86.3 Unit tests สำหรับ duplicate/fuzzy merge, malformed rows, replacement plan และ read-only behavior
+- [x] 86.1 plan นับ fact added/merged/skipped และ conversation added/skipped โดยไม่แก้ instance/storage
+- [x] 86.2 apply ใช้ผล plan เดิมครั้งเดียว; merge รักษา history เก่าและ dedupe เฉพาะ identity ที่ตรงกัน
+- [x] 86.3 Unit tests สำหรับ duplicate/fuzzy merge, malformed rows, replacement plan และ read-only behavior
 
 ## AP2 — แสดง preview/ยืนยันก่อน apply
 
-- [ ] 87.1 confirm แสดงจำนวนที่จะเพิ่ม/รวม/ข้ามจริง ไม่ใช่ raw row count
-- [ ] 87.2 Browser smoke ยืนยัน cancel ไม่เขียน storage และ confirm เขียนตาม preview
-- [ ] 87.3 อัปเดต `docs/MEMORY.md`
+- [x] 87.1 confirm แสดงจำนวนที่จะเพิ่ม/รวม/ข้ามจริง ไม่ใช่ raw row count
+- [x] 87.2 Browser smoke ยืนยัน cancel ไม่เขียน storage และ confirm เขียนตาม preview
+- [x] 87.3 อัปเดต `docs/MEMORY.md`
 
 ## AP3 — Release 2.22
 
-- [ ] 88.1 version 2.22.0 + CHANGELOG
-- [ ] 88.2 README + PHASES ปิดครบ
-- [ ] 88.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 88.1 version 2.22.0 + CHANGELOG
+- [x] 88.2 README + PHASES ปิดครบ
+- [x] 88.3 ตรวจรับรวม (check/test/browser/perf/build) + PR

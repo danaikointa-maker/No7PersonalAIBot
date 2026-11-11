@@ -143,6 +143,54 @@ test('import merges duplicates instead of doubling', () => {
   assert.equal(mem.listFacts()[0].importance, 5);
 });
 
+test('planImport previews fact/log outcomes without mutating memory or storage until applied', () => {
+  const mem = fresh();
+  const original = mem.addFact('alpha beta gamma', { importance: 2 });
+  mem.logTurn('user', 'already stored');
+  const before = localStorage.getItem('no7.memory.v2');
+  const existingLog = mem.log[0];
+  const plan = mem.planImport({
+    facts: [
+      { text: 'alpha beta gamma', importance: 5, pinned: true },
+      { text: 'alpha beta gamma delta', importance: 4 },
+      { text: 'brand new fact', importance: 3 },
+      { text: '   ' },
+    ],
+    log: [
+      { ...existingLog },
+      { role: 'assistant', text: 'new conversation', ts: existingLog.ts + 1 },
+      { role: 'tool', text: 'invalid role', ts: existingLog.ts + 2 },
+    ],
+  });
+  assert.deepEqual(plan.result, { added: 1, merged: 2, skipped: 1, logAdded: 1, logSkipped: 2 });
+  assert.equal(localStorage.getItem('no7.memory.v2'), before);
+  assert.equal(mem.facts.length, 1);
+  assert.equal(mem.getFact(original.id).importance, 2);
+  assert.equal(mem.getFact(original.id).pinned, false);
+  assert.equal(mem.log.length, 1);
+
+  assert.deepEqual(mem.applyImportPlan(plan), plan.result);
+  assert.equal(mem.facts.length, 2);
+  assert.equal(mem.getFact(original.id).importance, 5);
+  assert.equal(mem.getFact(original.id).pinned, true);
+  assert.equal(mem.log.length, 2);
+  assert.equal(mem.log.at(-1).text, 'new conversation');
+  assert.equal(mem.applyImportPlan(plan), null, 'the same preview cannot be applied twice');
+});
+
+test('replace import plans stay read-only until explicitly applied', () => {
+  const mem = fresh();
+  mem.addFact('keep me until replacement is confirmed');
+  const before = localStorage.getItem('no7.memory.v2');
+  const plan = mem.planImport({ facts: [{ text: 'replacement fact' }], log: [] }, { merge: false });
+  assert.deepEqual(plan.result, { added: 1, merged: 0, skipped: 0, logAdded: 0, logSkipped: 0 });
+  assert.equal(localStorage.getItem('no7.memory.v2'), before);
+  assert.equal(mem.facts.length, 1);
+  assert.equal(mem.facts[0].text, 'keep me until replacement is confirmed');
+  mem.applyImportPlan(plan);
+  assert.deepEqual(mem.facts.map((fact) => fact.text), ['replacement fact']);
+});
+
 test('importData merges sanitized chat log by role, timestamp and full text without trimming old history', () => {
   const mem = fresh();
   const entry = { role: 'user', text: 'restored question', ts: 1000, secret: 'strip' };

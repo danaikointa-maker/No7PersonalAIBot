@@ -376,14 +376,16 @@ check('memory: oversized import rejected without changing existing history', $('
 const memoryImportPayload = JSON.stringify({ facts: [{ text: 'memory import confirmation fact', importance: 3 }], log: [{ role: 'user', text: 'memory import confirmation log', ts: Date.now() - 1 }] });
 const memoryImportFile = new window.File([memoryImportPayload], 'memory.json', { type: 'application/json' });
 Object.defineProperty($('#mem-import-file'), 'files', { value: [memoryImportFile], configurable: true });
-window.confirm = () => false;
+let memoryImportPrompt = '';
+window.confirm = (message) => { memoryImportPrompt = message; return false; };
 $('#mem-import-file').dispatchEvent(new window.Event('change'));
 await wait(10);
+check('memory: import preview reports actual planned additions', memoryImportPrompt.includes('ความจำ: เพิ่ม 1') && memoryImportPrompt.includes('บทสนทนา: เพิ่ม 1'));
 check('memory: import cancel does not write to storage', $('#mem-status').textContent.includes('ยกเลิก') && window.localStorage.getItem('no7.memory.v2') === memoryBeforeOversizeImport);
 window.confirm = () => true;
 $('#mem-import-file').dispatchEvent(new window.Event('change'));
 await wait(20);
-check('memory: import writes only after explicit confirmation', $('#mem-status').textContent.includes('นำเข้าแล้ว') && JSON.parse(window.localStorage.getItem('no7.memory.v2')).facts.some((fact) => fact.text === 'memory import confirmation fact'));
+check('memory: confirmed import matches the preview and writes storage', $('#mem-status').textContent.includes('นำเข้าแล้ว: เพิ่ม 1') && $('#mem-status').textContent.includes('บทสนทนา +1') && JSON.parse(window.localStorage.getItem('no7.memory.v2')).facts.some((fact) => fact.text === 'memory import confirmation fact') && JSON.parse(window.localStorage.getItem('no7.memory.v2')).log.some((item) => item.text === 'memory import confirmation log'));
 
 // command palette (Ctrl/⌘ K)
 window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
