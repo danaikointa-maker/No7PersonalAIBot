@@ -970,3 +970,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 97.1 version 2.25.0 + CHANGELOG
 - [x] 97.2 README + PHASES ปิดครบ
 - [x] 97.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 31 (v2.26)
+
+เป้าหมาย: หลีกเลี่ยงการขอ confirm และเขียน storage สำหรับไฟล์ที่โครงสร้างถูกแต่ไม่มี record ที่นำเข้าได้; แจ้งชัดเจนโดยคงข้อมูลเดิมไว้
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AT1 | แยกผล plan ที่ไม่มีการเปลี่ยนแปลงจริง | 98.1–98.3 | ✅ |
+| AT2 | แจ้ง no-op ก่อน confirm พร้อมทดสอบ storage ไม่เปลี่ยน | 99.1–99.3 | ✅ |
+| AT3 | Release 2.26 | 100.1–100.3 | ✅ |
+
+## AT1 — แยกผล plan ที่ไม่มีการเปลี่ยนแปลงจริง
+
+- [x] 98.1 นับผลที่จะ apply (added/merged/logAdded) แยกจาก skipped
+- [x] 98.2 ถ้าไม่มีผล apply ให้จบโดยไม่เรียก applyImportPlan
+- [x] 98.3 Unit tests ครอบคลุม empty/malformed-only payload
+
+## AT2 — แจ้ง no-op ก่อน confirm พร้อมทดสอบ storage ไม่เปลี่ยน
+
+- [x] 99.1 UI แจ้งว่าไม่มีรายการนำเข้าได้ โดยไม่เปิด confirm
+- [x] 99.2 Browser smoke ยืนยัน storage ไม่ถูกเขียนสำหรับ no-op
+- [x] 99.3 อัปเดต `docs/MEMORY.md`
+
+## AT3 — Release 2.26
+
+- [x] 100.1 version 2.26.0 + CHANGELOG
+- [x] 100.2 README + PHASES ปิดครบ
+- [x] 100.3 ตรวจรับรวม (check/test/browser/perf/build) + PR

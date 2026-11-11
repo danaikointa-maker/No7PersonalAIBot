@@ -26,6 +26,10 @@ export function bindMemoryImport(input, {
       }
       const plan = memory.planImport(payload, { merge: true });
       const { added, merged, skipped, logAdded, logSkipped } = plan.result;
+      if (!added && !merged && !logAdded) {
+        setStatus(english ? 'No importable memory entries; existing memory was not changed.' : 'ไม่มีรายการความจำที่นำเข้าได้ ข้อมูลเดิมไม่เปลี่ยนแปลง');
+        return;
+      }
       const preview = english
         ? `Import memory JSON? Facts: +${added} · merge ${merged} · skip ${skipped}; conversations: +${logAdded} · skipped ${logSkipped}. Existing history stays; nothing is removed.`
         : `นำเข้า memory JSON หรือไม่? ความจำ: เพิ่ม ${added} · รวม ${merged} · ข้าม ${skipped}; บทสนทนา: เพิ่ม ${logAdded} · ข้าม ${logSkipped} — ข้อมูลเดิมคงอยู่ ไม่มีการลบ`;
