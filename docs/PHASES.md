@@ -252,17 +252,17 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | เฟส | ชื่อ | งานย่อย | สถานะ |
 |---|---|---|---|
-| U1 | Timeline + ยกเลิกกลางทาง | 22.1–22.4 | ⬜ |
+| U1 | Timeline + ยกเลิกกลางทาง | 22.1–22.4 | ✅ |
 | U2 | สรุปประจำวัน (digest) | 23.1–23.4 | ⬜ |
 | U3 | ปลั๊กอินเครื่องมือ HTTP | 24.1–24.4 | ⬜ |
 | U4 | Release 2.1 | 25.1–25.3 | ⬜ |
 
 ## U1 — Timeline + ยกเลิกกลางทาง
 
-- 22.1 `core/timeline.js`: `AgentTimeline` (push event → ขั้นตอนมีสถานะ running/ok/error/denied/cancelled), `summary()`, `toMarkdown()`
-- 22.2 `core/agent.js`: `cancel()` + ตรวจธงทุกจุดในลูป, event `cancelled`, ผลลัพธ์ `{ cancelled }`
-- 22.3 UI: แผง timeline ระหว่างทำงาน (`#run-timeline`) + ปุ่มหยุดกลางทาง (Esc/ปุ่ม ⏹) ที่ยกเลิกทั้ง agent/TTS
-- 22.4 Tests (`timeline` + agent cancel) + smoke + `docs/AGENT.md`
+- [x] 22.1 `core/timeline.js`: `AgentTimeline` (push event → ขั้นตอนมีสถานะ), `summary()`, `headline()`, `toRows()`, `toMarkdown()`
+- [x] 22.2 `core/agent.js`: `cancel()` + ตรวจธง 3 จุดในลูป (ก่อนรอบใหม่ / หลังได้คำตอบ / หลังยืนยัน), event `cancelled`, ผลลัพธ์ `{ cancelled }`
+- [x] 22.3 UI: แผง `#run-timeline` + `stopAll()` ผูกกับปุ่ม ⏹ และ `Esc` (ยกเลิก agent + หยุดเสียง)
+- [x] 22.4 `tests/timeline.test.js` (10) + smoke +3 (100 checks) + `docs/AGENT.md`
 
 ## U2 — สรุปประจำวัน (digest)
 

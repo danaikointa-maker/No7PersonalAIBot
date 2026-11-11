@@ -42,6 +42,7 @@ import { renderCard, renderError } from './ui/cards.js';
 import { loadSettings, saveSettings, resetSettings, hasProviderConfigured, loadPermissions } from './core/settings.js';
 import { detectPlatform, platformLabel, isDesktopHost } from './core/platform.js';
 import { applyI18n, langOf, viewTitle, t as tr } from './core/i18n.js';
+import { AgentTimeline, statusIcon } from './core/timeline.js';
 import {
   LOCAL_PRESETS, probeLocal, warmModel, pickBestModel, normalizeOfflineBrain,
   offlineChainSettings, describeLocalBrain, LocalModelCache,
@@ -281,6 +282,25 @@ async function speak(text) {
 }
 
 /** Add one visible agent step (tool call / denial / error) into the chat. */
+/** แผง timeline ระหว่างทำงาน — แสดงทุกขั้นพร้อมสถานะ */
+function renderTimeline(timeline) {
+  const box = $('#run-timeline');
+  if (!box) return;
+  if (!timeline || !timeline.steps.length) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+  const headIcon = timeline.cancelled ? statusIcon('cancelled') : timeline.active ? statusIcon('running') : statusIcon('ok');
+  box.hidden = false;
+  box.innerHTML = `<div class="tl-head">${headIcon} <span>${esc(timeline.headline())}</span></div>`
+    + timeline.toRows().map((r) => `<div class="tl-row ${esc(r.status)}">`
+      + `<span class="tl-icon">${r.icon}</span>`
+      + `<span class="tl-label">${esc(r.label)}${r.title ? ` — <em>${esc(r.title)}</em>` : ''}</span>`
+      + (r.ms ? `<span class="tl-ms">${Math.round(r.ms)} ms</span>` : '')
+      + '</div>').join('');
+}
+
 function addStep(text, kind = '') {
   const el = document.createElement('div');
   el.className = `step ${kind}`;
@@ -355,6 +375,14 @@ async function respond(userText) {
   if (speakLive) bargeIn.start();
   $('#stop-btn').hidden = false;
 
+  const timeline = new AgentTimeline({
+    maxSteps: Number(settings.maxSteps) || 4,
+    lang: langOf(settings.uiLang),
+  });
+  timeline.start();
+  currentTimeline = timeline;
+  renderTimeline(timeline);
+
   const agent = new Agent({
     chat: (messages, { onToken } = {}) => {
       let emitted = false;
@@ -381,6 +409,8 @@ async function respond(userText) {
     maxSteps: Number(settings.maxSteps) || 4,
     onToolTiming: ({ tool, ms, ok }) => metrics.record({ kind: 'tool', label: tool, totalMs: ms, ok }),
     onEvent: (e) => {
+      timeline.push(e);
+      renderTimeline(timeline);
       if (e.type === 'thinking') {
         sm.set({ requestInFlight: true, toolRunning: false });
         if (e.step > 1 && !streamBuf) botEl.textContent = 'กำลังคิดต่อ…';
@@ -418,6 +448,8 @@ async function respond(userText) {
     },
   });
 
+  currentAgent = agent;
+
   try {
     const result = await agent.run(userText, {
       history: history.slice(-20),
@@ -426,6 +458,8 @@ async function respond(userText) {
       modeId: settings.mode,
     });
     botText = result.text || '(ไม่มีคำตอบ)';
+    timeline.finish();
+    renderTimeline(timeline);
 
     if (speakLive) {
       queue.resume();
@@ -445,6 +479,8 @@ async function respond(userText) {
     if (!speakLive) await speak(botText);
   } catch (err) {
     chatOk = false;
+    timeline.finish();
+    renderTimeline(timeline);
     noteError(err, retriedOnce ? 'chat(retry)' : 'chat');
     queue.stop();
     botEl.textContent = `⚠️ ${err.message}`;
@@ -453,6 +489,7 @@ async function respond(userText) {
     setTimeout(() => sm.set({ error: null }), 4000);
   } finally {
     busy = false;
+    currentAgent = null;
     bargeIn.stop();
     $('#stop-btn').hidden = true;
     wakeWordResume();
@@ -615,7 +652,23 @@ const speechVoice = {
   stopSpeaking: () => tts.stop(),
 };
 
-/* ---------------------------------------------------------- stop speaking */
+/* ---------------------------------------------- stop speaking / stop agent */
+let currentAgent = null;
+let currentTimeline = null;
+
+/** ปุ่ม ⏹ / Esc: หยุดทั้งงานที่กำลังทำและเสียง */
+function stopAll(reason = 'ผู้ใช้กดหยุด') {
+  const stoppedWork = !!(busy && currentAgent);
+  if (stoppedWork) {
+    currentAgent.cancel(reason);
+    currentTimeline?.cancel(reason);
+    if (currentTimeline) renderTimeline(currentTimeline);
+    setSubtitle(tr('agent.cancelled', { lang: settings.uiLang }));
+  }
+  stopSpeaking();
+  return stoppedWork;
+}
+
 function stopSpeaking() {
   activeQueue?.stop();
   activeQueue = null;
@@ -625,7 +678,7 @@ function stopSpeaking() {
   $('#stop-btn').hidden = true;
   setSubtitle('หยุดแล้ว');
 }
-$('#stop-btn').addEventListener('click', stopSpeaking);
+$('#stop-btn').addEventListener('click', () => stopAll());
 
 function updateMicUi() {
   $('#mic-btn').classList.toggle('listening', sm.current === STATES.LISTENING);
@@ -2610,7 +2663,7 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === 'Escape') {
     if (!$('#confirm-modal').hidden) { $('#confirm-no').click(); e.preventDefault(); return; }
-    if (!$('#stop-btn').hidden) { stopSpeaking(); e.preventDefault(); return; }
+    if (!$('#stop-btn').hidden) { stopAll('หยุดด้วยแป้น Esc'); e.preventDefault(); return; }
     $('#sidebar').classList.remove('open');
     return;
   }

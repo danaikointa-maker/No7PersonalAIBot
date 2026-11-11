@@ -206,6 +206,9 @@ const lastBot = [...$('#messages').querySelectorAll('.msg.bot')].at(-1);
 check('tool: card rendered', !!lastBot?.querySelector('.card'));
 check('tool: provider API called', calls.some((c) => c.url.includes('gold-api')));
 check('tool: spoken summary', lastBot?.textContent.includes('2,412'), lastBot?.textContent.slice(0, 60));
+check('timeline: visible after a tool run', !$('#run-timeline').hidden, $('#run-timeline').hidden ? 'hidden' : 'shown');
+check('timeline: lists thinking + tool steps', $('#run-timeline').querySelectorAll('.tl-row').length >= 2, String($('#run-timeline').querySelectorAll('.tl-row').length));
+check('timeline: headline says finished', /เสร็จใน|Done in/.test($('#run-timeline').textContent), $('#run-timeline').textContent.slice(0, 70));
 
 $('#mic-btn').click();
 await wait(80);

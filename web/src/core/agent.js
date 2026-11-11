@@ -25,10 +25,24 @@ export class Agent {
     this.onEvent = onEvent;
     this.confirm = confirm;
     this.maxSteps = maxSteps;
+    this.cancelled = false;
+    this.cancelReason = '';
+  }
+
+  /**
+   * ขอหยุดกลางทาง — ไม่ตัดการเชื่อมต่อทันที แต่ธงจะถูกตรวจทุกจุดของลูป
+   * (ระหว่างรอคำตอบ AI จะหยุดเมื่อคำตอบกลับมาแล้ว 1 ก้าว)
+   */
+  cancel(reason = 'ผู้ใช้กดหยุด') {
+    this.cancelled = true;
+    this.cancelReason = String(reason);
+    return this;
   }
 
   /** @returns {Promise<{text: string, trace: object[], steps: number, blocked?: string[]}>} */
   async run(userText, { history = [], platform = 'web', persona, modeId } = {}) {
+    this.cancelled = false;
+    this.cancelReason = '';
     const mode = getMode(modeId || this.settings.mode || 'auto');
     const hint = (modeId || this.settings.mode) === 'auto' || !modeId ? detectMode(userText) : mode.id;
     const perms = this.settings.permissions;
@@ -52,13 +66,25 @@ export class Agent {
     const blocked = [];
     let steps = 0;
     let finalText = '';
+    let cancelled = false;
 
     while (steps < this.maxSteps) {
+      if (this.cancelled) {
+        cancelled = true;
+        this.onEvent({ type: 'cancelled', step: steps, reason: this.cancelReason });
+        break;
+      }
       steps++;
       this.onEvent({ type: 'thinking', step: steps, maxSteps: this.maxSteps });
       const reply = await this.chat(messages, {
         onToken: (delta) => this.onEvent({ type: 'token', step: steps, delta }),
       });
+      if (this.cancelled) {
+        cancelled = true;
+        this.onEvent({ type: 'cancelled', step: steps, reason: this.cancelReason });
+        break;
+      }
+
       const call = extractToolCall(reply);
 
       if (!call) {
@@ -95,6 +121,11 @@ export class Agent {
           args: call.args,
           meta: toolMeta(call.name),
         });
+        if (this.cancelled) {
+          cancelled = true;
+          this.onEvent({ type: 'cancelled', step: steps, reason: this.cancelReason });
+          break;
+        }
         if (!approved) {
           messages.push({ role: 'assistant', content: reply });
           messages.push({ role: 'user', content: `ผู้ใช้ไม่อนุญาตให้เรียก ${call.name} — หยุดแล้วถามว่าต้องการให้ทำอะไรต่อ` });
@@ -131,13 +162,20 @@ export class Agent {
       }
     }
 
+    if (cancelled) {
+      finalText = trace.length
+        ? `${this.summarize(trace)}\n\n_(หยุดตามคำสั่ง — ทำต่อได้ทุกเมื่อ)_`
+        : 'หยุดแล้วครับ ยังไม่ได้ทำอะไร — บอกได้เลยถ้าจะให้เริ่มใหม่';
+      return { text: finalText, trace, steps, blocked: [...new Set(blocked)], cancelled: true };
+    }
+
     if (!finalText) {
       finalText = trace.length
         ? this.summarize(trace)
         : 'ขอโทษครับ ผมยังทำงานนี้ไม่สำเร็จในจำนวนขั้นที่กำหนด — ลองแบ่งคำขอเป็นส่วนเล็กลงได้ไหมครับ';
     }
 
-    return { text: finalText, trace, steps, blocked: [...new Set(blocked)] };
+    return { text: finalText, trace, steps, blocked: [...new Set(blocked)], cancelled: false };
   }
 
   retrieve(query) {
