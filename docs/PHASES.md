@@ -293,16 +293,16 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | เฟส | ชื่อ | งานย่อย | สถานะ |
 |---|---|---|---|
-| V1 | ค้นหาทุกอย่าง (⌘K) | 26.1–26.4 | ⬜ |
+| V1 | ค้นหาทุกอย่าง (⌘K) | 26.1–26.4 | ✅ |
 | V2 | สำรอง/กู้คืนข้อมูล | 27.1–27.4 | ⬜ |
 | V3 | Release 2.2 | 28.1–28.3 | ⬜ |
 
 ## V1 — ค้นหาทุกอย่าง (Command palette)
 
-- 26.1 `core/search.js`: `buildIndex` (ความจำ/โน้ต/งาน/นัด/เครื่องมือ/เมนู) + `searchIndex` (คะแนน exact>prefix>token, Thai bigram) + highlight ranges
-- 26.2 UI: `#palette` เปิดด้วย ⌘/Ctrl+K, ลูกศรขึ้น/ลง, Enter ทำงาน, Esc ปิด, จัดกลุ่มตามชนิด
-- 26.3 การกระทำต่อผลลัพธ์: เปิดหน้า/ค้นความจำ/ใส่ชื่อเครื่องมือลงแชท/เรียกสรุปวันนี้
-- 26.4 Tests + smoke + `docs/SEARCH.md`
+- [x] 26.1 `core/search.js`: `buildIndex` (8 ชนิด) + `searchIndex` (exact>prefix>token + น้ำหนักชนิด + ความใหม่) + `matchRanges`/`highlightRanges` + `groupResults`
+- [x] 26.2 UI `#palette`: ⌘/Ctrl+K เปิด, ↑↓ เลื่อน, Enter เลือก, Esc ปิด, คลิกพื้นหลังปิด, จัดกลุ่มตามชนิด + ไฮไลต์คำค้น
+- [x] 26.3 การกระทำ: เปิดหน้า / ค้นความจำ / แสดงงาน-นัด-เครื่องมือ / `digest` / `stopAll` / เริ่มแชทใหม่
+- [x] 26.4 `tests/search.test.js` (13) + smoke +7 (118 checks) + `docs/SEARCH.md`
 
 ## V2 — สำรอง/กู้คืนข้อมูล
 

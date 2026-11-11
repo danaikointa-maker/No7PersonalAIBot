@@ -48,6 +48,9 @@ import {
   customToolDefs, validateCustomTools, PLUGIN_EXAMPLE, PLUGIN_LIMITS,
 } from './core/custom-tools.js';
 import {
+  buildIndex, searchIndex, groupResults, defaultPaletteExtras, highlightRanges,
+} from './core/search.js';
+import {
   LOCAL_PRESETS, probeLocal, warmModel, pickBestModel, normalizeOfflineBrain,
   offlineChainSettings, describeLocalBrain, LocalModelCache,
 } from './core/local-models.js';
@@ -2803,6 +2806,7 @@ window.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey;
 
   if (e.key === 'Escape') {
+    if ($('#palette') && !$('#palette').hidden) { closePalette(); e.preventDefault(); return; }
     if (!$('#confirm-modal').hidden) { $('#confirm-no').click(); e.preventDefault(); return; }
     if (!$('#stop-btn').hidden) { stopAll('หยุดด้วยแป้น Esc'); e.preventDefault(); return; }
     $('#sidebar').classList.remove('open');
@@ -2811,8 +2815,7 @@ window.addEventListener('keydown', (e) => {
 
   if (mod && e.key.toLowerCase() === 'k') {
     e.preventDefault();
-    showView('chat');
-    $('#input')?.focus();
+    openPalette();
     return;
   }
   if (mod && e.key.toLowerCase() === 'm') {
@@ -2825,6 +2828,164 @@ window.addEventListener('keydown', (e) => {
     $('#composer').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
   }
 });
+
+/* -------------------------------------------------------- command palette */
+let paletteRows = [];
+let paletteActive = 0;
+
+function readList(key) {
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
+}
+
+/** สร้างดัชนีสด ๆ จากข้อมูลปัจจุบัน (เรียกตอนเปิด palette — ข้อมูลไม่เก่า) */
+function paletteIndex() {
+  const tools = allToolIds().map((id) => {
+    const t = getTool(id);
+    const m = toolMeta(id);
+    return t ? { id, emoji: t.emoji, label: t.label, desc: t.desc, risk: m.risk, category: m.category } : null;
+  }).filter(Boolean);
+
+  return buildIndex({
+    memory: memory.listFacts({ sort: 'recent' }),
+    notes: readList('no7.notes.v1'),
+    todos: readList('no7.todos.v1'),
+    tasks: tasks.list({ done: null }),
+    events: calendar.all(),
+    tools,
+    ...defaultPaletteExtras(),
+  });
+}
+
+/** escape + ครอบ <mark> ตามตำแหน่งที่ตรงกับคำค้น */
+function highlightText(text, query) {
+  const ranges = highlightRanges(text, query);
+  if (!ranges.length) return esc(text);
+  const raw = String(text);
+  let out = '';
+  let last = 0;
+  for (const [from, to] of ranges) {
+    out += esc(raw.slice(last, from)) + `<mark>${esc(raw.slice(from, to))}</mark>`;
+    last = to;
+  }
+  return out + esc(raw.slice(last));
+}
+
+function renderPalette(query) {
+  const box = $('#palette-results');
+  if (!box) return;
+  paletteRows = searchIndex(paletteIndex(), query, { limit: 14 });
+  paletteActive = 0;
+  if (!paletteRows.length) {
+    box.innerHTML = `<p class="hint">${esc(tr('palette.empty', { lang: settings.uiLang }))}</p>`;
+    return;
+  }
+  let flat = -1;
+  box.innerHTML = groupResults(paletteRows).map((g) => `
+    <div class="palette-group">
+      <div class="palette-group-title">${g.emoji} ${esc(g.label)}</div>
+      ${g.items.map((row) => {
+        flat++;
+        return `<div class="palette-row${flat === 0 ? ' active' : ''}" data-i="${flat}" role="option">
+          <span>${row.emoji}</span><span>${highlightText(row.title, query)}</span>
+          ${row.subtitle ? `<small>${esc(row.subtitle)}</small>` : ''}
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+  box.querySelectorAll('.palette-row').forEach((el) => {
+    el.addEventListener('click', () => {
+      paletteActive = Number(el.dataset.i);
+      runPaletteAction();
+    });
+  });
+}
+
+function setPaletteActive(next) {
+  const rows = [...($('#palette-results')?.querySelectorAll('.palette-row') || [])];
+  if (!rows.length) return;
+  paletteActive = (next + rows.length) % rows.length;
+  rows.forEach((el, i) => el.classList.toggle('active', i === paletteActive));
+  rows[paletteActive]?.scrollIntoView({ block: 'nearest' });
+}
+
+function openPalette(initial = '') {
+  const box = $('#palette');
+  if (!box) return;
+  box.hidden = false;
+  const input = $('#palette-input');
+  if (input) {
+    input.value = initial;
+    input.focus();
+    if (initial) input.select();
+  }
+  renderPalette(initial);
+}
+
+function closePalette() {
+  const box = $('#palette');
+  if (box) box.hidden = true;
+  paletteRows = [];
+}
+
+function runPaletteAction() {
+  const row = paletteRows[paletteActive];
+  if (!row) return null;
+  const action = row.action || {};
+  closePalette();
+  switch (action.kind) {
+    case 'view':
+      showView(action.id);
+      break;
+    case 'memory':
+      showView('memory');
+      if (action.query) {
+        memQuery = action.query.length > 40 ? action.query.slice(0, 40) : action.query;
+        if ($('#mem-query')) $('#mem-query').value = memQuery;
+        if ($('#mem-clear-search')) $('#mem-clear-search').hidden = false;
+        renderMemory();
+      }
+      break;
+    case 'task':
+    case 'event':
+      showView('calendar');
+      setSubtitle(row.title);
+      break;
+    case 'note':
+    case 'todo':
+      showView('memory');
+      setSubtitle(row.title);
+      break;
+    case 'tool':
+      showView('tools');
+      setSubtitle(`${row.emoji} ${row.title} — ${row.subtitle}`);
+      break;
+    case 'digest':
+      showView('calendar');
+      $('#digest-btn')?.click();
+      break;
+    case 'stop':
+      stopAll('หยุดจาก command palette');
+      break;
+    case 'new-chat': {
+      showView('chat');
+      $('#messages').innerHTML = '';
+      history = [];
+      addMessage('bot', tr('chat.greetingFallback', { lang: settings.uiLang }));
+      break;
+    }
+    default:
+      setSubtitle(row.title);
+  }
+  return row;
+}
+
+$('#palette-input')?.addEventListener('input', (e) => renderPalette(e.target.value));
+$('#palette-input')?.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); setPaletteActive(paletteActive + 1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); setPaletteActive(paletteActive - 1); }
+  else if (e.key === 'Enter') { e.preventDefault(); runPaletteAction(); }
+  else if (e.key === 'Escape') { e.preventDefault(); closePalette(); }
+});
+$('#palette')?.addEventListener('click', (e) => { if (e.target.id === 'palette') closePalette(); });
 
 /* -------------------------------------------------------------- startup */
 startDailyConsolidation(memory, () => consolidate(memory, { chat: llmChat, useLLM: !!settings.memoryLLM }));

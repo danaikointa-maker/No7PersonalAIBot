@@ -263,6 +263,30 @@ const stillOpen = [...$('#task-list').querySelectorAll('.fact')].some((r) => r.t
 check('journey: recurring task stays open', stillOpen, $('#task-list').textContent.slice(0, 60));
 $('#task-repeat').value = '';
 
+// command palette (Ctrl/⌘ K)
+window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+await wait(30);
+check('palette: opens with Ctrl+K', !$('#palette').hidden, $('#palette').hidden ? 'hidden' : 'shown');
+const pInput = $('#palette-input');
+pInput.value = 'กาแฟ';
+pInput.dispatchEvent(new window.Event('input'));
+await wait(20);
+check('palette: finds memory fact', $('#palette-results').textContent.includes('กาแฟดำ'), $('#palette-results').textContent.slice(0, 60));
+check('palette: highlights match', !!$('#palette-results mark'), $('#palette-results').innerHTML.slice(0, 80));
+$('#palette-results .palette-row').click();
+await wait(30);
+check('palette: closes after choosing', $('#palette').hidden);
+check('palette: navigated to memory with query', $('#view-memory').classList.contains('active') && $('#mem-query').value.includes('กาแฟ'), $('#mem-query').value);
+window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+await wait(20);
+$('#palette-input').value = 'สรุปวันนี้';
+$('#palette-input').dispatchEvent(new window.Event('input'));
+await wait(20);
+check('palette: finds the digest action', $('#palette-results').textContent.includes('สรุปวันนี้'), $('#palette-results').textContent.slice(0, 60));
+window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+await wait(20);
+check('palette: Esc closes', $('#palette').hidden);
+
 // HTTP tool plugins
 $('#nav button[data-view="tools"]').click();
 $('#plugin-example').click();

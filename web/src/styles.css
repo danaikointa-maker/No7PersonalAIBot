@@ -129,6 +129,18 @@ label input[type="checkbox"] { width: auto; }
 }
 
 /* ---------- Chat ---------- */
+/* command palette (⌘K) */
+.palette { position: fixed; inset: 0; background: rgba(4, 8, 16, .62); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; z-index: 60; }
+.palette[hidden] { display: none; }
+.palette-box { width: min(620px, 92vw); background: var(--panel, #111a2b); border: 1px solid var(--line, #223); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 18px 60px rgba(0,0,0,.5); }
+.palette-box input { font-size: 15px; padding: 10px 12px; border-radius: 10px; }
+#palette-results { max-height: 52vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.palette-group-title { font-size: 11px; opacity: .6; text-transform: uppercase; letter-spacing: .04em; padding: 4px 6px 0; }
+.palette-row { display: flex; gap: 8px; align-items: baseline; padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.palette-row small { opacity: .6; margin-left: auto; font-size: 11px; }
+.palette-row.active, .palette-row:hover { background: rgba(120, 180, 255, .14); }
+.palette-row mark { background: rgba(255, 214, 102, .3); color: inherit; border-radius: 3px; }
+
 /* สรุปประจำวัน (digest) */
 .digest-card { border: 1px solid var(--line, #223); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: rgba(255,255,255,.02); }
 .digest-sec-head { font-weight: 600; font-size: 13px; }
