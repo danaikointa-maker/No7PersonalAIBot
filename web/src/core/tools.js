@@ -4,7 +4,12 @@ import { getDeviceRegistry, sendCommand } from './link.js';
 import {
   ControlAudit, normalizeControlPolicy, checkControl, runControlAction,
 } from './control.js';
-import { TaskStore, PRIORITIES, parseDue, formatTaskTime } from './tasks.js';
+import {
+  TaskStore, PRIORITIES, parseDue, formatTaskTime, normalizeRecurrence, describeRecurrence,
+} from './tasks.js';
+import {
+  RecipeStore, listWindows, focusWindow, matchWindows, parseRecipeText, runRecipe, planRecipe,
+} from './desktop.js';
 
 // Tool registry — the ESP32 "42 tools with on-screen cards" principle, re-implemented
 // for web so the SAME code runs on mobile + PC. Only key-free public APIs by default,
@@ -410,30 +415,41 @@ export const TOOLS = {
       title: 'string ชื่องาน (ตอน add)',
       when: 'string เวลา เช่น 2026-11-11T09:00, +30m, +2h, วันนี้ 18:00, พรุ่งนี้ 09:30',
       priority: 'number 0=ปกติ 1=สำคัญ 2=ด่วน 3=ด่วนมาก',
+      repeat: 'string daily|weekdays|weekly|monthly|hourly (งานซ้ำ)',
       id: 'string รหัสงาน (ตอน done/remove)',
       filter: 'string all|open|done|today|overdue (ตอน list)',
     },
-    async run({ action = 'list', title = '', when = '', priority = 0, id = '', filter = 'open' }) {
+    async run({ action = 'list', title = '', when = '', priority = 0, id = '', filter = 'open', repeat = '' }) {
       const store = new TaskStore();
       if (action === 'add') {
         if (!String(title).trim()) throw new Error('ต้องบอกว่าต้องทำงานอะไร');
         const due = when ? parseDue(when) : null;
         if (when && !due) throw new Error(`อ่านเวลา "${when}" ไม่ได้ — ลอง ISO หรือ +30m / พรุ่งนี้ 09:00`);
-        const task = store.add({ title, due, priority });
+        const recurrence = repeat ? normalizeRecurrence(repeat) : null;
+        if (repeat && !recurrence) throw new Error(`ไม่รู้จักการทำซ้ำ "${repeat}" — ใช้ daily/weekdays/weekly/monthly/hourly`);
+        const task = store.add({ title, due, priority, recurrence });
         return {
           title: 'เพิ่มงานแล้ว',
           big: task.title,
           lines: [
             `${PRIORITIES[task.priority].emoji} ${PRIORITIES[task.priority].label} · ${formatTaskTime(task.due)}`,
+            recurrence ? `🔁 ${describeRecurrence(recurrence)}` : '',
             `id: ${task.id}`,
-          ],
+          ].filter(Boolean),
         };
       }
       if (action === 'done') {
         if (!id) throw new Error('ต้องระบุ id ของงาน (ดูก่อนด้วย action=list)');
-        const task = store.complete(id);
-        if (!task) throw new Error(`ไม่พบงาน id ${id}`);
-        return { title: 'ปิดงานแล้ว', big: task.title, lines: [formatTaskTime(task.due)] };
+        const result = store.complete(id);
+        if (!result.task) throw new Error(`ไม่พบงาน id ${id}`);
+        if (result.advanced) {
+          return {
+            title: 'งานซ้ำ — เลื่อนรอบถัดไป',
+            big: result.task.title,
+            lines: [`รอบถัดไป: ${formatTaskTime(result.task.due)}`, `🔁 ${describeRecurrence(result.task.recurrence)}`],
+          };
+        }
+        return { title: 'ปิดงานแล้ว', big: result.task.title, lines: [formatTaskTime(result.task.due)] };
       }
       if (action === 'remove') {
         if (!id) throw new Error('ต้องระบุ id ของงาน');
@@ -450,7 +466,8 @@ export const TOOLS = {
         big: list.length ? `${list.length} งาน` : 'ไม่มีงานค้าง 🎉',
         lines: [
           `ค้าง ${stats.open} · วันนี้ ${stats.today} · เกินกำหนด ${stats.overdue} · เสร็จแล้ว ${stats.done}`,
-          ...list.slice(0, 6).map((t) => `${PRIORITIES[t.priority].emoji} ${t.title} — ${formatTaskTime(t.due)} (${t.id})`),
+          ...list.slice(0, 6).map((t) => `${PRIORITIES[t.priority].emoji} ${t.title} — ${formatTaskTime(t.due)}`
+            + `${t.recurrence ? ` 🔁 ${describeRecurrence(t.recurrence)}` : ''} (${t.id})`),
         ],
       };
     },
@@ -481,6 +498,74 @@ export const TOOLS = {
       const card = await runControlAction({ action, target, text, policy });
       audit.record({ action, target, allowed: true, reason: check.reason });
       return card;
+    },
+  },
+
+  desktop: {
+    emoji: '🪟',
+    label: 'หน้าต่างบนจอ',
+    desc: 'ดูว่ามีหน้าต่างอะไรเปิดอยู่ หรือโฟกัสหน้าต่างที่ต้องการ (เดสก์ท็อปเท่านั้น)',
+    params: {
+      action: 'string — list | focus (ไม่ใส่ = list)',
+      query: 'string คำค้นชื่อหน้าต่าง (list) หรือชื่อหน้าต่างที่จะโฟกัส (focus)',
+    },
+    async run({ action = 'list', query = '' }) {
+      if (action === 'focus') {
+        // ถ้าอ่านรายชื่อหน้าต่างได้ ให้เลือกชื่อเต็มที่ตรงที่สุดก่อน
+        const listed = await listWindows();
+        return focusWindow({ target: query, windows: listed.ok ? listed.windows : null });
+      }
+      const res = await listWindows();
+      if (!res.ok) throw new Error(res.reason);
+      const found = matchWindows(res.windows, query);
+      if (!found.length) throw new Error(query ? `ไม่พบหน้าต่างที่ตรงกับ "${query}"` : 'ไม่พบหน้าต่างที่เปิดอยู่');
+      return {
+        title: 'หน้าต่างที่เปิดอยู่',
+        big: `${found.length} หน้าต่าง`,
+        lines: found.slice(0, 10).map((w) => `🪟 ${w}`),
+      };
+    },
+  },
+
+  run_recipe: {
+    emoji: '🧩',
+    label: 'สูตรอัตโนมัติ',
+    desc: 'รันลำดับขั้นที่ปลอดภัย (เปิดโปรแกรม/ลิงก์ รอ แจ้งเตือน/โฟกัสหน้าต่าง) — ลองก่อนได้ด้วย dryRun',
+    params: {
+      name: 'string ชื่อสูตรที่บันทึกไว้',
+      steps: 'string หลายบรรทัด เช่น open_app notepad / wait 800 / notify เริ่มงาน (ใช้เมื่อยังไม่มีสูตรนี้)',
+      dryRun: 'boolean true = ดูแผนก่อน ไม่ทำจริง',
+    },
+    async run({ name = '', steps = '', dryRun = false }, ctx = {}) {
+      const store = new RecipeStore();
+      let recipe = name ? store.find(name) : null;
+      if (!recipe) {
+        const parsed = parseRecipeText(steps);
+        if (!parsed.steps.length) {
+          const names = store.list().map((r) => r.name);
+          throw new Error(name
+            ? `ไม่พบสูตร "${name}"${names.length ? ` — ที่มี: ${names.join(', ')}` : ' และยังไม่มีสูตรไหนเลย'}`
+            : 'ต้องบอกชื่อสูตร หรือใส่ steps');
+        }
+        if (parsed.errors.length) throw new Error(parsed.errors[0]);
+        recipe = store.save({ name: name || 'สูตรใหม่', steps: parsed.steps });
+      }
+
+      const policy = ctx.settings?.controlPolicy || {};
+      const plan = planRecipe(recipe, { policy });
+      if (dryRun) {
+        return {
+          title: 'แผนของสูตร (dry-run)',
+          big: recipe.name,
+          lines: plan.steps.map((s) => `${s.allowed ? '✅' : '⛔'} ${s.label}${s.allowed ? '' : ` — ${s.reason}`}`),
+        };
+      }
+      const needsWindows = recipe.steps.some((s) => s.action === 'focus_window');
+      const win = needsWindows ? await listWindows() : { windows: [] };
+      const result = await runRecipe(recipe, { policy, windows: win.windows });
+      const lines = result.steps.map((s) => `${s.status === 'done' ? '✅' : s.status === 'planned' ? '•' : '⛔'} ${s.label}${s.reason ? ` — ${s.reason}` : ''}`);
+      if (!result.ok) throw new Error(result.error || 'สูตรนี้รันไม่สำเร็จ');
+      return { title: 'รันสูตรแล้ว', big: recipe.name, lines };
     },
   },
 
@@ -576,6 +661,8 @@ export const TOOL_META = {
   open_url: { category: 'act', risk: 1 },
   compose_message: { category: 'message', risk: 2 },
   open_app: { category: 'control', risk: 3 },
+  desktop: { category: 'control', risk: 3 },
+  run_recipe: { category: 'control', risk: 3 },
   control_run: { category: 'control', risk: 3 },
   device_command: { category: 'control', risk: 3 },
 };

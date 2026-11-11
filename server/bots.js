@@ -147,7 +147,7 @@ export function botSystemPrompt({ platform = 'telegram' } = {}) {
 }
 
 /** คำสั่งพื้นฐานที่ไม่ต้องเรียก AI */
-export function cannedReply(command, { toolCount = 26 } = {}) {
+export function cannedReply(command, { toolCount = 28 } = {}) {
   switch (command) {
     case '/start':
       return `สวัสดีครับ ผม No7 👋\nพิมพ์คุยได้เลย เช่น "อากาศกรุงเทพวันนี้" หรือ "เตือนฉัน 20 นาที"\nดูคำสั่งทั้งหมด: /help`;
@@ -169,7 +169,7 @@ export function cannedReply(command, { toolCount = 26 } = {}) {
  *          chat: (messages: object[]) => Promise<string>, toolCount?: number}} input
  */
 export async function handleBotMessage({
-  text, chatId, provider = 'telegram', sessions, chat, toolCount = 26,
+  text, chatId, provider = 'telegram', sessions, chat, toolCount = 28,
 } = {}) {
   const { command } = parseCommand(text);
   if (command) {

@@ -38,7 +38,19 @@ link.onCommand([](const String& cmd, const String& args, const String& id) {
 });
 ```
 
-5. ใน `loop()` เรียก `link.loop();`
+5. ลงทะเบียน + รับอารมณ์ (v1.5):
+
+```cpp
+link.hello("จอโต๊ะทำงาน", "esp32", "{\"mic\":true,\"speaker\":true,\"eyes\":true,\"buttons\":true}");
+link.onEyes([](const String& emotion, int intensity, bool stale) {
+  // วาดตาตาม emotion (14 แบบ) — stale = ข้อมูลเก่าเกิน ttl ให้หรี่ตา
+  drawEyes(emotion, intensity, stale);
+});
+link.sendEyes("happy", 90);                       // ส่งอารมณ์ขึ้น server ให้เครื่องอื่นเห็น
+link.sendVoice(pcm, pcmLen, true);                // ส่ง chunk เสียง (เสียงจะถูก base64 ให้เอง)
+```
+
+6. ใน `loop()` เรียก `link.loop();` — จะ poll คำสั่งทุก 3 วิ และ poll อารมณ์ทุก 1 วิ
 
 ## หมายเหตุ
 

@@ -38,6 +38,32 @@ headers: X-No7-Code: <code>   X-No7-Signature: <signature>
 | GET | `/api/link/status` | แอป | `online` (เห็นภายใน 30 วิ), pending, delivered |
 | POST | `/api/link/result` | อุปกรณ์ | รายงานผล `{id, ok, data}` |
 | GET | `/api/link/results` | แอป | ผลลัพธ์ทั้งหมด (`?since=<ts>`) |
+| POST | `/api/link/hello` | อุปกรณ์ | ลงทะเบียนตัวเอง + capabilities → `{protocol, features, eyesTtlMs}` |
+| GET | `/api/link/hello` | ทั้งคู่ | อ่านข้อมูลอุปกรณ์ที่ลงทะเบียนไว้ |
+| POST | `/api/link/eyes` | ทั้งคู่ | เก็บอารมณ์/ตาล่าสุด `{emotion, intensity, ttlMs}` |
+| GET | `/api/link/eyes` | ทั้งคู่ | อ่านอารมณ์ล่าสุด + `stale`/`ageMs` |
+| POST | `/api/link/voice` | อุปกรณ์ | ต่อคิวเสียง `{chunk(base64), mime, seq, final}` (≤256 KB/chunk, ≤2 MB/อุปกรณ์) |
+| GET | `/api/link/voice?since=` | PC | ดึง chunk ที่ยังไม่ได้เล่น |
+| GET | `/api/link/voice/status` | PC | จำนวน chunk/bytes ที่ค้าง + `lastSeq` + `dropped` |
+| POST | `/api/link/voice/ack` | PC | เล่นถึง seq ไหนแล้ว `{upto}` → ล้างคิว |
+
+### hello / eyes / voice (รอบ v1.5)
+
+```
+อุปกรณ์                      server                        แอป/PC
+   │ POST hello(caps) ─────────►│                             │
+   │◄─ protocol/features ───────│                             │
+   │                            │◄──── POST eyes(emotion) ────│  (หรือบอร์ดส่งเอง)
+   │ GET eyes (1 วิ) ──────────►│                             │
+   │◄─ eyes + stale ────────────│                             │
+   │ POST voice(chunk) ────────►│◄──── GET voice?since ───────│
+   │                            │──── POST voice/ack ────────►│
+```
+
+- **capabilities**: `mic`, `speaker`, `eyes`, `screen`, `buttons`, `voice` (บูลีน) — ส่งซ้ำแล้วไม่ระบุ = คงค่าเดิม
+- **eyes**: `ttlMs` 1–60 วิ (default 15) — เกินเวลาแล้ว `stale: true` ให้จอหรี่ตาได้เอง
+- **voice**: base64 ใน JSON, mime ที่รับ: `audio/ogg|opus|pcm|wav|webm|mpeg`; เกินเพดานแล้วทิ้ง chunk เก่าสุด (`dropped` บอกจำนวน)
+- ข้อมูลอุปกรณ์เก็บที่ `.no7/devices.json` (`NO7_DATA_DIR`) — eyes/voice อยู่ในหน่วยความจำ (เร็ว เปลี่ยนบ่อย)
 
 ## คำสั่งมาตรฐาน (QUICK_COMMANDS)
 
@@ -66,7 +92,8 @@ AI ใช้ได้ผ่าน tool `device_command` — หมวด **contr
 
 - `secret` เก็บในเครื่องผู้ใช้ (localStorage) — ไม่ถูกส่งไปที่อื่นนอกจาก server ที่ระบุ
 - ถ้า `crypto.subtle` ไม่มี (เปิดผ่าน `http://` ที่ไม่ใช่ localhost) การเซ็นจะถูกปฏิเสธพร้อมข้อความชัดเจน
-- server เก็บ `pairings` ในหน่วยความจำ (รีสตาร์ทแล้วหาย) — ต้องจับคู่ใหม่; เก็บลงดิสก์เป็นงานถัดไป
+- server เก็บ `pairings` ในหน่วยความจำ (รีสตาร์ทแล้วหาย) — ต้องจับคู่ใหม่; ส่วนข้อมูลอุปกรณ์ (`hello`) เก็บลง `.no7/devices.json` แล้ว
+- คิวเสียงมีเพดาน (2 MB / 40 chunk) เพื่อกันหน่วยความจำบวม — ไคลเอนต์ควร ack ทุกครั้งที่เล่นจบ
 - คำสั่งที่อันตรายไม่ควรถูกทำโดยอัตโนมัติ: ให้ฝั่งอุปกรณ์ตรวจ allowlist ของตัวเองอีกชั้น
 
 ## ตัวอย่างฝั่งอุปกรณ์

@@ -137,3 +137,52 @@
 - [x] 6.2 client รองรับ `transport: 'stdio'` + UI เลือก server ที่ server ประกาศไว้
 - [x] 6.3 OAuth 2.0 + PKCE: `core/oauth.js`, `/api/oauth/token` proxy, `oauth-callback.html`, ปุ่ม 🔑 ในหน้าตั้งค่า
 - [x] 6.4 Tests (`oauth` 14, `mcp` +4, integration stdio 1) + `docs/MCP.md` + `docs/OAUTH.md`
+
+---
+
+# รอบที่ 4 (v1.5)
+
+เป้าหมาย: ลงลึกที่อุปกรณ์และการออฟไลน์ — งานซ้ำ + เตือนที่ดังแม้ปิดแอป, รู้จักหน้าต่างบนจอ,
+Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที่ไม่ต้องใช้เบราว์เซอร์
+
+| เฟส | ชื่อ | งานย่อย | สถานะ |
+|---|---|---|---|
+| S1 | งานซ้ำ + เตือนผ่าน server | 11.1–11.4 | ✅ |
+| S2 | Desktop awareness + automation | 12.1–12.4 | ✅ |
+| S3 | Phone-Link ครบวงจร | 13.1–13.4 | ✅ |
+| S4 | MCP OAuth: device flow + DCR | 14.1–14.4 | ✅ |
+| S5 | Release 1.5 | 15.1–15.3 | ⬜ |
+
+## S1 — งานซ้ำ + เตือนผ่าน server
+
+- [x] 11.1 `core/tasks.js`: `normalizeRecurrence` (daily/weekdays/weekly/monthly/hourly + interval/weekday/at), `nextOccurrence`, `describeRecurrence`, `complete()` เลื่อนงานซ้ำไปรอบถัดไป
+- [x] 11.2 server: `PUT /api/reminders` + `/due` + `/upcoming` + `/ack` + `/status`, tick ทุก `NO7_REMINDER_TICK_MS`, ส่ง Telegram (`TELEGRAM_REMINDER_CHAT_ID`) และเลื่อนงานซ้ำให้เอง, เก็บที่ `NO7_DATA_DIR/reminders.json`
+- [x] 11.3 UI: เลือกงานซ้ำ, แสดง 🔁 + รอบถัดไป, push งานขึ้น server, poll due ทุก 60 วิ, แสดงสถานะ server
+- [x] 11.4 Tests (`tasks` +5, `server.reminders` 1 integration) + `docs/TASKS.md`
+
+## S2 — Desktop awareness + automation
+
+- [x] 12.1 `core/desktop.js`: `parseWindowList` (win32/darwin/wmctrl), `matchWindows` (คะแนน + glob), `listWindows`, `focusWindow` + bridge `listWindows`/`focusWindow` ใน Electron (`powershell`/`osascript`/`wmctrl`, ไม่มี shell)
+- [x] 12.2 recipes: 5 ขั้น (`open_app`/`open_url`/`focus_window`/`wait`/`notify`), สูงสุด 8 ขั้น, `validateRecipe`, `planRecipe` (dry-run), `runRecipe` (หยุดเมื่อล้มเหลว, ผ่าน allowlist เดิม), `RecipeStore` (20 สูตร, localStorage)
+- [x] 12.3 tool `desktop` (list/focus) + tool `run_recipe` (เก็บ/รัน/สร้างจาก steps) + หน้า 🖥️ เดสก์ท็อป (รายการหน้าต่าง + ตัวแก้สูตร + dry-run + log)
+- [x] 12.4 Tests (`tests/desktop.test.js` 16, smoke +3) + `docs/DESKTOP.md`
+
+## S3 — Phone-Link ครบวงจร
+
+- [x] 13.1 `POST /api/link/hello` — ลงทะเบียนอุปกรณ์ + capabilities (mic/speaker/eyes/screen/buttons/voice), เก็บ `.no7/devices.json`, `GET` อ่านคืนได้, ส่งซ้ำไม่ทับค่าเดิม
+- [x] 13.2 eyes: `POST/GET /api/link/eyes` เก็บตา/อารมณ์ล่าสุด + `ttlMs` → `stale`/`ageMs` ให้จอ ESP32 ดึงไปวาด (poll 1 วิ)
+- [x] 13.3 voice: `POST /api/link/voice` รับ chunk base64 (≤256 KB, mime allowlist) → คิว ≤2 MB/40 chunk, `GET ?since`, `/voice/status`, `POST /voice/ack`; ฝั่ง PC มี `pullVoice/ackVoice`
+- [x] 13.4 Tests (`link` +3, `server.link` 1 integration ครอบ hello/eyes/voice/auth, smoke +3) + `devices/esp32/no7_link.h` (hello/onEyes/sendEyes/sendVoice) + docs `DEVICES.md`, `PHONE_LINK.md`
+
+## S4 — MCP OAuth: device flow + DCR
+
+- [x] 14.1 `core/oauth.js`: `requestDeviceCode`, `requestDeviceToken`, `pollDeviceToken` (interval/slow_down/expired_token/access_denied/timeout), `normalizeDeviceCode`
+- [x] 14.2 `registerClient` (RFC 7591) + proxy `/api/oauth/device` และ `/api/oauth/register` (+ ส่ง `device_code` ผ่าน `/api/oauth/token`)
+- [x] 14.3 UI: ช่อง Device/Registration URL, ปุ่ม 🔢 "ล็อกอินด้วยรหัส" (แสดงรหัส + ลิงก์ + slow_down) และ 🆕 ขอ client id
+- [x] 14.4 Tests (`oauth` +7, `server.oauth` 1 integration, smoke +3) + `docs/OAUTH.md`
+
+## S5 — Release 1.5
+
+- 15.1 version 1.5.0 + CHANGELOG
+- 15.2 README + ROADMAP + PHASES ปิดครบ
+- 15.3 ตรวจรับรวม + PR

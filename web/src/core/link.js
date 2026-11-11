@@ -117,6 +117,93 @@ export async function commandResults(device, sinceTs = 0) {
   return signedFetch(device, 'GET', `/api/link/results?code=${encodeURIComponent(device.code)}&since=${sinceTs}`);
 }
 
+/* ------------------------------------------------ hello / eyes / voice *
+ * สามส่วนนี้ทำให้ Phone-Link ครบวงจร:
+ *   hello → อุปกรณ์บอกว่าตัวเองเป็นใคร มีไมค์/ลำโพง/จอ/ปุ่มอะไร
+ *   eyes  → เก็บอารมณ์ล่าสุดไว้ให้จอ (ESP32) ดึงไปวาด
+ *   voice → อุปกรณ์ส่ง chunk เสียงขึ้นมา แล้ว PC ดึงไปเล่น/ถอดความ
+ */
+
+/** base64 ของ bytes → ใช้ส่งเสียงผ่าน JSON */
+export function encodeBase64(bytes) {
+  const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  if (typeof globalThis.btoa === 'function' && typeof TextDecoder !== 'undefined') {
+    let s = '';
+    for (let i = 0; i < arr.length; i++) s += String.fromCharCode(arr[i]);
+    return btoa(s);
+  }
+  let out = '';
+  for (let i = 0; i < arr.length; i++) out += String.fromCharCode(arr[i]);
+  return out ? Buffer.from(out, 'binary').toString('base64') : '';
+}
+
+/** base64 → Uint8Array (สำหรับเล่นเสียงฝั่ง PC) */
+export function decodeBase64(text = '') {
+  const clean = String(text || '').replace(/[^A-Za-z0-9+/=]/g, '');
+  if (!clean) return new Uint8Array();
+  try {
+    const binary = typeof globalThis.atob === 'function' ? atob(clean) : Buffer.from(clean, 'base64').toString('binary');
+    const out = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+    return out;
+  } catch { return new Uint8Array(); }
+}
+
+/** ความสามารถที่อุปกรณ์นี้มี — ใช้แนบไปกับ hello */
+export function linkCapabilities(scope = globalThis) {
+  const native = scope?.no7?.native || {};
+  return {
+    mic: typeof scope?.navigator?.mediaDevices?.getUserMedia === 'function' || native.isDesktop === true,
+    speaker: typeof scope?.speechSynthesis !== 'undefined' || native.isDesktop === true,
+    eyes: !!scope?.no7,
+    screen: typeof scope?.document !== 'undefined',
+    buttons: !!scope?.no7 || typeof scope?.Capacitor !== 'undefined',
+    voice: typeof scope?.MediaRecorder !== 'undefined' || !!native.isDesktop,
+  };
+}
+
+/** ลงทะเบียนอุปกรณ์กับ server → ได้ protocol/features/eyesTtlMs กลับมา */
+export async function helloDevice(device, { name = device?.name, kind = 'pc', firmware = '', capabilities = null } = {}) {
+  return signedFetch(device, 'POST', '/api/link/hello', {
+    name, kind, firmware,
+    capabilities: capabilities || linkCapabilities(),
+  });
+}
+
+export async function deviceInfo(device) {
+  return signedFetch(device, 'GET', '/api/link/hello');
+}
+
+/** ส่งอารมณ์/ตาให้จออุปกรณ์วาด */
+export async function sendEyes(device, { emotion = 'happy', mood = '', intensity = 80, text = '', ttlMs = 15000 } = {}) {
+  if (!String(emotion).trim()) throw new Error('ต้องระบุอารมณ์');
+  return signedFetch(device, 'POST', '/api/link/eyes', { emotion, mood, intensity, text, ttlMs });
+}
+
+export async function getEyes(device) {
+  return signedFetch(device, 'GET', '/api/link/eyes');
+}
+
+/** อุปกรณ์ส่ง chunk เสียงขึ้น server (bytes หรือ base64) */
+export async function sendVoiceChunk(device, { chunk, mime = 'audio/ogg', seq = 0, final = false } = {}) {
+  const payload = typeof chunk === 'string' ? chunk : encodeBase64(chunk);
+  if (!payload) throw new Error('ไม่มีข้อมูลเสียง');
+  return signedFetch(device, 'POST', '/api/link/voice', { chunk: payload, mime, seq, final });
+}
+
+/** PC ดึง chunk เสียงที่ค้างอยู่ (since = seq ล่าสุดที่เล่นแล้ว) */
+export async function pullVoice(device, since = 0) {
+  return signedFetch(device, 'GET', `/api/link/voice?since=${Number(since) || 0}`);
+}
+
+export async function voiceStatus(device) {
+  return signedFetch(device, 'GET', '/api/link/voice/status');
+}
+
+export async function ackVoice(device, upto) {
+  return signedFetch(device, 'POST', '/api/link/voice/ack', { upto: Number(upto) || 0 });
+}
+
 /** คำสั่งด่วนที่ทุกอุปกรณ์ควรรู้จัก (โปรโตคอลกลาง) */
 export const QUICK_COMMANDS = [
   { id: 'ping', label: '👋 ทักทาย', args: {} },

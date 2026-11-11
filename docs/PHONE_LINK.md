@@ -61,7 +61,27 @@ ESP32 ไม่ต้องถือ Gemini key อีกต่อไป — ใ
 2. บอร์ดเรียก `POST /api/tools/run` พร้อมลายเซ็น เพื่อดึงข้อมูลจริง (อากาศ/PM2.5/คริปโต)
 3. ข้อความที่พูด → ส่งเข้าแอป (พิมพ์ผ่าน UI หรือ `POST /api/chat`) แล้วรับข้อความตอบกลับไปแสดง/อ่านออกเสียง
 
-## 5) ข้อควรระวัง
+## 5) ครบวงจร: hello · eyes · voice (v1.5)
+
+```js
+import { helloDevice, sendEyes, getEyes, pullVoice, ackVoice } from './core/link.js';
+
+await helloDevice(device, { name: 'จอโต๊ะทำงาน', kind: 'esp32',
+  capabilities: { mic: true, speaker: true, eyes: true } });
+// → { protocol: 'no7-link/1', features: [...], eyesTtlMs: 15000 }
+
+await sendEyes(device, { emotion: 'happy', intensity: 85 });
+const { eyes } = await getEyes(device);      // { emotion, intensity, stale, ageMs }
+
+const q = await pullVoice(device, lastSeq);  // chunks: [{seq, mime, chunk(base64), bytes, final}]
+await ackVoice(device, q.lastSeq);
+```
+
+- ฝั่งบอร์ด: `link.hello(...)`, `link.onEyes(cb)`, `link.sendEyes(...)`, `link.sendVoice(pcm, len, final)`
+- ฝั่ง ESP32 จะ poll `/api/link/eyes` ทุก 1 วินาทีและเรียก callback เมื่อค่าอารมณ์เปลี่ยน
+- รายละเอียด endpoint และเพดานข้อมูล: [DEVICES.md](DEVICES.md)
+
+## 6) ข้อควรระวัง
 
 - `secret` ไม่ควรอยู่ใน firmware แบบ plain text ถ้าบอร์ดถูกจับได้ — พิจารณา NVS + เข้ารหัส flash
 - ใช้เฉพาะในวง LAN ที่เชื่อถือได้ หรือใส่ TLS ผ่าน reverse proxy

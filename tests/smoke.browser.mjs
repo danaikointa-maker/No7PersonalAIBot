@@ -67,6 +67,15 @@ window.SpeechRecognition = class {
   stop() {}
 };
 
+// jsdom ไม่มี WebCrypto — stub ให้ HMAC ของ Phone-Link ทำงานได้ (ค่าคงที่พอสำหรับ UI test)
+if (!window.crypto?.subtle) {
+  const subtle = {
+    importKey: async () => ({}),
+    sign: async () => new Uint8Array(32).fill(7),
+  };
+  try { Object.defineProperty(window.crypto, 'subtle', { value: subtle, configurable: true }); } catch { window.crypto.subtle = subtle; }
+}
+
 const calls = [];
 window.fetch = async (url, opts = {}) => {
   calls.push({ url: String(url), body: opts.body });
@@ -81,6 +90,33 @@ window.fetch = async (url, opts = {}) => {
     if (last.includes('เปิดเว็บ')) return reply('```tool\n{"tool":"open_url","args":{"url":"https://example.com"}}\n```');
     return reply('สวัสดีครับ ผมชื่อ No7');
   }
+  const linkReply = (obj) => ({ ok: true, json: async () => obj, text: async () => JSON.stringify(obj) });
+  if (u.includes('/api/oauth/device')) {
+    return { ok: true, json: async () => ({ status: 200, body: JSON.stringify({ device_code: 'dc-1', user_code: 'ABCD-EFGH', verification_uri: 'https://id.example.com/device', expires_in: 600, interval: 1 }) }) };
+  }
+  if (u.includes('/api/oauth/token')) {
+    return { ok: true, json: async () => ({ status: 400, body: JSON.stringify({ error: 'authorization_pending' }) }) };
+  }
+  if (u.includes('/api/oauth/register')) {
+    return { ok: true, json: async () => ({ status: 201, body: JSON.stringify({ client_id: 'dcr-1', client_secret: 's', token_endpoint_auth_method: 'none' }) }) };
+  }
+  if (u.includes('/api/link/hello')) {
+    return linkReply({
+      ok: true, protocol: 'no7-link/1', serverTime: 1_760_000_000_000,
+      device: { code: '123456', name: 'PC ทดสอบ', capabilities: { mic: true, speaker: true, eyes: true, screen: true, buttons: true, voice: false } },
+      features: ['hello', 'eyes', 'voice', 'command', 'results'], eyesTtlMs: 15000,
+    });
+  }
+  if (u.includes('/api/link/eyes')) {
+    return linkReply({ ok: true, eyes: { emotion: 'happy', mood: 'happy', intensity: 85, text: 'จาก No7', ttlMs: 15000, ts: 1_760_000_000_000, stale: false, ageMs: 1200 } });
+  }
+  if (u.includes('/api/link/voice/status')) {
+    return linkReply({ ok: true, chunks: 2, bytes: 2048, lastSeq: 2, dropped: 0, final: true });
+  }
+  if (u.includes('/api/reminders/status')) {
+    return { ok: true, json: async () => ({ count: 1, due: 0, next: { id: 't1', title: 'ทดสอบงาน', due: '2026-12-01T02:00:00.000Z' }, telegram: { configured: true }, tickMs: 30000 }) };
+  }
+  if (u.includes('/api/reminders')) return { ok: true, json: async () => ({ ok: true, count: 1, items: [] }) };
   if (u.includes('/api/bots/status')) {
     return { ok: true, json: async () => ({ provider: 'pollinations', model: null, telegram: { configured: true }, line: { configured: false }, sessions: 2, recent: [] }) };
   }
@@ -119,7 +155,7 @@ const submit = (text) => {
 await wait(100);
 check('boot: initial state', ['IDLE', 'SETUP'].includes($('#state-label').textContent), $('#state-label').textContent);
 check('boot: welcome message', $('#messages').children.length >= 1);
-check('boot: 26 tools in auto mode', $('#tools-grid').children.length === 26, String($('#tools-grid').children.length));
+check('boot: 28 tools in auto mode', $('#tools-grid').children.length === 28, String($('#tools-grid').children.length));
 check('boot: 5 role modes', $('#mode-chips').children.length === 5, String($('#mode-chips').children.length));
 check('boot: persona header', $('#persona-name').textContent.length > 0);
 
@@ -129,10 +165,10 @@ check('nav: memory view', $('#view-memory').classList.contains('active'));
 // mode switching filters tools
 window.document.querySelector('#mode-chips button[data-mode="hub"]').click();
 await wait(20);
-check('mode: hub filters tools', $('#tools-grid').children.length === 19, String($('#tools-grid').children.length));
+check('mode: hub filters tools', $('#tools-grid').children.length === 21, String($('#tools-grid').children.length));
 window.document.querySelector('#mode-chips button[data-mode="auto"]').click();
 await wait(20);
-check('mode: back to auto', $('#tools-grid').children.length === 26, String($('#tools-grid').children.length));
+check('mode: back to auto', $('#tools-grid').children.length === 28, String($('#tools-grid').children.length));
 
 $('#set-provider').value = 'pollinations';
 $('#save-settings-btn').click();
@@ -195,6 +231,7 @@ $('#task-list').querySelectorAll('.fact button')[0]?.click();  // ✅ ปิด�
 await wait(20);
 $('#task-filter').value = 'done';
 $('#task-filter').dispatchEvent(new window.Event('change'));
+check('tasks: server reminder status shown', $('#task-server-status').textContent.includes('server:'), $('#task-server-status').textContent);
 check('tasks: completed task shown in done filter', $('#task-list').textContent.includes('ทดสอบงาน'), $('#task-list').textContent.slice(0, 60));
 $('#task-filter').value = 'open';
 $('#task-filter').dispatchEvent(new window.Event('change'));
@@ -226,6 +263,28 @@ check('devices: added to registry', $('#dev-list').textContent.includes('PC ท�
 $('#dev-list').querySelector('.dev-actions button')?.click();
 await wait(150);
 check('devices: failure logged, no crash', $('#dev-log').hidden === false, $('#dev-log').textContent.slice(0, 80));
+
+// phone-link ครบวงจร: hello / eyes / voice status
+$('#link-hello').click();
+await wait(60);
+check('phone-link: hello shows capabilities', /no7-link\/1/.test($('#link-status').textContent), $('#link-status').textContent.slice(0, 70));
+$('#link-eyes').click();
+await wait(60);
+check('phone-link: eyes sent', /👀/.test($('#link-status').textContent) && /happy/.test($('#link-status').textContent), $('#link-status').textContent.slice(0, 70));
+$('#link-voice-status').click();
+await wait(60);
+check('phone-link: voice queue status', /🎧/.test($('#link-status').textContent) && /2 chunk/.test($('#link-status').textContent), $('#link-status').textContent.slice(0, 70));
+
+// desktop view: windows (no Electron bridge → graceful) + recipe editor
+$('#nav button[data-view="desktop"]').click();
+await wait(30);
+check('desktop: window list explains missing bridge', /เดสก์ท็อป/.test($('#win-status').textContent), $('#win-status').textContent.slice(0, 60));
+$('#recipe-name').value = 'ทดสอบ UI';
+$('#recipe-steps').value = 'notify สวัสดี\nwait 100';
+$('#recipe-save').click();
+check('desktop: recipe saved from UI', /บันทึกสูตร/.test($('#recipe-status').textContent) && $('#recipe-select').options.length > 1, $('#recipe-status').textContent);
+$('#recipe-try').click();
+check('desktop: dry-run shows plan', $('#recipe-log').hidden === false && $('#recipe-log').textContent.includes('แจ้งเตือน'), $('#recipe-log').textContent.slice(0, 60));
 
 // capabilities + storage panels (R1)
 check('caps: list rendered', $('#caps-list').children.length > 3, String($('#caps-list').children.length));
@@ -271,6 +330,29 @@ $('#mcp-transport').dispatchEvent(new window.Event('change'));
 await wait(80);
 check('mcp: stdio select reveals server list', $('#mcp-stdio-wrap').hidden === false && $('#mcp-stdio-id').value === 'fixture', $('#mcp-stdio-id').value);
 check('mcp: oauth section present', !!$('#mcp-oauth-token'));
+check('mcp: oauth device + registration fields', !!$('#mcp-oauth-device') && !!$('#mcp-oauth-register'));
+
+// add a second server that supports device flow + DCR
+$('#mcp-name').value = 'Device Demo';
+$('#mcp-url').value = 'http://localhost:3100/device-mcp';
+$('#mcp-oauth-authorize').value = 'https://id.example.com/authorize';
+$('#mcp-oauth-token').value = 'https://id.example.com/token';
+$('#mcp-oauth-device').value = 'https://id.example.com/device';
+$('#mcp-oauth-register').value = 'https://id.example.com/register';
+$('#mcp-add').click();
+await wait(200);
+$('#mcp-list').querySelector('[data-mcp-register]')?.click();
+await wait(250);
+const dcrClient = (() => {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem('no7.settings.v1') || '{}');
+    return (saved.mcpServers || []).map((x) => x.oauth?.clientId).filter(Boolean).join(',');
+  } catch { return ''; }
+})();
+check('oauth: DCR client id persisted', dcrClient === 'dcr-1', dcrClient || $('#mcp-status').textContent.slice(0, 60));
+$('#mcp-list').querySelector('[data-mcp-device]')?.click();
+await wait(250);
+check('oauth: device code shown for user', /ABCD-EFGH/.test($('#mcp-status').textContent), $('#mcp-status').textContent.slice(0, 80));
 $('#mcp-transport').value = 'proxy';
 $('#mcp-transport').dispatchEvent(new window.Event('change'));
 

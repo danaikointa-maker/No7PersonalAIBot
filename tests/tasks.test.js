@@ -15,7 +15,8 @@ globalThis.dispatchEvent = globalThis.dispatchEvent || (() => true);
 
 const {
   TaskStore, TaskScheduler, parseDue, normalizeTask, mergeTaskLists, formatTaskTime,
-  isOverdue, PRIORITIES, TASKS_KEY,
+  isOverdue, PRIORITIES, TASKS_KEY, normalizeRecurrence, nextOccurrence, describeRecurrence,
+  RECURRENCE_FREQS, WEEKDAYS_TH,
 } = await import('../web/src/core/tasks.js');
 const { runTool } = await import('../web/src/core/tools.js');
 
@@ -205,4 +206,73 @@ test('sync bundle carries tasks both ways', async () => {
   const merged = mergeBundle(bundle, { memory: null, calendar: null });
   assert.equal(merged.tasks, 1);
   assert.equal(new TaskStore().list()[0].title, 'งานซิงก์');
+});
+
+test('normalizeRecurrence validates input', () => {
+  assert.equal(normalizeRecurrence(null), null);
+  assert.deepEqual(normalizeRecurrence('daily'), { freq: 'daily', interval: 1, weekday: null, at: '' });
+  assert.deepEqual(normalizeRecurrence({ freq: 'weekly', weekday: 1, interval: 2 }), { freq: 'weekly', interval: 2, weekday: 1, at: '' });
+  assert.equal(normalizeRecurrence({ freq: 'nope' }), null);
+  assert.equal(normalizeRecurrence({ freq: 'daily', interval: -5 }).interval, 1);
+  assert.equal(normalizeRecurrence({ freq: 'daily', interval: 999 }).interval, 90);
+  assert.equal(normalizeRecurrence({ freq: 'weekly', weekday: 9 }).weekday, null);
+});
+
+test('nextOccurrence covers daily, weekdays, weekly, hourly, monthly', () => {
+  const tue = Date.parse('2026-11-10T10:00:00+07:00');
+  assert.equal(nextOccurrence(tue, 'daily', tue), new Date(new Date(tue).setDate(new Date(tue).getDate() + 1)).toISOString().replace(/T.*/, 'T03:00:00.000Z'));
+  const sat = Date.parse('2026-11-14T10:00:00+07:00');
+  const fromSat = nextOccurrence(sat, 'weekdays', sat);
+  assert.equal(new Date(fromSat).getDay(), 1, 'ศุกร์→จันทร์');
+  const monday = Date.parse('2026-11-16T09:00:00+07:00');
+  assert.equal(new Date(nextOccurrence(monday, { freq: 'weekly', weekday: 1 }, monday)).getDay(), 1);
+  assert.equal(nextOccurrence(monday, { freq: 'weekly', weekday: 1 }, monday), new Date(monday + 7 * 86400_000).toISOString());
+  assert.equal(nextOccurrence(tue, { freq: 'hourly', interval: 3 }, tue), new Date(tue + 3 * 3600_000).toISOString());
+  assert.match(nextOccurrence(tue, 'monthly', tue), /^2026-12-10/);
+  assert.equal(nextOccurrence(tue, { freq: 'nope' }), null);
+});
+
+test('describeRecurrence reads in Thai', () => {
+  assert.equal(describeRecurrence('weekdays'), 'วันจันทร์–ศุกร์');
+  assert.equal(describeRecurrence({ freq: 'weekly', weekday: 1 }), 'ทุกสัปดาห์ (จันทร์)');
+  assert.match(describeRecurrence({ freq: 'hourly', interval: 4 }), /ทุก 4 ชั่วโมง/);
+  assert.equal(describeRecurrence(null), '');
+  assert.equal(WEEKDAYS_TH[1], 'จันทร์');
+  assert.ok(RECURRENCE_FREQS.monthly);
+});
+
+test('recurring task add + complete advances instead of closing', () => {
+  localStorage.clear();
+  let now = Date.parse('2026-11-10T10:00:00+07:00');
+  const store = new TaskStore({ now: () => now });
+  const task = store.add({ title: 'ออกกำลังกาย', recurrence: 'daily' });
+  assert.equal(task.done, false);
+  assert.equal(task.recurrence.freq, 'daily');
+  assert.ok(Date.parse(task.due) > now, 'ต้องมีเวลารอบแรกอัตโนมัติ');
+
+  const firstDue = task.due;
+  now += 3600_000;
+  const res = store.complete(task.id);
+  assert.equal(res.advanced, true);
+  assert.equal(res.task.done, false, 'งานซ้ำไม่ถูกปิด');
+  assert.notEqual(res.task.due, firstDue);
+  assert.equal(res.task.repeatCount, 1);
+  assert.equal(res.task.notifiedAt, null, 'ต้องเตือนรอบใหม่ได้');
+  assert.equal(store.list({ done: true }).length, 0);
+
+  const plain = store.add({ title: 'งานครั้งเดียว' });
+  const closed = store.complete(plain.id);
+  assert.equal(closed.advanced, false);
+  assert.equal(closed.task.done, true);
+  assert.equal(store.complete('missing').task, null);
+});
+
+test('task tool accepts repeat and reports the next round', async () => {
+  localStorage.clear();
+  const added = await runTool('task', { action: 'add', title: 'จ่ายบิล', when: '+1h', repeat: 'monthly' }, {});
+  assert.ok(added.data.lines.some((l) => l.includes('🔁')));
+  const id = added.data.lines.find((l) => l.startsWith('id: ')).replace('id: ', '');
+  const done = await runTool('task', { action: 'done', id }, {});
+  assert.match(done.data.title, /งานซ้ำ/);
+  await assert.rejects(() => runTool('task', { action: 'add', title: 'x', repeat: 'ทุกเมื่อ' }, {}), /ไม่รู้จักการทำซ้ำ/);
 });
