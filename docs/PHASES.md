@@ -466,3 +466,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 43.1 version 2.7.0 + CHANGELOG
 - [x] 43.2 README (32 docs, 427 unit / 154 checks) + PHASES ปิดครบ
 - [x] 43.3 ตรวจรับรวม: check 110 files · unit 427 · browser 154 · perf · build → PR
+
+# รอบที่ 13 (v2.8)
+
+เป้าหมาย: ให้ผู้ใช้ส่งออกประวัติสุขภาพแบบเลือกเอง โดยส่งออกเฉพาะสรุปคะแนนที่เก็บในเครื่อง ไม่รวมเนื้อหาส่วนตัว
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AB1 | Export ประวัติสุขภาพ | 44.1–44.3 | ⬜ |
+| AB2 | UI ดาวน์โหลด CSV/Markdown | 45.1–45.3 | ⬜ |
+| AB3 | Release 2.8 | 46.1–46.3 | ⬜ |
+
+## AB1 — Export ประวัติสุขภาพ
+
+- [ ] 44.1 API CSV (BOM/Excel) และ Markdown (ไทย/อังกฤษ) จาก summary snapshots เท่านั้น
+- [ ] 44.2 Escape CSV และกัน formula injection; ไม่มีรายละเอียดปัญหาหรือข้อความส่วนตัว
+- [ ] 44.3 Tests สำหรับรูปแบบ/ข้อมูลว่าง/ภาษา
+
+## AB2 — UI ดาวน์โหลด CSV/Markdown
+
+- [ ] 45.1 ปุ่มส่งออกในประวัติ พร้อมชื่อไฟล์วันที่และ clipboard fallback
+- [ ] 45.2 บันทึกเฉพาะตอนผู้ใช้กดส่งออก; ไม่มี auto-upload
+- [ ] 45.3 Browser smoke + `docs/HEALTH.md`
+
+## AB3 — Release 2.8
+
+- [ ] 46.1 version 2.8.0 + CHANGELOG
+- [ ] 46.2 README + PHASES ปิดครบ
+- [ ] 46.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
