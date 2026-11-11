@@ -46,12 +46,14 @@ test('package metadata has an author email for Debian package metadata', () => {
 
 test('desktop packaging icons exist in the formats referenced by the build config', () => {
   const build = JSON.parse(read('package.json')).build;
-  for (const icon of [build.mac.icon, build.win.icon, build.linux.icon]) {
-    assert.ok(fs.existsSync(path.join(ROOT, icon)), `ไม่พบไฟล์ไอคอน ${icon}`);
+  const resourceDir = build.directories?.buildResources || 'build';
+  const iconPath = (platform) => path.join(ROOT, resourceDir, build[platform].icon);
+  for (const platform of ['mac', 'win', 'linux']) {
+    assert.ok(fs.existsSync(iconPath(platform)), `ไม่พบไฟล์ไอคอน ${build[platform].icon}`);
   }
-  assert.equal(fs.readFileSync(path.join(ROOT, build.mac.icon)).toString('ascii', 0, 4), 'icns');
-  assert.equal(fs.readFileSync(path.join(ROOT, build.win.icon)).readUInt16LE(2), 1);
-  assert.equal(fs.readFileSync(path.join(ROOT, build.linux.icon)).toString('ascii', 1, 4), 'PNG');
+  assert.equal(fs.readFileSync(iconPath('mac')).toString('ascii', 0, 4), 'icns');
+  assert.equal(fs.readFileSync(iconPath('win')).readUInt16LE(2), 1);
+  assert.equal(fs.readFileSync(iconPath('linux')).toString('ascii', 1, 4), 'PNG');
 });
 
 test('release workflow triggers on version tags and builds all 3 platforms', () => {
