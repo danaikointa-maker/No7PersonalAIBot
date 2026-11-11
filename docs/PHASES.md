@@ -550,3 +550,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 52.1 version 2.10.0 + CHANGELOG
 - [x] 52.2 README (32 docs, 434 unit / 159 checks) + PHASES ปิดครบ
 - [x] 52.3 ตรวจรับรวม: check 112 files · unit 434 · browser 159 · perf · build → PR
+
+# รอบที่ 16 (v2.11)
+
+เป้าหมาย: กู้คืน/รวมประวัติสุขภาพ JSON ที่ผู้ใช้ส่งออกไว้ โดยตรวจสอบก่อนเขียนและไม่รับข้อมูลส่วนตัวส่วนเกิน
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AE1 | ตรวจสอบและวางแผนนำเข้า | 53.1–53.3 | ✅ |
+| AE2 | UI นำเข้าแบบยืนยัน | 54.1–54.3 | ✅ |
+| AE3 | Release 2.11 | 55.1–55.3 | ✅ |
+
+## AE1 — ตรวจสอบและวางแผนนำเข้า
+
+- [x] 53.1 `parseHealthHistoryBackup`: ตรวจ format/schema/date/ขนาด/จำนวน snapshots
+- [x] 53.2 `planHealthHistoryImport`: merge ตามวัน, incoming ชนะเมื่อชนกัน, cap 30 และสรุปผลโดยไม่เขียน storage
+- [x] 53.3 Tests ครอบคลุม malformed/oversized/privacy/merge/retention
+
+## AE2 — UI นำเข้าแบบยืนยัน
+
+- [x] 54.1 เลือกไฟล์ JSON พร้อม preview เพิ่ม/แทนที่/คงเดิม/ตัดเก่า แล้วต้องยืนยันก่อนบันทึก
+- [x] 54.2 Import ไทย/อังกฤษ; อ่านไฟล์เสีย/ไม่รองรับแล้วไม่เปลี่ยนข้อมูล
+- [x] 54.3 Browser smoke + `docs/HEALTH.md`
+
+## AE3 — Release 2.11
+
+- [x] 55.1 version 2.11.0 + CHANGELOG
+- [x] 55.2 README (32 docs, 439 unit / 161 checks) + PHASES ปิดครบ
+- [x] 55.3 ตรวจรับรวม: check 115 files · unit 439 · browser 161 · perf · build → PR
