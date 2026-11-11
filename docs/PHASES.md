@@ -886,3 +886,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 88.1 version 2.22.0 + CHANGELOG
 - [x] 88.2 README + PHASES ปิดครบ
 - [x] 88.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 28 (v2.23)
+
+เป้าหมาย: ป้องกันการใช้ import preview ที่ไม่ถูกต้องหรือเก่า หลัง memory เปลี่ยนระหว่าง plan กับ apply; แผนที่หมดอายุ/ถูกแก้ไข/มาจาก store อื่นต้องไม่เขียน storage
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AQ1 | ทำ import plan ให้ opaque และผูกกับ store ต้นทาง | 89.1–89.3 | ⬜ |
+| AQ2 | ปฏิเสธ plan ที่ stale/tampered ก่อน persist | 90.1–90.3 | ⬜ |
+| AQ3 | Release 2.23 | 91.1–91.3 | ⬜ |
+
+## AQ1 — ทำ import plan ให้ opaque และผูกกับ store ต้นทาง
+
+- [ ] 89.1 เก็บ payload/result จริงใน WeakMap; consumer เห็นเฉพาะ preview counts
+- [ ] 89.2 อนุญาต apply เฉพาะ plan ที่สร้างจาก MemoryStore instance นี้และยังไม่เคยใช้
+- [ ] 89.3 Unit tests สำหรับ plan ที่ปลอม/แก้ไข/ย้ายข้าม instance และ apply ซ้ำ
+
+## AQ2 — ปฏิเสธ plan ที่ stale ก่อน persist
+
+- [ ] 90.1 ตรวจ snapshot ของ facts/log/meta ก่อน apply; state เปลี่ยนแล้วให้ reject แบบ no-write
+- [ ] 90.2 UI แจ้งให้ผู้ใช้เริ่ม import ใหม่เมื่อ preview หมดอายุ
+- [ ] 90.3 Browser smoke ครอบคลุมการเปลี่ยน memory ระหว่าง plan/apply โดยไม่ทิ้งข้อมูล
+
+## AQ3 — Release 2.23
+
+- [ ] 91.1 version 2.23.0 + CHANGELOG
+- [ ] 91.2 README + PHASES ปิดครบ
+- [ ] 91.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
