@@ -283,3 +283,36 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 25.1 version 2.1.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics) + CHANGELOG 2.1.0
 - [x] 25.2 README v2.1 (timeline, digest, plugins, 341 unit / 111 checks, 29 tools) + docs table + PHASES ปิดครบ
 - [x] 25.3 ตรวจรับรวม: check 92 ไฟล์ · unit 341 · browser 111 · build · perf (83.5 KB gzip) → PR
+
+---
+
+# รอบที่ 7 (v2.2)
+
+เป้าหมาย: ทำให้ข้อมูลที่มีอยู่ "หาเจอ" และ "ย้ายเครื่องได้" — ค้นทุกอย่างจากที่เดียวด้วย ⌘/Ctrl+K
+และสำรอง/กู้คืนข้อมูลทั้งแอปได้อย่างปลอดภัย (schema ชัดเจน, dry-run ก่อนเขียนทับ)
+
+| เฟส | ชื่อ | งานย่อย | สถานะ |
+|---|---|---|---|
+| V1 | ค้นหาทุกอย่าง (⌘K) | 26.1–26.4 | ⬜ |
+| V2 | สำรอง/กู้คืนข้อมูล | 27.1–27.4 | ⬜ |
+| V3 | Release 2.2 | 28.1–28.3 | ⬜ |
+
+## V1 — ค้นหาทุกอย่าง (Command palette)
+
+- 26.1 `core/search.js`: `buildIndex` (ความจำ/โน้ต/งาน/นัด/เครื่องมือ/เมนู) + `searchIndex` (คะแนน exact>prefix>token, Thai bigram) + highlight ranges
+- 26.2 UI: `#palette` เปิดด้วย ⌘/Ctrl+K, ลูกศรขึ้น/ลง, Enter ทำงาน, Esc ปิด, จัดกลุ่มตามชนิด
+- 26.3 การกระทำต่อผลลัพธ์: เปิดหน้า/ค้นความจำ/ใส่ชื่อเครื่องมือลงแชท/เรียกสรุปวันนี้
+- 26.4 Tests + smoke + `docs/SEARCH.md`
+
+## V2 — สำรอง/กู้คืนข้อมูล
+
+- 27.1 `core/backup.js`: `createBackup` (schema 2, redact คีย์) / `validateBackup` / `summarizeBackup`
+- 27.2 `planRestore` + `mergeRecords` (merge vs replace, last-write-wins ตาม `updatedAt/ts`)
+- 27.3 UI: ปุ่มสำรองข้อมูลรูปแบบใหม่ + นำเข้าไฟล์ (dry-run แสดงจำนวนก่อนยืนยัน)
+- 27.4 Tests + smoke + `docs/BACKUP.md`
+
+## V3 — Release 2.2
+
+- 28.1 version 2.2.0 + CHANGELOG
+- 28.2 README + PHASES ปิดครบ
+- 28.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
