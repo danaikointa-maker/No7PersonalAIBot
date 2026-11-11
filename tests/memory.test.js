@@ -195,6 +195,38 @@ test('import plans are private to their store and reject stale state without ove
   assert.equal(mem.log.at(-1).text, 'concurrent local write');
 });
 
+test('failed replace import leaves memory/storage/legacy backups intact and the plan can retry', () => {
+  const mem = fresh();
+  mem.addFact('existing saved fact');
+  mem.logTurn('user', 'existing saved conversation');
+  localStorage.setItem('no7.memory.facts.v1', JSON.stringify([{ text: 'legacy fact backup' }]));
+  localStorage.setItem('no7.memory.log.v1', JSON.stringify([{ text: 'legacy log backup' }]));
+  const beforeStorage = localStorage.getItem('no7.memory.v2');
+  const beforeFacts = JSON.stringify(mem.facts);
+  const beforeLog = JSON.stringify(mem.log);
+  const plan = mem.planImport({ facts: [{ text: 'replacement fact' }], log: [] }, { merge: false });
+  const originalSetItem = localStorage.setItem;
+  localStorage.setItem = (key, value) => {
+    if (key === 'no7.memory.v2') throw new Error('QuotaExceededError');
+    originalSetItem(key, value);
+  };
+  try {
+    assert.throws(() => mem.applyImportPlan(plan), { code: 'MEMORY_STORAGE_WRITE_FAILED' });
+  } finally {
+    localStorage.setItem = originalSetItem;
+  }
+  assert.equal(localStorage.getItem('no7.memory.v2'), beforeStorage);
+  assert.equal(localStorage.getItem('no7.memory.facts.v1'), JSON.stringify([{ text: 'legacy fact backup' }]));
+  assert.equal(localStorage.getItem('no7.memory.log.v1'), JSON.stringify([{ text: 'legacy log backup' }]));
+  assert.equal(JSON.stringify(mem.facts), beforeFacts);
+  assert.equal(JSON.stringify(mem.log), beforeLog);
+
+  assert.equal(mem.applyImportPlan(plan).added, 1, 'a failed write leaves the current plan retryable');
+  assert.deepEqual(mem.facts.map((fact) => fact.text), ['replacement fact']);
+  assert.equal(localStorage.getItem('no7.memory.facts.v1'), null);
+  assert.equal(localStorage.getItem('no7.memory.log.v1'), null);
+});
+
 test('replace import plans stay read-only until explicitly applied', () => {
   const mem = fresh();
   mem.addFact('keep me until replacement is confirmed');

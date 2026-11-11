@@ -35,7 +35,10 @@ export function bindMemoryImport(input, {
         : `นำเข้าแล้ว: เพิ่ม ${result.added} · รวม ${result.merged} · ข้าม ${result.skipped} · บทสนทนา +${result.logAdded}`);
       onImported?.();
     } catch (err) {
-      setStatus(`${String(getLang?.() || 'th').toLowerCase().startsWith('en') ? 'Invalid file' : 'ไฟล์ไม่ถูกต้อง'}: ${err.message}`);
+      const english = String(getLang?.() || 'th').toLowerCase().startsWith('en');
+      setStatus(err.code === 'MEMORY_STORAGE_WRITE_FAILED'
+        ? (english ? 'Import could not be saved; existing memory is unchanged. Free storage and try again.' : 'บันทึกการนำเข้าไม่สำเร็จ ความจำเดิมยังอยู่ กรุณาจัดการพื้นที่แล้วลองอีกครั้ง')
+        : `${english ? 'Invalid file' : 'ไฟล์ไม่ถูกต้อง'}: ${err.message}`);
     } finally {
       event.target.value = '';
     }

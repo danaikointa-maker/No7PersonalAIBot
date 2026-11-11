@@ -1,4 +1,4 @@
-# No7 Personal AI Bot `v2.23`
+# No7 Personal AI Bot `v2.24`
 
 > ผู้ช่วย AI ส่วนตัวที่ **โค้ดชุดเดียวกันรันได้ทั้งมือถือและ PC** — พูดไทยก่อน ฟังได้ด้วยเสียง มีความจำระยะยาว
 > เรียกเครื่องมือจริง ทำงานหลายก้าวได้ ซิงก์ข้ามเครื่อง และสั่งงานอุปกรณ์ผ่าน HMAC
@@ -22,15 +22,15 @@ npm run build         # dist/ ชุดเดียวสำหรับ PWA + E
 npm run server        # companion server: static + AI proxy + tools + sync + phone-link
 npm run desktop       # เปิดเป็นแอปเดสก์ท็อป (Electron)
 npm run mobile:sync   # ซิงก์ dist/ เข้าโปรเจค Android/iOS
-npm test              # 465 unit tests
-npm run test:browser  # 180 end-to-end checks (รันแอปจริงใน jsdom)
+npm test              # 466 unit tests
+npm run test:browser  # 181 end-to-end checks (รันแอปจริงใน jsdom)
 npm run check         # syntax + structure check
 npm run perf          # performance budget (ขนาด bundle/source)
 ```
 
 ---
 
-## ทำอะไรได้ (v2.23)
+## ทำอะไรได้ (v2.24)
 
 ### 🎭 เลือกได้ทั้งหมด — 5 บทบาทในที่เดียว
 `✨ ทั้งหมด` (สลับบทบาทเองตามคำขอ) · `💛 เพื่อนคุย` · `💼 งาน` · `📅 ชีวิตประจำวัน` · `🏠 อุปกรณ์`

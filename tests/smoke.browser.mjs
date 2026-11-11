@@ -396,6 +396,24 @@ $('#mem-import-file').dispatchEvent(new window.Event('change'));
 await wait(10);
 check('memory: stale preview refuses to overwrite concurrent storage update', $('#mem-status').textContent.includes('เปลี่ยนหลังแสดงตัวอย่าง') && window.localStorage.getItem('no7.memory.v2') === memoryAfterConcurrentWrite && !JSON.parse(memoryAfterConcurrentWrite).facts.some((fact) => fact.text === 'memory import confirmation fact'));
 window.localStorage.setItem('no7.memory.v2', memoryBeforeConcurrentWrite);
+const memoryBeforeQuotaFailure = window.localStorage.getItem('no7.memory.v2');
+const storagePrototype = Object.getPrototypeOf(window.localStorage);
+const originalMemorySetItem = storagePrototype.setItem;
+storagePrototype.setItem = function (key, value) {
+  if (key === 'no7.memory.v2') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalMemorySetItem.call(this, key, value);
+};
+window.confirm = () => true;
+$('#mem-import-file').dispatchEvent(new window.Event('change'));
+await wait(20);
+storagePrototype.setItem = originalMemorySetItem;
+check('memory: storage write failure reports no success and preserves memory', $('#mem-status').textContent.includes('บันทึกการนำเข้าไม่สำเร็จ') && window.localStorage.getItem('no7.memory.v2') === memoryBeforeQuotaFailure && !JSON.parse(memoryBeforeQuotaFailure).facts.some((fact) => fact.text === 'memory import confirmation fact') && $('#offline-banner').textContent.includes('พื้นที่เก็บข้อมูลเต็ม'));
+$('#offline-banner').hidden = true;
+$('#offline-banner').textContent = '';
 window.confirm = () => true;
 $('#mem-import-file').dispatchEvent(new window.Event('change'));
 await wait(20);

@@ -921,21 +921,21 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AR1 | Persist แผน import แบบ atomic ก่อนเปลี่ยน instance | 92.1–92.3 | ⬜ |
-| AR2 | แสดง failure ที่ตรงจริงและรักษาแผนให้ retry ได้ | 93.1–93.3 | ⬜ |
-| AR3 | Release 2.24 | 94.1–94.3 | ⬜ |
+| AR1 | Persist แผน import แบบ atomic ก่อนเปลี่ยน instance | 92.1–92.3 | ✅ |
+| AR2 | แสดง failure ที่ตรงจริงและรักษาแผนให้ retry ได้ | 93.1–93.3 | ✅ |
+| AR3 | Release 2.24 | 94.1–94.3 | ✅ |
 
 ## AR1 — Persist แผน import แบบ atomic ก่อนเปลี่ยน instance
 
-- [ ] 92.1 เขียน candidate state ให้สำเร็จก่อนเปลี่ยน facts/log/meta ในหน่วยความจำ
-- [ ] 92.2 replace ลบ legacy keys หลัง v2 write สำเร็จเท่านั้น
-- [ ] 92.3 Unit tests จำลอง quota/write error, ตรวจ instance/storage/legacy ไม่เปลี่ยน และ retry สำเร็จ
+- [x] 92.1 เขียน candidate state ให้สำเร็จก่อนเปลี่ยน facts/log/meta ในหน่วยความจำ
+- [x] 92.2 replace ลบ legacy keys หลัง v2 write สำเร็จเท่านั้น
+- [x] 92.3 Unit tests จำลอง quota/write error, ตรวจ instance/storage/legacy ไม่เปลี่ยน และ retry สำเร็จ
 
 ## AR2 — แสดง failure ที่ตรงจริงและรักษาแผนให้ retry ได้
 
-- [ ] 93.1 write failure คืน error ที่แยกจาก stale/invalid plan และแผนยัง retry ได้
-- [ ] 93.2 UI แจ้งว่าบันทึกไม่สำเร็จและข้อมูลเดิมยังอยู่
-- [ ] 93.3 Browser smoke ตรวจ failure ไม่แสดง success และไม่เปลี่ยนข้อมูล
+- [x] 93.1 write failure คืน error ที่แยกจาก stale/invalid plan และแผนยัง retry ได้
+- [x] 93.2 UI แจ้งว่าบันทึกไม่สำเร็จและข้อมูลเดิมยังอยู่
+- [x] 93.3 Browser smoke ตรวจ failure ไม่แสดง success และไม่เปลี่ยนข้อมูล
 
 ## AR3 — Release 2.24
 
