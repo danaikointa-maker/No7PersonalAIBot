@@ -2,6 +2,21 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.11.0] — 2026-11-11
+
+รอบที่สิบหก: นำเข้าประวัติสุขภาพ JSON แบบตรวจสอบและ preview ก่อน merge
+
+### เพิ่ม
+- รับเฉพาะ `no7-health-history` schema 1; จำกัดไฟล์ 64 KiB และไม่เกิน 30 snapshots
+- ตรวจ format, exportedAt, วัน/คะแนน/จำนวน; ทิ้ง field เพิ่มเติมและแถว malformed
+- merge ตามวัน โดยไฟล์นำเข้าชนะเมื่อวันที่ชนกัน; แสดงจำนวนเพิ่ม/แทนที่/คงเดิม/ตัดเก่าก่อนยืนยัน
+- วางแผนแบบ read-only และเขียน localStorage หลังผู้ใช้ยืนยันเท่านั้น; ไม่อัปโหลด
+- เพิ่ม `parseHealthHistoryBackup`, `planHealthHistoryImport`, `applyHealthHistoryImport` และ file picker ไทย/อังกฤษ
+
+### ตรวจรับ
+- 439 unit tests · 161 browser checks · `npm run check` 115 JS files
+- Performance/build ผ่าน; source ใหญ่สุด 149.6 KB; main gzip 105.2 KB
+
 ## [2.10.0] — 2026-11-10
 
 รอบที่สิบห้า: ส่งออกประวัติสุขภาพเป็น JSON แบบมี schema และตัดข้อมูลส่วนตัวออก
