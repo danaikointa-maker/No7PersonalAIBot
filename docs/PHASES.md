@@ -316,3 +316,36 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 28.1 version 2.2.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics) + CHANGELOG 2.2.0
 - [x] 28.2 README v2.2 (⌘K, backup/restore, 368 unit / 123 checks, 28 docs) + PHASES ปิดครบ
 - [x] 28.3 ตรวจรับรวม: check 96 ไฟล์ · unit 368 · browser 123 · build · perf → PR
+
+---
+
+# รอบที่ 8 (v2.3)
+
+เป้าหมาย: ทำงานหลายเครื่องมือได้ลื่นขึ้น (เห็นผลระหว่างทาง), มองย้อนภาพรวมสัปดาห์ได้,
+และปิดช่องว่างของ sync ความจำระหว่างเครื่อง
+
+| เฟส | ชื่อ | งานย่อย | สถานะ |
+|---|---|---|---|
+| W1 | ผลเครื่องมือแบบ progressive | 29.1–29.4 | ⬜ |
+| W2 | รายงานรายสัปดาห์ | 30.1–30.4 | ⬜ |
+| W3 | Release 2.3 | 31.1–31.3 | ⬜ |
+
+## W1 — ผลเครื่องมือแบบ progressive (partial UI)
+
+- 29.1 `core/agent.js`: ส่ง event `result` พร้อม `card` ที่ render ได้ทันที (ไม่รอคำตอบจบ) + `partialText`
+- 29.2 UI: วาดการ์ดผลลัพธ์ลงฟองคำตอบระหว่างลูป (หลายการ์ดต่อคำสั่ง) + คง timeline/การ์ดเดิมเมื่อจบ
+- 29.3 กันข้อความซ้ำ: คำตอบสุดท้ายแทนที่เฉพาะข้อความ ไม่ลบการ์ดที่วาดไปแล้ว
+- 29.4 Tests + smoke + อัปเดต `docs/AGENT.md`
+
+## W2 — รายงานรายสัปดาห์ (weekly review)
+
+- 30.1 `core/weekly.js`: `buildWeekly({tasks, events, facts, metrics, now})` → งานเสร็จ/สร้างใหม่/เกินกำหนด, นัดหมาย, ความจำใหม่, การใช้เครื่องมือ, ข้อเสนอโฟกัส
+- 30.2 tool `weekly` (dynamic, risk 0) + ปุ่ม "📆 รายงานสัปดาห์" + การ์ด/markdown
+- 30.3 กำหนดช่วง 7 วันตามเวลาเครื่อง + เทียบสัปดาห์ก่อน (delta)
+- 30.4 Tests + smoke + `docs/WEEKLY.md`
+
+## W3 — Release 2.3
+
+- 31.1 version 2.3.0 + CHANGELOG
+- 31.2 README + PHASES ปิดครบ
+- 31.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
