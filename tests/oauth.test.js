@@ -122,6 +122,33 @@ test('TokenStore persists, keeps refresh token and lists state', () => {
   assert.equal(store.get('gmail'), null);
 });
 
+test('TokenStore set/remove are transactional when storage writes fail', () => {
+  const storage = fakeStorage();
+  let fail = false;
+  let writes = 0;
+  const setItem = storage.setItem;
+  storage.setItem = function (key, value) {
+    writes += 1;
+    if (fail) throw new Error('quota exceeded');
+    return setItem.call(this, key, value);
+  };
+  const store = new TokenStore({ storage });
+  store.set('gmail', { accessToken: 'old-access', refreshToken: 'old-refresh' });
+  const previousData = store.data;
+  const previousStored = storage.getItem(OAUTH_KEY);
+  fail = true;
+  assert.throws(() => store.set('gmail', { accessToken: 'new-access', refreshToken: 'new-refresh' }), { name: 'OAuthStorageError' });
+  assert.equal(store.data, previousData);
+  assert.deepEqual(store.get('gmail'), { accessToken: 'old-access', refreshToken: 'old-refresh' });
+  assert.equal(storage.getItem(OAUTH_KEY), previousStored);
+  assert.throws(() => store.remove('gmail'), { name: 'OAuthStorageError' });
+  assert.equal(store.data, previousData);
+  assert.equal(storage.getItem(OAUTH_KEY), previousStored);
+  const attemptedWrites = writes;
+  assert.equal(store.remove('missing'), false);
+  assert.equal(writes, attemptedWrites, 'removing an unknown token does not write');
+});
+
 test('requestToken goes through the companion proxy', async () => {
   const fetchImpl = jsonFetch(() => ({
     envelope: { status: 200, body: JSON.stringify({ access_token: 'at', refresh_token: 'rt', expires_in: 60 }) },
@@ -196,6 +223,28 @@ test('OAuthSession without tokens returns null and exchange stores them', async 
   const sent = JSON.parse(fetchImpl.calls[0].body);
   assert.equal(sent.grant_type, 'authorization_code');
   assert.equal(sent.redirect_uri, 'https://no7.local/cb');
+});
+
+test('OAuthSession exchange/refresh do not report success when token persistence fails', async () => {
+  const storage = fakeStorage();
+  let fail = false;
+  const setItem = storage.setItem;
+  storage.setItem = function (key, value) {
+    if (fail && key === OAUTH_KEY) throw new Error('quota exceeded');
+    return setItem.call(this, key, value);
+  };
+  const store = new TokenStore({ storage });
+  const fetchImpl = jsonFetch(() => ({ envelope: { status: 200, body: JSON.stringify({ access_token: 'new-access', refresh_token: 'new-refresh', expires_in: 3600 }) } }));
+  const session = new OAuthSession({ name: 'drive', tokenUrl: 'https://oauth/token', store, serverUrl: 'http://srv', fetchImpl, now: () => 1000 });
+  fail = true;
+  await assert.rejects(() => session.exchange({ code: 'code', codeVerifier: 'verifier', redirectUri: 'https://no7.local/cb' }), { name: 'OAuthStorageError' });
+  assert.equal(session.authorized(), false, 'exchange must not appear successful without saved tokens');
+
+  fail = false;
+  store.set('drive', { accessToken: 'old-access', refreshToken: 'old-refresh', expiresAt: 1 });
+  fail = true;
+  await assert.rejects(() => session.getAccessToken(), { name: 'OAuthStorageError' });
+  assert.equal(store.get('drive').accessToken, 'old-access', 'failed refresh keeps the prior token');
 });
 
 /* ------------------------- device flow + DCR (v1.5) ------------------------- */

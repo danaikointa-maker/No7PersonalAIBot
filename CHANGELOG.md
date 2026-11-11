@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.35.0] — 2026-11-11
+
+- OAuth token writes now persist candidate state before updating memory. Failed storage writes preserve existing access/refresh tokens, and OAuth exchange/refresh surfaces the failure instead of appearing successful.
+
 ## [2.34.0] — 2026-11-11
 
 - Control audit entries now persist transactionally before updating memory. Desktop control actions require a durable audit entry before execution, so storage failures block the action; clearing logs also preserves the existing history if storage fails.
