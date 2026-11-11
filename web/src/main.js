@@ -1938,7 +1938,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.15.0',
+      version: window.NO7_VERSION || '2.16.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -3109,6 +3109,7 @@ function restoreFromText(text) {
     tasks: tasks.list({ done: null }),
     events: calendar.all(),
     log: memory.log,
+    settings,
     personas: customPersonas(),
     healthHistory: readHealthHistory().snapshots,
   }, { mode: 'merge' });

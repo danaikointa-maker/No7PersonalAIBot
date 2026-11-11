@@ -237,6 +237,25 @@ test('planRestore replace mode clears existing data', () => {
   assert.equal(describePlan(plan).includes('แทนที่ทั้งหมด'), true);
 });
 
+test('redacted restore keeps current provider and matched MCP credentials in merge and replace', () => {
+  const redacted = createBackup({ settings: { language: 'en', apiKey: '', ttsApiKey: '', syncToken: '', mcpServers: [{ id: 'm1', name: 'One', apiKey: '' }] } });
+  const local = { settings: { language: 'th', apiKey: 'local-api', ttsApiKey: 'local-tts', syncToken: 'local-sync', mcpServers: [{ id: 'm1', name: 'One', apiKey: 'local-mcp' }] } };
+  const merged = planRestore(redacted, local, { mode: 'merge' });
+  assert.equal(merged.settings.language, 'en');
+  assert.equal(merged.settings.apiKey, 'local-api');
+  assert.equal(merged.settings.ttsApiKey, 'local-tts');
+  assert.equal(merged.settings.syncToken, 'local-sync');
+  assert.equal(merged.settings.mcpServers[0].apiKey, 'local-mcp');
+  assert.ok(merged.warnings.some((warning) => /credentials/.test(warning)));
+  const replaced = planRestore(redacted, local, { mode: 'replace' });
+  assert.equal(replaced.settings.apiKey, 'local-api');
+  assert.equal(replaced.settings.mcpServers[0].apiKey, 'local-mcp');
+  const explicit = createBackup({ settings: { apiKey: 'file-api', mcpServers: [{ id: 'm1', apiKey: 'file-mcp' }] } }, { includeSecrets: true });
+  const included = planRestore(explicit, local);
+  assert.equal(included.settings.apiKey, 'file-api');
+  assert.equal(included.settings.mcpServers[0].apiKey, 'file-mcp');
+});
+
 test('planRestore falls back to merge for unknown modes and warns about settings', () => {
   const b = createBackup({ settings: { language: 'en', apiKey: '' } });
   const plan = planRestore(b, {}, { mode: 'weird' });

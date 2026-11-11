@@ -276,11 +276,37 @@ export function planRestore(backup = {}, local = {}, { mode = 'merge' } = {}) {
     });
   }
 
-  const nextSettings = data.settings && typeof data.settings === 'object' ? { ...data.settings } : null;
+  const incomingSettings = data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings) ? data.settings : null;
+  const localSettings = local.settings && typeof local.settings === 'object' && !Array.isArray(local.settings) ? local.settings : {};
+  let nextSettings = incomingSettings
+    ? (mode === 'merge' ? { ...localSettings, ...incomingSettings } : { ...incomingSettings })
+    : null;
   if (nextSettings) {
-    const blanked = SETTINGS_SECRET_KEYS.filter((k) => !String(nextSettings[k] || '').length);
-    if (blanked.length) warnings.push(`คีย์ว่างในไฟล์: ${blanked.join(', ')} (ของเดิมในเครื่องจะถูกแทนที่ด้วยค่าว่าง)`);
-    if (hasSecrets(nextSettings)) warnings.push('ไฟล์มีความลับ — จะถูกเขียนลงเครื่องนี้');
+    const blanked = SETTINGS_SECRET_KEYS.filter((key) => !String(incomingSettings[key] || '').length);
+    const preserved = [];
+    for (const key of SETTINGS_SECRET_KEYS) {
+      if (!String(incomingSettings[key] || '').length && String(localSettings[key] || '').length) {
+        nextSettings[key] = localSettings[key];
+        preserved.push(key);
+      }
+    }
+    if (Array.isArray(incomingSettings.mcpServers)) {
+      const localServers = new Map((Array.isArray(localSettings.mcpServers) ? localSettings.mcpServers : [])
+        .filter((server) => server && typeof server === 'object')
+        .map((server) => [String(server.id || server.name || server.url || ''), server]));
+      nextSettings.mcpServers = incomingSettings.mcpServers.map((server) => {
+        if (!server || typeof server !== 'object') return server;
+        const localServer = localServers.get(String(server.id || server.name || server.url || ''));
+        if (!String(server.apiKey || '').length && String(localServer?.apiKey || '').length) {
+          preserved.push(`MCP:${server.id || server.name || server.url}`);
+          return { ...server, apiKey: localServer.apiKey };
+        }
+        return server;
+      });
+    }
+    if (blanked.length) warnings.push(`คีย์ว่าง/ไม่มีในไฟล์: ${blanked.join(', ')}; จะเก็บค่าปัจจุบันของเครื่องไว้ถ้ามี`);
+    if (preserved.length) warnings.push('รักษา credentials ที่มีอยู่ในเครื่องนี้ไว้ (ไม่ได้นำ secrets จากไฟล์ที่ว่างมาทับ)');
+    if (hasSecrets(incomingSettings)) warnings.push('ไฟล์มีความลับ — จะถูกเขียนลงเครื่องนี้');
   } else {
     warnings.push('ไฟล์ไม่มี settings — ตั้งค่าเดิมจะถูกเก็บไว้');
   }
