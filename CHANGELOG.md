@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.40.0] — 2026-11-10
+
+- Local reminders now merge across devices by due time and label, deduplicate on retry, arm immediately after sync, persist transactionally with notes/todos, and appear in the sync result. Storage failures roll back all three collections; malformed legacy entries are retained.
+
 ## [2.39.0] — 2026-11-10
 
 - Sync downloads now persist notes and todos before applying other collections, roll both list keys back if a store write fails, and surface apply errors instead of claiming success. Task sync uses the live store cache and retains deletion tombstones; partial applies identify committed collections and can be safely retried.

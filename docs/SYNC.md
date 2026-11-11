@@ -29,6 +29,7 @@
 | `todos` | `ts｜text` | เช่นเดียวกับ notes |
 | `tasks` | `id` | ใช้ `TaskStore.merge` (tombstone ของรายการที่ลบยังทำงาน) |
 | `events` | `uid` | ถ้าไม่มี uid ใช้ `start｜title` |
+| `reminders` | `when｜label` | ใช้เวลาเตือนกับข้อความเป็น identity; malformed legacy rows ยังถูกเก็บไว้ |
 
 ## รายงานผล
 
@@ -37,7 +38,7 @@
 ```js
 {
   strategy: 'newest',
-  data: { facts, notes, todos, tasks, events },   // ชุดที่รวมแล้ว
+  data: { facts, notes, todos, tasks, events, reminders },   // ชุดที่รวมแล้ว
   collections: { facts: { label, added, updated, kept, conflicts }, ... },
   conflicts: [{ collection, label, key, winner, localAt, remoteAt, local, remote }],
   totals: { added, updated, kept, conflicts },
@@ -50,6 +51,7 @@
 ## ข้อจำกัดที่รู้อยู่
 
 - `notes`/`todos` ไม่มีตัวระบุถาวร → ถ้าสองเครื่องสร้างข้อความเดียวกันในวินาทีเดียวกันจะรวมเป็นรายการเดียว
+- `reminders` ใช้ `when｜label` เป็น identity; เตือนที่มีข้อความและเวลาตรงกันจะรวมเป็นรายการเดียว และ timer ที่ตั้งอยู่จะไม่ถูกตั้งซ้ำ
 - `personas` ยังเป็น additive (ไม่มีเวลาอัปเดต) — ซ้ำเฉพาะเมื่อชื่อ+system ต่างกัน
 - ไม่มี UI กู้คืนย้อนหลัง (undo) — ใช้ `prefer-local` / `keep-both` กันข้อมูลหายก่อนซิงก์
 - `keep-both` สร้าง id ใหม่ทุกครั้งที่ชน → ซิงก์ซ้ำจะไม่เพิ่มสำเนาซ้ำเพราะครั้งถัดไปไม่มีคู่ที่ชนแล้ว

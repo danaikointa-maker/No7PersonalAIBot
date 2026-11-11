@@ -733,10 +733,15 @@ async function copyText(text) {
   ta.remove();
 }
 
+const scheduledReminderKeys = new Set();
 function scheduleReminder({ label, when }) {
   const delay = Math.max(0, when - Date.now());
   if (delay > 2 ** 31 - 1) return; // >24 days: ไม่ตั้งในรอบนี้
+  const key = `${Number(when)}|${String(label || '')}`;
+  if (scheduledReminderKeys.has(key)) return;
+  scheduledReminderKeys.add(key);
   setTimeout(() => {
+    scheduledReminderKeys.delete(key);
     globalThis.dispatchEvent(new CustomEvent('no7:timer', { detail: { label } }));
     if (globalThis.Notification?.permission === 'granted') new Notification('No7 AI', { body: label });
   }, delay);
@@ -746,7 +751,11 @@ function scheduleReminder({ label, when }) {
 export function restoreReminders() {
   try {
     const list = JSON.parse(localStorage.getItem('no7.reminders.v1') || '[]');
-    for (const r of list) if (r.when > Date.now()) scheduleReminder(r);
+    for (const r of list) {
+      if (r && typeof r.label === 'string' && Number.isFinite(Number(r.when)) && Number(r.when) > Date.now()) {
+        scheduleReminder({ label: r.label, when: Number(r.when) });
+      }
+    }
   } catch {}
 }
 

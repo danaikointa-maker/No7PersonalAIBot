@@ -7,6 +7,7 @@ export const SYNC_VERSION = 1;
 import { TaskStore } from './tasks.js';
 import { mergeSyncBundle } from './sync-merge.js';
 import { withBackupListsRestore } from './backup-restore.js';
+import { restoreReminders } from './tools.js';
 
 export function collectBundle({ memory, personas = [], calendar = [], tasks = null, settings = {} }) {
   const safeSettings = { ...settings };
@@ -54,6 +55,10 @@ export async function pullBundle(serverUrl, token) {
   return res.json();
 }
 
+export function formatSyncResult(result = {}) {
+  return `✅ ผสานแล้ว: ความจำ +${result.facts || 0} · persona +${result.personas || 0} · นัด +${result.events || 0} · งาน ${result.tasks || 0} · เตือน +${result.reminders || 0}`;
+}
+
 export class SyncApplyError extends Error {
   constructor(message, { cause, applied = [], report = null } = {}) {
     super(message, { cause });
@@ -70,7 +75,7 @@ export class SyncApplyError extends Error {
 export function mergeBundle(bundle, {
   memory, createPersona, getPersona, listPersonas, calendar, tasks = null, strategy = 'newest',
 } = {}) {
-  const out = { facts: 0, personas: 0, events: 0, tasks: 0, conflicts: [], report: null };
+  const out = { facts: 0, personas: 0, events: 0, tasks: 0, reminders: 0, conflicts: [], report: null };
   if (!bundle) return out;
 
   const taskStore = tasks && typeof tasks.merge === 'function' ? tasks : new TaskStore();
@@ -78,6 +83,7 @@ export function mergeBundle(bundle, {
     facts: memory?.listFacts?.() || [],
     notes: safeJson('no7.notes.v1', []),
     todos: safeJson('no7.todos.v1', []),
+    reminders: safeJson('no7.reminders.v1', []),
     // Include deleted records: their tombstones prevent deleted tasks reappearing.
     tasks: taskStore.exportData?.().tasks || taskStore.list?.({ done: null }) || [],
     events: calendar?.all?.() || [],
@@ -86,6 +92,7 @@ export function mergeBundle(bundle, {
     facts: bundle.memory?.facts || [],
     notes: bundle.notes || [],
     todos: bundle.todos || [],
+    reminders: bundle.reminders || [],
     tasks: bundle.tasks || [],
     events: bundle.calendar || [],
   };
@@ -121,15 +128,23 @@ export function mergeBundle(bundle, {
         markApplied('persona');
       }
     }
+    restoreReminders();
     return out;
   };
 
   try {
-    return withBackupListsRestore({ notes: merged.data.notes, todos: merged.data.todos }, applyOtherStores);
+    const result = withBackupListsRestore(
+      { notes: merged.data.notes, todos: merged.data.todos, reminders: merged.data.reminders },
+      applyOtherStores,
+      globalThis.localStorage,
+      ['no7.notes.v1', 'no7.todos.v1', 'no7.reminders.v1'],
+    );
+    out.reminders = merged.collections.reminders.added + merged.collections.reminders.updated;
+    return result;
   } catch (cause) {
     const message = applied.length
-      ? `ซิงก์หยุดกลางทาง — ผสานแล้วบางส่วน (${applied.join(', ')}) โน้ต/รายการถูกย้อนกลับแล้ว; กดดาวน์โหลดซ้ำเพื่อลองต่อได้`
-      : `บันทึกข้อมูลซิงก์ไม่สำเร็จ — โน้ต/รายการเดิมยังคงอยู่: ${cause?.message || cause}`;
+      ? `ซิงก์หยุดกลางทาง — ผสานแล้วบางส่วน (${applied.join(', ')}) โน้ต/รายการ/เตือนถูกย้อนกลับแล้ว; กดดาวน์โหลดซ้ำเพื่อลองต่อได้`
+      : `บันทึกข้อมูลซิงก์ไม่สำเร็จ — โน้ต/รายการ/เตือนเดิมยังคงอยู่: ${cause?.message || cause}`;
     throw new SyncApplyError(message, { cause, applied, report: merged });
   }
 }

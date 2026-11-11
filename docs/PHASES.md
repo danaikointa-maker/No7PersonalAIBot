@@ -1352,10 +1352,10 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | สถานะ |
 |---|---|---|
-| CA1 | เพิ่ม merge/persist เตือนความจำแบบ transaction | ⬜ |
-| CA2 | แสดงจำนวนเตือนและครอบคลุม dedupe, rollback, scheduling | ⬜ |
-| CA3 | Release 2.40 + ตรวจรับ + PR | ⬜ |
+| CA1 | เพิ่ม merge/persist เตือนความจำแบบ transaction | ✅ |
+| CA2 | แสดงจำนวนเตือนและครอบคลุม dedupe, rollback, scheduling | ✅ |
+| CA3 | Release 2.40 + ตรวจรับ + PR | ✅ |
 
-- [ ] CA1: ใช้ when+label เป็น identity; เก็บ malformed rows; persist กับ notes/todos และ rollback พร้อมกัน
-- [ ] CA2: รายงานจำนวนที่เพิ่ม; retry idempotent; re-arm timers โดยไม่ตั้งซ้ำ
-- [ ] CA3: อัปเดต metadata/docs และผ่าน test/browser/check/build/perf ก่อน PR
+- [x] CA1: ใช้ when+label เป็น identity; เก็บ malformed rows; persist กับ notes/todos และ rollback พร้อมกัน
+- [x] CA2: รายงานจำนวนที่เพิ่ม; retry idempotent; re-arm timers โดยไม่ตั้งซ้ำ
+- [x] CA3: อัปเดต metadata/docs และผ่าน test/browser/check/build/perf ก่อน PR

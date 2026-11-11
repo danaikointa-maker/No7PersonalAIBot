@@ -1,19 +1,20 @@
 const LIST_KEYS = ['no7.notes.v1', 'no7.todos.v1'];
+const fieldForKey = (key) => key.replace(/^no7\./, '').replace(/\.v1$/, '');
 
-/** Persist notes/todos as one guarded restore step; roll them back if later memory work fails. */
-export function withBackupListsRestore(values, apply, storage = globalThis.localStorage) {
-  const previous = LIST_KEYS.map((key) => storage.getItem(key));
-  const candidates = [values?.notes || [], values?.todos || []];
+/** Persist a related set of local lists before applying other stores; roll them back on failure. */
+export function withBackupListsRestore(values, apply, storage = globalThis.localStorage, keys = LIST_KEYS) {
+  const previous = keys.map((key) => storage.getItem(key));
+  const candidates = keys.map((key) => values?.[fieldForKey(key)] || []);
   const rollback = () => {
-    for (let i = 0; i < LIST_KEYS.length; i++) {
+    for (let i = 0; i < keys.length; i++) {
       try {
-        if (previous[i] == null) storage.removeItem(LIST_KEYS[i]);
-        else storage.setItem(LIST_KEYS[i], previous[i]);
+        if (previous[i] == null) storage.removeItem(keys[i]);
+        else storage.setItem(keys[i], previous[i]);
       } catch { /* best-effort rollback; quota errors do not alter existing values */ }
     }
   };
   try {
-    for (let i = 0; i < LIST_KEYS.length; i++) storage.setItem(LIST_KEYS[i], JSON.stringify(candidates[i]));
+    for (let i = 0; i < keys.length; i++) storage.setItem(keys[i], JSON.stringify(candidates[i]));
     return apply();
   } catch (error) {
     rollback();

@@ -7,7 +7,7 @@ globalThis.localStorage = (() => {
 })();
 
 const { parseRss, stripHtml, pageMeta, fetchText } = await import('../web/src/core/net.js');
-const { collectBundle, mergeBundle } = await import('../web/src/core/sync.js');
+const { collectBundle, mergeBundle, formatSyncResult } = await import('../web/src/core/sync.js');
 const { MemoryStore } = await import('../web/src/core/memory.js');
 const { CalendarStore } = await import('../web/src/core/calendar.js');
 const { createPersona, getPersona, customPersonas } = await import('../web/src/core/persona-store.js');
@@ -117,5 +117,9 @@ test('mergeBundle adds facts, personas and events without duplicating', () => {
 test('mergeBundle tolerates an empty bundle', () => {
   const memory = new MemoryStore();
   const res = mergeBundle(null, { memory });
-  assert.deepEqual(res, { facts: 0, personas: 0, events: 0, tasks: 0, conflicts: [], report: null });
+  assert.deepEqual(res, { facts: 0, personas: 0, events: 0, tasks: 0, reminders: 0, conflicts: [], report: null });
+});
+
+test('formatSyncResult reports reminders in Thai', () => {
+  assert.equal(formatSyncResult({ facts: 1, personas: 2, events: 3, tasks: 4, reminders: 5 }), '✅ ผสานแล้ว: ความจำ +1 · persona +2 · นัด +3 · งาน 4 · เตือน +5');
 });
