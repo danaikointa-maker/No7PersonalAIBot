@@ -46,4 +46,7 @@ test('release workflow triggers on version tags and builds all 3 platforms', () 
   }
   assert.match(rel, /npm run perf/);
   assert.match(rel, /latest\*\.yml/);
+  assert.match(rel, /release_tag/);
+  assert.match(rel, /tag_name: \$\{\{ inputs\.release_tag \|\| github\.ref_name \}\}/);
+  assert.match(rel, /Sanitized packaging log/);
 });
