@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.32.0] — 2026-11-11
+
+- Calendar mutations now persist candidate event lists before swapping live state. Storage failures preserve existing appointments, and add/delete/import/replace operations report failure instead of silently appearing successful.
+
 ## [2.31.0] — 2026-11-11
 
 - Task mutations now persist candidates before swapping live state; quota failures preserve existing tasks and surface clear errors. Bulk completion cleanup uses one atomic tombstone write, restore replacement commits once, and scheduler reminders wait until notification state can be saved.

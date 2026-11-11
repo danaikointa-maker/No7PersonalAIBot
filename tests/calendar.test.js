@@ -74,6 +74,31 @@ test('importIcs skips duplicates on second import', () => {
   assert.equal(cal.all().length, 2);
 });
 
+test('CalendarStore mutations preserve live and stored events when storage writes fail', () => {
+  const storage = {
+    value: null,
+    fail: false,
+    getItem() { return this.value; },
+    setItem(_key, value) { if (this.fail) throw new Error('quota exceeded'); this.value = value; },
+  };
+  const cal = new CalendarStore({ storage });
+  const original = cal.add({ title: 'นัดที่ต้องรักษา', start: Date.now() + 60_000 });
+  const priorEvents = cal.events;
+  const priorStored = storage.value;
+  storage.fail = true;
+  const assertRollback = (operation) => {
+    assert.throws(operation, { name: 'CalendarStorageError' });
+    assert.equal(cal.events, priorEvents, 'live event array must remain untouched');
+    assert.equal(storage.value, priorStored, 'persisted events must remain untouched');
+    assert.equal(cal.all()[0].uid, original.uid);
+  };
+  assertRollback(() => cal.add({ title: 'เพิ่มไม่สำเร็จ', start: Date.now() + 120_000 }));
+  assertRollback(() => cal.remove(original.uid));
+  assertRollback(() => cal.importIcs(ICS));
+  assertRollback(() => cal.replaceAll([{ uid: 'replacement', title: 'แทนที่', start: Date.now() + 180_000 }]));
+  assert.deepEqual(cal.importIcs('BEGIN:VCALENDAR\nEND:VCALENDAR'), { added: 0, total: 0 }, 'no-op imports do not write storage');
+});
+
 test('upcoming filters by window and limit', () => {
   const cal = fresh();
   const now = Date.now();

@@ -264,6 +264,24 @@ $('#cal-add-btn').click();
 await wait(20);
 check('calendar: event added', $('#cal-list').textContent.includes('ประชุมทดสอบ'), $('#cal-list').textContent.slice(0, 60));
 check('calendar: persisted', JSON.parse(window.localStorage.getItem('no7.calendar.v1') || '[]').length > 0);
+const calendarBeforeQuotaFailure = window.localStorage.getItem('no7.calendar.v1');
+const calendarStoragePrototype = Object.getPrototypeOf(window.localStorage);
+const originalCalendarSetItem = calendarStoragePrototype.setItem;
+calendarStoragePrototype.setItem = function (key, value) {
+  if (key === 'no7.calendar.v1') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalCalendarSetItem.call(this, key, value);
+};
+$('#cal-title').value = 'นัดที่บันทึกไม่สำเร็จ';
+$('#cal-when').value = '2026-12-02T10:00';
+$('#cal-add-btn').click();
+check('calendar: failed add preserves form and existing event', $('#cal-title').value === 'นัดที่บันทึกไม่สำเร็จ' && $('#cal-when').value === '2026-12-02T10:00' && $('#cal-status').textContent.includes('บันทึกปฏิทินไม่สำเร็จ') && window.localStorage.getItem('no7.calendar.v1') === calendarBeforeQuotaFailure);
+$('#cal-list').querySelector('.fact button')?.click();
+check('calendar: failed delete keeps event visible and stored', $('#cal-list').textContent.includes('ประชุมทดสอบ') && window.localStorage.getItem('no7.calendar.v1') === calendarBeforeQuotaFailure);
+calendarStoragePrototype.setItem = originalCalendarSetItem;
 
 // tasks: add, list, complete
 $('#task-title').value = 'ทดสอบงาน';
