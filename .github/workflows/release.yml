@@ -79,8 +79,9 @@ jobs:
           from pathlib import Path
 
           lines = Path(sys.argv[1]).read_text(errors='replace').splitlines()
-          matcher = re.compile(r'(?i)(error|fail|exception|unresolved|missing|not found|doesn.t exist|cannot|exited command|exit code|ERR_)')
-          selected = [line for line in lines if matcher.search(line)][-8:] or lines[-8:]
+          # Keep enough sanitized tail context to show the actual failing command,
+          # even when electron-builder's final diagnostic misses known keywords.
+          selected = lines[-30:]
           for line in selected:
               line = re.sub(r"https?://[^\s\"']+", '[URL redacted]', line)
               line = re.sub(r'(?i)(api[_-]?key|token|secret|password|authorization)(\s*[:=]\s*)[^,\s]+', r'\1\2[REDACTED]', line)
