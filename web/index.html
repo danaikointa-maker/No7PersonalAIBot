@@ -35,6 +35,17 @@
         </div>
       </aside>
 
+      <!-- Command palette (⌘/Ctrl+K) -->
+      <div id="palette" class="palette" hidden>
+        <div class="palette-box" role="dialog" aria-modal="true" aria-label="ค้นหาทุกอย่าง">
+          <input id="palette-input" type="text" autocomplete="off" spellcheck="false"
+                 placeholder="ค้นหาความจำ โน้ต งาน นัดหมาย เครื่องมือ…"
+                 data-i18n-placeholder="palette.placeholder" />
+          <div id="palette-results" role="listbox"></div>
+          <small id="palette-hint" class="hint" data-i18n="palette.hint">↑↓ เลือก · Enter เปิด · Esc ปิด</small>
+        </div>
+      </div>
+
       <!-- Main -->
       <main id="main">
         <header id="topbar">
@@ -151,9 +162,11 @@
           <p class="hint">มีเวลาเตือน + ซิงก์ข้ามเครื่องผ่าน <code>/api/sync</code> (last-write-wins)</p>
           <div class="row">
             <button id="digest-btn" data-i18n="digest.button">🌅 สรุปวันนี้</button>
+            <button id="weekly-btn" data-i18n="weekly.button">📆 รายงานสัปดาห์</button>
             <label class="inline"><input type="checkbox" id="set-digest-auto" /> สรุปอัตโนมัติทุกเช้า</label>
           </div>
           <div id="digest-card" hidden></div>
+          <div id="weekly-card" hidden></div>
           <div id="task-stats" class="hint"></div>
           <div id="task-server-status" class="hint"></div>
           <div class="row">
@@ -444,9 +457,12 @@
           <p class="hint" id="device-info">—</p>
           <div class="row">
             <button id="install-btn">ติดตั้งเป็นแอป (PWA)</button>
-            <button id="export-btn">ส่งออกข้อมูล</button>
+            <button id="export-btn" data-i18n="backup.export">ส่งออกข้อมูล</button>
+            <button id="import-btn" data-i18n="backup.import">นำเข้าข้อมูลสำรอง</button>
+            <input id="import-file" type="file" accept="application/json,.json" hidden />
             <button id="reset-btn">ล้างข้อมูลทั้งหมด</button>
           </div>
+          <p id="backup-status" class="hint"></p>
 
           <h3>🔄 ซิงก์ข้ามเครื่อง</h3>
           <p class="hint">ใช้ companion server ของคุณเอง (npm run server) — ไม่มีคลาวด์ ไม่มีบัญชี</p>

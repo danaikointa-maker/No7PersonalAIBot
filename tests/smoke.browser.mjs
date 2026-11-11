@@ -83,9 +83,15 @@ window.fetch = async (url, opts = {}) => {
   if (u.includes('text.pollinations.ai')) {
     const msgs = JSON.parse(opts.body).messages;
     const last = msgs[msgs.length - 1].content;
+    const history = msgs.map((m) => String(m.content)).join('\n');
     const reply = (content) => ({ ok: true, json: async () => ({ choices: [{ message: { content } }] }) });
+    // multi-tool: คำขอ "สองอย่าง" → gold แล้วต่อด้วย calc ในลูปเดียว (ดูกำลังจากประวัติ ไม่ใช้สถานะภายนอก)
+    if (history.includes('สองอย่าง') && last.includes('ผลลัพธ์จากเครื่องมือ gold') && !history.includes('ผลลัพธ์จากเครื่องมือ calc')) {
+      return reply('```tool\n{"tool":"calc","args":{"expression":"2412*2"}}\n```');
+    }
     if (last.includes('ผลลัพธ์จากเครื่องมือ')) return reply('ราคาทองตอนนี้ 2,412 ดอลลาร์ต่อออนซ์ครับ');
     if (last.includes('พิมพ์คำว่า OK')) return reply('OK');
+    if (last.includes('สองอย่าง')) return reply('```tool\n{"tool":"gold","args":{}}\n```');
     if (last.includes('ราคาทอง')) return reply('```tool\n{"tool":"gold","args":{}}\n```');
     if (last.includes('เปิดเว็บ')) return reply('```tool\n{"tool":"open_url","args":{"url":"https://example.com"}}\n```');
     return reply('สวัสดีครับ ผมชื่อ No7');
@@ -163,7 +169,7 @@ const submit = (text) => {
 await wait(100);
 check('boot: initial state', ['IDLE', 'SETUP'].includes($('#state-label').textContent), $('#state-label').textContent);
 check('boot: welcome message', $('#messages').children.length >= 1);
-check('boot: 29 tools in auto mode (28 + digest)', $('#tools-grid').children.length === 29, String($('#tools-grid').children.length));
+check('boot: 30 tools in auto mode (28 + digest + weekly)', $('#tools-grid').children.length === 30, String($('#tools-grid').children.length));
 check('boot: 5 role modes', $('#mode-chips').children.length === 5, String($('#mode-chips').children.length));
 check('boot: persona header', $('#persona-name').textContent.length > 0);
 
@@ -173,10 +179,10 @@ check('nav: memory view', $('#view-memory').classList.contains('active'));
 // mode switching filters tools
 window.document.querySelector('#mode-chips button[data-mode="hub"]').click();
 await wait(20);
-check('mode: hub filters tools', $('#tools-grid').children.length === 22, String($('#tools-grid').children.length));
+check('mode: hub filters tools', $('#tools-grid').children.length === 23, String($('#tools-grid').children.length));
 window.document.querySelector('#mode-chips button[data-mode="auto"]').click();
 await wait(20);
-check('mode: back to auto', $('#tools-grid').children.length === 29, String($('#tools-grid').children.length));
+check('mode: back to auto', $('#tools-grid').children.length === 30, String($('#tools-grid').children.length));
 
 $('#set-provider').value = 'pollinations';
 $('#save-settings-btn').click();
@@ -204,11 +210,22 @@ submit('ราคาทองวันนี้');
 await wait(220);
 const lastBot = [...$('#messages').querySelectorAll('.msg.bot')].at(-1);
 check('tool: card rendered', !!lastBot?.querySelector('.card'));
+check('progressive: card lands in .msg-cards', !!lastBot?.querySelector('.msg-cards .card'));
+check('progressive: answer stays in .msg-text', lastBot?.querySelector('.msg-text')?.textContent.includes('2,412'), lastBot?.querySelector('.msg-text')?.textContent?.slice(0, 40));
+check('progressive: card count recorded', lastBot?.querySelector('.msg-cards')?.dataset.count === '1', lastBot?.querySelector('.msg-cards')?.dataset.count);
 check('tool: provider API called', calls.some((c) => c.url.includes('gold-api')));
 check('tool: spoken summary', lastBot?.textContent.includes('2,412'), lastBot?.textContent.slice(0, 60));
 check('timeline: visible after a tool run', !$('#run-timeline').hidden, $('#run-timeline').hidden ? 'hidden' : 'shown');
 check('timeline: lists thinking + tool steps', $('#run-timeline').querySelectorAll('.tl-row').length >= 2, String($('#run-timeline').querySelectorAll('.tl-row').length));
 check('timeline: headline says finished', /เสร็จใน|Done in/.test($('#run-timeline').textContent), $('#run-timeline').textContent.slice(0, 70));
+
+// multi-tool in a single request → two cards in the same bubble, rendered as they arrive
+submit('ทำสองอย่างให้หน่อย');
+await wait(300);
+const multiBot = [...$('#messages').querySelectorAll('.msg.bot')].at(-1);
+check('progressive: two cards in one answer', multiBot?.querySelectorAll('.msg-cards .card').length === 2, `cards=${multiBot?.querySelectorAll('.msg-cards .card').length} txt=${multiBot?.textContent?.slice(0, 80)} calls=${calls.filter((c) => c.url.includes('gold-api')).length}`);
+check('progressive: count attribute matches', multiBot?.querySelector('.msg-cards')?.dataset.count === '2', multiBot?.querySelector('.msg-cards')?.dataset.count);
+check('progressive: cards survive final text', multiBot?.querySelectorAll('.msg-cards .card').length === 2 && !!multiBot?.querySelector('.msg-text')?.textContent);
 
 $('#mic-btn').click();
 await wait(80);
@@ -263,6 +280,67 @@ const stillOpen = [...$('#task-list').querySelectorAll('.fact')].some((r) => r.t
 check('journey: recurring task stays open', stillOpen, $('#task-list').textContent.slice(0, 60));
 $('#task-repeat').value = '';
 
+// backup / restore (schema 2)
+window.confirm = () => true;
+$('#nav button[data-view="settings"]').click();
+$('#export-btn').click();
+check('backup: export reports a schema-2 file', $('#backup-status').textContent.includes('schema 2'), $('#backup-status').textContent.slice(0, 80));
+const backupPayload = {
+  app: 'no7-personal-ai', schema: 2, version: '2.2.0', createdAt: new Date().toISOString(), includeSecrets: false,
+  data: {
+    settings: { language: 'th', uiLang: 'th' },
+    facts: [{ id: 'imp-1', text: 'ความจำจากการนำเข้า', ts: Date.now(), importance: 2 }],
+    log: [], notes: [{ text: 'โน้ตจากไฟล์สำรอง', ts: Date.now() }], todos: [], tasks: [], events: [],
+  },
+};
+const backupFile = new window.File([JSON.stringify(backupPayload)], 'no7-backup.json', { type: 'application/json' });
+Object.defineProperty($('#import-file'), 'files', { value: [backupFile], configurable: true });
+$('#import-file').dispatchEvent(new window.Event('change'));
+await wait(120);
+check('backup: import succeeded', $('#backup-status').textContent.includes('นำเข้าแล้ว'), $('#backup-status').textContent.slice(0, 80));
+$('#nav button[data-view="memory"]').click();
+$('#mem-query').value = 'นำเข้า';
+$('#mem-search-btn').click();
+check('backup: imported fact searchable', $('#mem-results').textContent.includes('ความจำจากการนำเข้า'), $('#mem-results').textContent.slice(0, 60));
+check('backup: imported note stored', JSON.parse(window.localStorage.getItem('no7.notes.v1') || '[]').some((n) => n.text.includes('โน้ตจากไฟล์สำรอง')));
+const badFile = new window.File(['{not json'], 'bad.json', { type: 'application/json' });
+Object.defineProperty($('#import-file'), 'files', { value: [badFile], configurable: true });
+$('#import-file').dispatchEvent(new window.Event('change'));
+await wait(80);
+check('backup: broken file rejected', $('#backup-status').textContent.includes('❌'), $('#backup-status').textContent.slice(0, 60));
+
+// command palette (Ctrl/⌘ K)
+window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+await wait(30);
+check('palette: opens with Ctrl+K', !$('#palette').hidden, $('#palette').hidden ? 'hidden' : 'shown');
+const pInput = $('#palette-input');
+pInput.value = 'กาแฟ';
+pInput.dispatchEvent(new window.Event('input'));
+await wait(20);
+check('palette: finds memory fact', $('#palette-results').textContent.includes('กาแฟดำ'), $('#palette-results').textContent.slice(0, 60));
+check('palette: highlights match', !!$('#palette-results mark'), $('#palette-results').innerHTML.slice(0, 80));
+$('#palette-results .palette-row').click();
+await wait(30);
+check('palette: closes after choosing', $('#palette').hidden);
+check('palette: navigated to memory with query', $('#view-memory').classList.contains('active') && $('#mem-query').value.includes('กาแฟ'), $('#mem-query').value);
+window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));
+await wait(20);
+$('#palette-input').value = 'สรุปวันนี้';
+$('#palette-input').dispatchEvent(new window.Event('input'));
+await wait(20);
+check('palette: finds the digest action', $('#palette-results').textContent.includes('สรุปวันนี้'), $('#palette-results').textContent.slice(0, 60));
+window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+await wait(20);
+check('palette: Esc closes', $('#palette').hidden);
+
+// weekly review
+$('#weekly-btn').click();
+await wait(30);
+check('weekly: card rendered', !$('#weekly-card').hidden, $('#weekly-card').hidden ? 'hidden' : 'shown');
+check('weekly: shows the range', /\d/.test($('#weekly-card').textContent), $('#weekly-card').textContent.slice(0, 70));
+check('weekly: focus section present', $('#weekly-card').textContent.includes('โฟกัสสัปดาห์หน้า'), $('#weekly-card').textContent.slice(0, 80));
+check('weekly: posted to chat', [...$('#messages').querySelectorAll('.msg.bot.digest')].length >= 1);
+
 // HTTP tool plugins
 $('#nav button[data-view="tools"]').click();
 $('#plugin-example').click();
@@ -273,21 +351,21 @@ $('#plugin-save').click();
 await wait(20);
 check('plugins: saved to settings', (JSON.parse(window.localStorage.getItem('no7.settings.v1') || '{}').customPlugins || []).length === 2);
 check('plugins: listed in panel', $('#plugin-list').textContent.includes('เกร็ดแมว'), $('#plugin-list').textContent.slice(0, 60));
-check('plugins: tools grid grows', $('#tools-grid').children.length === 31, String($('#tools-grid').children.length));
+check('plugins: tools grid grows', $('#tools-grid').children.length === 32, String($('#tools-grid').children.length));
 $('#plugin-json').value = '[{"id":"bad","label":"ไม่ดี","url":"http://insecure.example.com/x"}]';
 $('#plugin-save').click();
 check('plugins: http url rejected', $('#plugin-status').textContent.includes('❌'), $('#plugin-status').textContent.slice(0, 60));
 $('#plugin-json').value = '[]';
 $('#plugin-save').click();
 await wait(10);
-check('plugins: cleared back to 29 tools', $('#tools-grid').children.length === 29, String($('#tools-grid').children.length));
+check('plugins: cleared back to 30 tools', $('#tools-grid').children.length === 30, String($('#tools-grid').children.length));
 
 // daily digest
 $('#digest-btn').click();
 await wait(30);
 check('digest: card rendered', !$('#digest-card').hidden, $('#digest-card').hidden ? 'hidden' : 'shown');
 check('digest: includes today\'s task', $('#digest-card').textContent.includes('ทดสอบงาน') || $('#digest-card').textContent.includes('งานซ้ำทดสอบ'), `${JSON.parse(window.localStorage.getItem('no7.tasks.v1') || '[]').length} tasks / ${$('#digest-card').textContent.slice(0, 120)}`);
-check('digest: posted to chat', [...$('#messages').querySelectorAll('.msg.bot.digest')].length === 1);
+check('digest: posted to chat', [...$('#messages').querySelectorAll('.msg.bot.digest')].length >= 2, String([...$('#messages').querySelectorAll('.msg.bot.digest')].length));
 check('digest: remembers the day', !!window.localStorage.getItem('no7.digest.last'));
 $('#set-digest-auto').checked = true;
 $('#set-digest-auto').dispatchEvent(new window.Event('change'));

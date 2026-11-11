@@ -2,6 +2,56 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.3.0] — 2026-11-10
+
+รอบที่แปด: งานหลายเครื่องมือเห็นผลระหว่างทาง (ไม่ต้องรอคำตอบจบ) และมองภาพรวมสัปดาห์เพื่อวางแผนต่อ
+
+### เพิ่ม
+**W1 — ผลเครื่องมือแบบ progressive**
+- ฟองคำตอบแยกเป็น `.msg-text` + `.msg-cards`: event `result` วาดการ์ดทันทีที่เครื่องมือคืนค่า
+  (กำหนด `data-count` ไว้ตรวจสอบ), หลายเครื่องมือต่อคำสั่ง = หลายการ์ดในฟองเดียว
+- ระหว่างลูปแสดง `ได้ผลแล้ว — กำลังสรุป…` / `เก็บผลแล้ว N อย่าง — กำลังสรุป…`
+- คำตอบสุดท้ายและข้อความ error เขียนเฉพาะ `.msg-text` → การ์ดที่วาดไปแล้วไม่หาย
+
+**W2 — รายงานรายสัปดาห์**
+- `core/weekly.js`: `startOfWeek`/`weekRange` (เริ่มจันทร์ 00:00, half-open), `buildWeekly`
+  (ปิดได้/เพิ่มใหม่/เกินกำหนด/ครบกำหนดสัปดาห์หน้า/นัดหมาย/ความจำใหม่/เครื่องมือ+failure rate/
+  latency แชท) + เทียบสัปดาห์ก่อน + ข้อเสนอโฟกัส + `weeklyMarkdown`
+- tool `weekly` (dynamic, risk 0) + ปุ่ม "📆 รายงานสัปดาห์" + การ์ด `#weekly-card`
+- `docs/WEEKLY.md`
+
+### เปลี่ยน
+- เครื่องมือในหน้าเครื่องมือ = 30 (28 เดิม + `digest` + `weekly`) และเพิ่มตามปลั๊กอิน
+
+## [2.2.0] — 2026-11-10
+
+รอบที่เจ็ด: ทำให้ข้อมูลที่สะสมไว้ "หาเจอ" และ "ย้ายเครื่องได้" — command palette ที่ค้นทุกอย่าง,
+ไฟล์สำรอง schema ใหม่ที่ตรวจสอบได้ และกู้คืนแบบ dry-run ก่อนเขียนทับ
+
+### เพิ่ม
+**V1 — ค้นหาทุกอย่าง (⌘/Ctrl+K)**
+- `core/search.js`: `buildIndex` (ความจำ/โน้ต/รายการ/งาน/นัด/เครื่องมือ/เมนู/คำสั่ง) + `searchIndex`
+  (exact > prefix > substring > token, น้ำหนักชนิด, โบนัสความใหม่/pinned) + จำกัดผลลัพธ์ต่อชนิด
+- `groupResults`, `matchRanges`, `highlightRanges` (ตำแหน่งบนข้อความดิบ — ปลอดภัยกับวรรณยุกต์ไทย),
+  `defaultPaletteExtras()` (เมนู 7 หน้า + 3 คำสั่ง)
+- UI `#palette`: เปิดด้วย ⌘/Ctrl+K, ↑↓/Enter/Esc, คลิกพื้นหลังปิด, ไฮไลต์คำค้นด้วย `<mark>`
+- การกระทำ: เปลี่ยนหน้า, ค้นความจำทันที, แสดงงาน/นัด/เครื่องมือ, `สรุปวันนี้`, `หยุดทุกอย่าง`, เริ่มแชทใหม่
+- `docs/SEARCH.md`
+
+**V2 — สำรอง / กู้คืน (schema 2)**
+- `core/backup.js`: `createBackup` (+ counts + checksum), `redactSettings`/`hasSecrets`,
+  `validateBackup` (string/object, migrate export รุ่นเก่า, เตือนเมื่อ checksum ไม่ตรง),
+  `summarizeBackup`, `mergeRecords` (last-write-wins ต่อคอลเลกชัน), `planRestore`/`describePlan`
+- UI: ส่งออกเป็น schema 2 (ไม่มีคีย์), นำเข้าไฟล์ด้วย `FileReader` → dry-run สรุปในกล่องยืนยัน → merge
+- `docs/BACKUP.md`
+
+### เปลี่ยน
+- `Ctrl/Cmd+K` เปิด command palette (เดิมโฟกัสช่องแชท) · `Esc` ปิด palette ก่อน modal อื่น
+- `downloadJson` คืนสถานะและไม่ล้มในสภาพแวดล้อมที่ไม่มี object URL
+
+### แก้
+- กัน `tasks`/`calendar` ถูกอ้างก่อนประกาศในโค้ด digest (TDZ) ด้วย closure
+
 ## [2.1.0] — 2026-11-10
 
 รอบที่หก: "ทำงานหลายขั้น" กลายเป็นสิ่งที่มองเห็นและหยุดได้, No7 สรุปวันให้ทุกเช้า,

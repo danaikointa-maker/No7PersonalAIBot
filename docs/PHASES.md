@@ -283,3 +283,69 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 25.1 version 2.1.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics) + CHANGELOG 2.1.0
 - [x] 25.2 README v2.1 (timeline, digest, plugins, 341 unit / 111 checks, 29 tools) + docs table + PHASES ปิดครบ
 - [x] 25.3 ตรวจรับรวม: check 92 ไฟล์ · unit 341 · browser 111 · build · perf (83.5 KB gzip) → PR
+
+---
+
+# รอบที่ 7 (v2.2)
+
+เป้าหมาย: ทำให้ข้อมูลที่มีอยู่ "หาเจอ" และ "ย้ายเครื่องได้" — ค้นทุกอย่างจากที่เดียวด้วย ⌘/Ctrl+K
+และสำรอง/กู้คืนข้อมูลทั้งแอปได้อย่างปลอดภัย (schema ชัดเจน, dry-run ก่อนเขียนทับ)
+
+| เฟส | ชื่อ | งานย่อย | สถานะ |
+|---|---|---|---|
+| V1 | ค้นหาทุกอย่าง (⌘K) | 26.1–26.4 | ✅ |
+| V2 | สำรอง/กู้คืนข้อมูล | 27.1–27.4 | ✅ |
+| V3 | Release 2.2 | 28.1–28.3 | ✅ |
+
+## V1 — ค้นหาทุกอย่าง (Command palette)
+
+- [x] 26.1 `core/search.js`: `buildIndex` (8 ชนิด) + `searchIndex` (exact>prefix>token + น้ำหนักชนิด + ความใหม่) + `matchRanges`/`highlightRanges` + `groupResults`
+- [x] 26.2 UI `#palette`: ⌘/Ctrl+K เปิด, ↑↓ เลื่อน, Enter เลือก, Esc ปิด, คลิกพื้นหลังปิด, จัดกลุ่มตามชนิด + ไฮไลต์คำค้น
+- [x] 26.3 การกระทำ: เปิดหน้า / ค้นความจำ / แสดงงาน-นัด-เครื่องมือ / `digest` / `stopAll` / เริ่มแชทใหม่
+- [x] 26.4 `tests/search.test.js` (13) + smoke +7 (118 checks) + `docs/SEARCH.md`
+
+## V2 — สำรอง/กู้คืนข้อมูล
+
+- [x] 27.1 `core/backup.js`: `createBackup` (schema 2 + checksum + counts), `redactSettings`/`hasSecrets`, `validateBackup`, `summarizeBackup`, `migrateBackup` (export รุ่นเก่า)
+- [x] 27.2 `mergeRecords` (LWW ตาม `ts/updatedAt`) + `planRestore` (merge/replace, dry-run) + `describePlan` + `COLLECTIONS`
+- [x] 27.3 UI: `#export-btn` ใช้ schema 2, `#import-btn`/`#import-file` (FileReader → validate → confirm พร้อมสรุป → merge) + `#backup-status`
+- [x] 27.4 `tests/backup.test.js` (14) + smoke +5 (123 checks) + `docs/BACKUP.md`
+
+## V3 — Release 2.2
+
+- [x] 28.1 version 2.2.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics) + CHANGELOG 2.2.0
+- [x] 28.2 README v2.2 (⌘K, backup/restore, 368 unit / 123 checks, 28 docs) + PHASES ปิดครบ
+- [x] 28.3 ตรวจรับรวม: check 96 ไฟล์ · unit 368 · browser 123 · build · perf → PR
+
+---
+
+# รอบที่ 8 (v2.3)
+
+เป้าหมาย: ทำงานหลายเครื่องมือได้ลื่นขึ้น (เห็นผลระหว่างทาง), มองย้อนภาพรวมสัปดาห์ได้,
+และปิดช่องว่างของ sync ความจำระหว่างเครื่อง
+
+| เฟส | ชื่อ | งานย่อย | สถานะ |
+|---|---|---|---|
+| W1 | ผลเครื่องมือแบบ progressive | 29.1–29.4 | ✅ |
+| W2 | รายงานรายสัปดาห์ | 30.1–30.4 | ✅ |
+| W3 | Release 2.3 | 31.1–31.3 | ✅ |
+
+## W1 — ผลเครื่องมือแบบ progressive (partial UI)
+
+- [x] 29.1 ฟองคำตอบแยก `msg-text` + `msg-cards`: event `result` วาดการ์ดทันที + `data-count` + ข้อความ "กำลังสรุป…"
+- [x] 29.2 หลายเครื่องมือต่อคำสั่ง → หลายการ์ดในฟองเดียว ตามลำดับที่เสร็จ (ไม่รอคำตอบจบ)
+- [x] 29.3 คำตอบสุดท้ายเขียนเฉพาะ `msg-text` → การ์ดที่วาดไปแล้วไม่หาย (ลบ `.streaming` เมื่อจบ/ผิดพลาด)
+- [x] 29.4 smoke +6 (129 checks: การ์ดใน `msg-cards`, ข้อความใน `msg-text`, multi-tool 2 การ์ด) + `docs/AGENT.md` §2.1
+
+## W2 — รายงานรายสัปดาห์ (weekly review)
+
+- [x] 30.1 `core/weekly.js`: `buildWeekly` (ปิดได้/เพิ่มใหม่/เกินกำหนด/สัปดาห์หน้า/นัดหมาย/ความจำใหม่/เครื่องมือ+failure rate) + `focus` + sections + markdown
+- [x] 30.2 tool `weekly` (dynamic, risk 0) + ปุ่ม "📆 รายงานสัปดาห์" + `#weekly-card` + โพสต์ในแชท
+- [x] 30.3 `startOfWeek`/`weekRange` (จันทร์ 00:00, half-open) + เทียบสัปดาห์ก่อน (`deltaCompleted`)
+- [x] 30.4 `tests/weekly.test.js` (9) + smoke +4 (133 checks) + `docs/WEEKLY.md`
+
+## W3 — Release 2.3
+
+- [x] 31.1 version 2.3.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics) + CHANGELOG 2.3.0
+- [x] 31.2 README v2.3 (progressive cards, weekly review, 30 tools, 377 unit / 133 checks, 29 docs) + PHASES ปิดครบ
+- [x] 31.3 ตรวจรับรวม: check 98 ไฟล์ · unit 377 · browser 133 · build · perf → PR

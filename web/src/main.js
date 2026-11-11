@@ -44,9 +44,16 @@ import { detectPlatform, platformLabel, isDesktopHost } from './core/platform.js
 import { applyI18n, langOf, viewTitle, t as tr } from './core/i18n.js';
 import { AgentTimeline, statusIcon } from './core/timeline.js';
 import { buildDigest, digestTool, shouldAutoDigest } from './core/digest.js';
+import { buildWeekly, weeklyTool } from './core/weekly.js';
 import {
   customToolDefs, validateCustomTools, PLUGIN_EXAMPLE, PLUGIN_LIMITS,
 } from './core/custom-tools.js';
+import {
+  buildIndex, searchIndex, groupResults, defaultPaletteExtras, highlightRanges,
+} from './core/search.js';
+import {
+  createBackup, validateBackup, summarizeBackup, planRestore, describePlan, BACKUP_SCHEMA,
+} from './core/backup.js';
 import {
   LOCAL_PRESETS, probeLocal, warmModel, pickBestModel, normalizeOfflineBrain,
   offlineChainSettings, describeLocalBrain, LocalModelCache,
@@ -66,9 +73,15 @@ const mcp = new McpRegistry({
 /** เครื่องมือ dynamic ทั้งหมด: MCP + ปลั๊กอิน HTTP + digest (ลงทะเบียนที่เดียว) */
 let pluginToolDefs = {};
 let digestToolDef = null;
+let weeklyToolDef = null;
 
 function refreshDynamicTools() {
-  const defs = { ...mcp.toolDefs(), ...pluginToolDefs, digest: digestToolDef };
+  const defs = {
+    ...mcp.toolDefs(),
+    ...pluginToolDefs,
+    digest: digestToolDef,
+    weekly: weeklyToolDef,
+  };
   registerDynamicTools(defs);
   return Object.keys(defs).length;
 }
@@ -364,8 +377,24 @@ async function respond(userText) {
 
   const persona = getPersona(settings.persona);
   const chain = resolveProviderChain(offlineChainSettings(settings));
-  const botEl = addMessage('bot', '…');
-  const cards = [];
+  const botEl = addMessage('bot', '');
+  botEl.classList.add('streaming');
+  const textEl = document.createElement('div');
+  textEl.className = 'msg-text';
+  textEl.textContent = '…';
+  const cardsEl = document.createElement('div');
+  cardsEl.className = 'msg-cards';
+  botEl.append(textEl, cardsEl);
+  const setBotText = (text) => { textEl.textContent = text; };
+  let partialCards = 0;
+  /** การ์ดผลลัพธ์ถูกวาดทันทีที่เครื่องมือคืนค่า (ไม่รอคำตอบจบ) */
+  const pushCard = (tool, data) => {
+    partialCards++;
+    cardsEl.dataset.count = String(partialCards);
+    renderCard(cardsEl, tool, data);
+    $('#messages').scrollTop = $('#messages').scrollHeight;
+    return partialCards;
+  };
   const splitter = new SentenceSplitter();
   const queue = new SpeechQueue(speechVoice, {
     onSentence: (sentence) => { bargeIn.setSpoken(sentence); },
@@ -425,13 +454,13 @@ async function respond(userText) {
       renderTimeline(timeline);
       if (e.type === 'thinking') {
         sm.set({ requestInFlight: true, toolRunning: false });
-        if (e.step > 1 && !streamBuf) botEl.textContent = 'กำลังคิดต่อ…';
+        if (e.step > 1 && !streamBuf) setBotText('กำลังคิดต่อ…');
       }
       if (e.type === 'token') {
         if (!firstTokenAt) firstTokenAt = performance.now();
         streamBuf += e.delta;
         if (streamBuf.includes('```') || /^\s*\{/.test(streamBuf)) toolLikely = true;
-        botEl.textContent = withCursor(streamBuf, !toolLikely);
+        setBotText(withCursor(streamBuf, !toolLikely));
         $('#messages').scrollTop = $('#messages').scrollHeight;
         if (speakLive && !toolLikely) {
           for (const sentence of splitter.push(e.delta)) queue.enqueue(sentence);
@@ -441,7 +470,7 @@ async function respond(userText) {
         // ข้อความที่ไหลมาเป็นเจตนาเรียกเครื่องมือ ไม่ใช่คำตอบ → ล้างและหยุดเสียง
         streamBuf = '';
         toolLikely = false;
-        botEl.textContent = '';
+        setBotText('');
         splitter.reset();
         speakLive = false;
         queue.stop();
@@ -451,7 +480,12 @@ async function respond(userText) {
       }
       if (e.type === 'result') {
         addStep(`${e.data?.title || e.tool} — เสร็จแล้ว`, 'ok');
-        cards.push(e);
+        pushCard(e.tool, e.data);
+        if (!streamBuf) {
+          setBotText(partialCards > 1
+            ? `เก็บผลแล้ว ${partialCards} อย่าง — กำลังสรุป…`
+            : 'ได้ผลแล้ว — กำลังสรุป…');
+        }
       }
       if (e.type === 'denied') {
         addStep(e.reason === 'user-declined' ? `ไม่อนุญาต ${e.tool}` : `ถูกบล็อก: หมวด ${CATEGORIES[e.category]?.label || e.category}`, 'deny');
@@ -478,9 +512,9 @@ async function respond(userText) {
       for (const sentence of splitter.flush()) queue.enqueue(sentence);
       setSubtitle(botText);
     } else {
-      botEl.textContent = botText;
+      setBotText(botText);
     }
-    for (const c of cards) renderCard(botEl, c.tool, c.data);
+    botEl.classList.remove('streaming');
 
     memory.logTurn('assistant', botText);
     history.push({ role: 'user', content: userText }, { role: 'assistant', content: botText });
@@ -495,7 +529,8 @@ async function respond(userText) {
     renderTimeline(timeline);
     noteError(err, retriedOnce ? 'chat(retry)' : 'chat');
     queue.stop();
-    botEl.textContent = `⚠️ ${err.message}`;
+    setBotText(`⚠️ ${err.message}`);
+    botEl.classList.remove('streaming');
     sm.set({ error: err.message, requestInFlight: false, toolRunning: false });
     setSubtitle('มีปัญหาการเชื่อมต่อ ลองตรวจสอบการตั้งค่า');
     setTimeout(() => sm.set({ error: null }), 4000);
@@ -911,10 +946,15 @@ $('#mem-llm-toggle').addEventListener('change', (e) => {
 function downloadJson(data, filename) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
+  if (typeof URL.createObjectURL !== 'function') {
+    // สภาพแวดล้อมที่ไม่มี object URL (เช่น jsdom ในเทสต์) — ไม่ทำให้ทั้งฟังก์ชันล้ม
+    return { downloaded: false, bytes: blob.size, filename };
+  }
   a.href = URL.createObjectURL(blob);
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(a.href);
+  URL.revokeObjectURL?.(a.href);
+  return { downloaded: true, bytes: blob.size, filename };
 }
 
 /* ------------------------------------------------------- HTTP tool plugins */
@@ -1034,6 +1074,50 @@ function maybeAutoDigest() {
   return digest;
 }
 
+weeklyToolDef = weeklyTool({
+  tasks: { list: (opts = {}) => tasks.list(opts) },
+  calendar: { list: () => calendar.all() },
+  memory: { list: () => memory.listFacts({ sort: 'recent' }) },
+  samples: () => metrics.entries(),
+  lang: () => langOf(settings.uiLang),
+});
+
+function renderWeeklyCard(weekly, target = null) {
+  const box = $('#weekly-card');
+  const html = `<div class="digest-card weekly-card">
+    <strong>${esc(`${weekly.range.label} · ${weekly.headline}`)}</strong>
+    ${weekly.sections.map((sec) => `<div class="digest-sec">
+      <div class="digest-sec-head">${sec.emoji} ${esc(sec.title)}</div>
+      ${sec.items.map((it) => `<div class="digest-item">· ${esc(it.label)}${it.meta ? ` <small>${esc(it.meta)}</small>` : ''}</div>`).join('')}
+    </div>`).join('') || `<p class="hint">${esc(tr('weekly.empty', { lang: settings.uiLang }))}</p>`}
+  </div>`;
+  if (box) { box.innerHTML = html; box.hidden = false; }
+  if (target) {
+    const plain = [`${tr('weekly.title', { lang: settings.uiLang })} — ${weekly.range.label}`, weekly.headline]
+      .concat(weekly.sections.flatMap((sec) => [
+        `${sec.emoji} ${sec.title}`,
+        ...sec.items.map((it) => `  · ${it.label}${it.meta ? ` (${it.meta})` : ''}`),
+      ])).join('\n');
+    addMessage('bot', plain).classList.add('digest');
+  }
+  return html;
+}
+
+function showWeekly({ inChat = true } = {}) {
+  const weekly = buildWeekly({
+    tasks: tasks.list({ done: null, sort: 'priority' }),
+    events: calendar.all(),
+    facts: memory.listFacts({ sort: 'recent' }),
+    samples: metrics.entries(),
+    now: Date.now(),
+    weekStart: 1,
+    lang: langOf(settings.uiLang),
+  });
+  renderWeeklyCard(weekly, inChat ? {} : null);
+  setSubtitle(weekly.headline);
+  return weekly;
+}
+
 /* ---------------------------------------------------------------- calendar */
 const calendar = getCalendar();
 
@@ -1097,6 +1181,7 @@ $('#digest-btn')?.addEventListener('click', () => {
   const digest = showDigest({ inChat: true });
   try { localStorage.setItem(DIGEST_KEY, String(digest.date)); } catch { /* noop */ }
 });
+$('#weekly-btn')?.addEventListener('click', () => showWeekly({ inChat: true }));
 $('#set-digest-auto')?.addEventListener('change', (e) => {
   Object.assign(settings, saveSettings({ digestAuto: e.target.checked }));
   $('#settings-status').textContent = e.target.checked
@@ -1631,7 +1716,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.1.0',
+      version: window.NO7_VERSION || '2.3.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -2684,16 +2769,107 @@ $('#set-provider').addEventListener('change', () => {
   }
 });
 
-$('#export-btn').addEventListener('click', () => {
-  const data = {
-    exportedAt: new Date().toISOString(),
-    settings: { ...settings, apiKey: '' },
-    facts: memory.listFacts(),
+/* ------------------------------------------------- backup / restore (v2) */
+function collectBackupState() {
+  return {
+    settings,
+    facts: memory.listFacts({ sort: 'recent' }),
     log: memory.recentLog(500),
-    todos: JSON.parse(localStorage.getItem('no7.todos.v1') || '[]'),
-    notes: JSON.parse(localStorage.getItem('no7.notes.v1') || '[]'),
+    notes: readList('no7.notes.v1'),
+    todos: readList('no7.todos.v1'),
+    tasks: tasks.list({ done: null }),
+    events: calendar.all(),
+    personas: [],
   };
-  downloadJson(data, `no7-backup-${Date.now()}.json`);
+}
+
+function setBackupStatus(text) {
+  const el = $('#backup-status');
+  if (el) el.textContent = text;
+  return text;
+}
+
+$('#export-btn').addEventListener('click', () => {
+  const backup = createBackup(collectBackupState(), {
+    includeSecrets: false,
+    version: window.NO7_VERSION || '',
+  });
+  setBackupStatus(`⬇️ สำรองข้อมูลแล้ว (schema ${BACKUP_SCHEMA} · ${backup.counts.facts} ความจำ · ${backup.counts.tasks} งาน) — ไม่มีคีย์/โทเคนติดไป`);
+  try {
+    downloadJson(backup, `no7-backup-${new Date().toISOString().slice(0, 10)}.json`);
+  } catch (err) {
+    setBackupStatus(`⚠️ สร้างไฟล์ไม่สำเร็จในสภาพแวดล้อมนี้: ${err.message}`);
+  }
+});
+
+/** เขียนข้อมูลตามแผนกู้คืน (เรียกหลังผู้ใช้ยืนยันแล้วเท่านั้น) */
+function applyRestore(plan) {
+  const replace = plan.mode === 'replace';
+  if (replace) memory.clearAll();
+  memory.importData({ facts: plan.values.facts }, { merge: !replace });
+  try {
+    localStorage.setItem('no7.notes.v1', JSON.stringify(plan.values.notes || []));
+    localStorage.setItem('no7.todos.v1', JSON.stringify(plan.values.todos || []));
+  } catch { /* พื้นที่เต็ม */ }
+  if (replace) tasks.clear();
+  if (plan.values.tasks?.length) tasks.merge(plan.values.tasks);
+  calendar.replaceAll(plan.values.events || []);
+  if (plan.settings) {
+    settings = saveSettings({ ...plan.settings });
+    renderSettingsForm();
+    applyUiLang(settings.uiLang);
+  }
+  renderMemory();
+  renderCalendar();
+  renderTasks?.();
+  sm.set({ hasProvider: hasProviderConfigured(settings) });
+  return plan.totals;
+}
+
+function restoreFromText(text) {
+  const check = validateBackup(text);
+  if (!check.ok) {
+    setBackupStatus(`❌ ไฟล์ใช้ไม่ได้: ${check.errors.slice(0, 2).join(' · ')}`);
+    return null;
+  }
+  const summary = summarizeBackup(check.backup);
+  const plan = planRestore(check.backup, {
+    facts: memory.listFacts({ sort: 'recent' }),
+    notes: readList('no7.notes.v1'),
+    todos: readList('no7.todos.v1'),
+    tasks: tasks.list({ done: null }),
+    events: calendar.all(),
+  }, { mode: 'merge' });
+
+  const lines = [
+    `พบข้อมูลสำรอง ${summary.total} รายการ (schema ${summary.schema}${summary.version ? ` · v${summary.version}` : ''})`,
+    describePlan(plan),
+    ...check.warnings.map((w) => `⚠️ ${w}`),
+    '',
+    'กด OK เพื่อรวมข้อมูลนี้เข้ากับเครื่องนี้ (ของใหม่ทับตามเวลา)',
+  ];
+  if (!window.confirm(lines.join('\n'))) {
+    setBackupStatus('ยกเลิกการนำเข้าแล้ว');
+    return null;
+  }
+  const totals = applyRestore(plan);
+  setBackupStatus(`✅ นำเข้าแล้ว: +${totals.added} ใหม่ · ${totals.updated} อัปเดต${check.warnings.length ? ' (มีคำเตือน)' : ''}`);
+  return { check, plan, totals };
+}
+
+$('#import-btn')?.addEventListener('click', () => $('#import-file')?.click());
+
+$('#import-file')?.addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setBackupStatus('กำลังอ่านไฟล์…');
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { restoreFromText(String(reader.result || '')); } catch (err) { setBackupStatus(`❌ ${err.message}`); }
+    e.target.value = '';
+  };
+  reader.onerror = () => setBackupStatus('❌ อ่านไฟล์ไม่สำเร็จ');
+  reader.readAsText(file);
 });
 
 $('#reset-btn').addEventListener('click', () => {
@@ -2803,6 +2979,7 @@ window.addEventListener('keydown', (e) => {
   const mod = e.ctrlKey || e.metaKey;
 
   if (e.key === 'Escape') {
+    if ($('#palette') && !$('#palette').hidden) { closePalette(); e.preventDefault(); return; }
     if (!$('#confirm-modal').hidden) { $('#confirm-no').click(); e.preventDefault(); return; }
     if (!$('#stop-btn').hidden) { stopAll('หยุดด้วยแป้น Esc'); e.preventDefault(); return; }
     $('#sidebar').classList.remove('open');
@@ -2811,8 +2988,7 @@ window.addEventListener('keydown', (e) => {
 
   if (mod && e.key.toLowerCase() === 'k') {
     e.preventDefault();
-    showView('chat');
-    $('#input')?.focus();
+    openPalette();
     return;
   }
   if (mod && e.key.toLowerCase() === 'm') {
@@ -2825,6 +3001,164 @@ window.addEventListener('keydown', (e) => {
     $('#composer').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
   }
 });
+
+/* -------------------------------------------------------- command palette */
+let paletteRows = [];
+let paletteActive = 0;
+
+function readList(key) {
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
+}
+
+/** สร้างดัชนีสด ๆ จากข้อมูลปัจจุบัน (เรียกตอนเปิด palette — ข้อมูลไม่เก่า) */
+function paletteIndex() {
+  const tools = allToolIds().map((id) => {
+    const t = getTool(id);
+    const m = toolMeta(id);
+    return t ? { id, emoji: t.emoji, label: t.label, desc: t.desc, risk: m.risk, category: m.category } : null;
+  }).filter(Boolean);
+
+  return buildIndex({
+    memory: memory.listFacts({ sort: 'recent' }),
+    notes: readList('no7.notes.v1'),
+    todos: readList('no7.todos.v1'),
+    tasks: tasks.list({ done: null }),
+    events: calendar.all(),
+    tools,
+    ...defaultPaletteExtras(),
+  });
+}
+
+/** escape + ครอบ <mark> ตามตำแหน่งที่ตรงกับคำค้น */
+function highlightText(text, query) {
+  const ranges = highlightRanges(text, query);
+  if (!ranges.length) return esc(text);
+  const raw = String(text);
+  let out = '';
+  let last = 0;
+  for (const [from, to] of ranges) {
+    out += esc(raw.slice(last, from)) + `<mark>${esc(raw.slice(from, to))}</mark>`;
+    last = to;
+  }
+  return out + esc(raw.slice(last));
+}
+
+function renderPalette(query) {
+  const box = $('#palette-results');
+  if (!box) return;
+  paletteRows = searchIndex(paletteIndex(), query, { limit: 14 });
+  paletteActive = 0;
+  if (!paletteRows.length) {
+    box.innerHTML = `<p class="hint">${esc(tr('palette.empty', { lang: settings.uiLang }))}</p>`;
+    return;
+  }
+  let flat = -1;
+  box.innerHTML = groupResults(paletteRows).map((g) => `
+    <div class="palette-group">
+      <div class="palette-group-title">${g.emoji} ${esc(g.label)}</div>
+      ${g.items.map((row) => {
+        flat++;
+        return `<div class="palette-row${flat === 0 ? ' active' : ''}" data-i="${flat}" role="option">
+          <span>${row.emoji}</span><span>${highlightText(row.title, query)}</span>
+          ${row.subtitle ? `<small>${esc(row.subtitle)}</small>` : ''}
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+  box.querySelectorAll('.palette-row').forEach((el) => {
+    el.addEventListener('click', () => {
+      paletteActive = Number(el.dataset.i);
+      runPaletteAction();
+    });
+  });
+}
+
+function setPaletteActive(next) {
+  const rows = [...($('#palette-results')?.querySelectorAll('.palette-row') || [])];
+  if (!rows.length) return;
+  paletteActive = (next + rows.length) % rows.length;
+  rows.forEach((el, i) => el.classList.toggle('active', i === paletteActive));
+  rows[paletteActive]?.scrollIntoView({ block: 'nearest' });
+}
+
+function openPalette(initial = '') {
+  const box = $('#palette');
+  if (!box) return;
+  box.hidden = false;
+  const input = $('#palette-input');
+  if (input) {
+    input.value = initial;
+    input.focus();
+    if (initial) input.select();
+  }
+  renderPalette(initial);
+}
+
+function closePalette() {
+  const box = $('#palette');
+  if (box) box.hidden = true;
+  paletteRows = [];
+}
+
+function runPaletteAction() {
+  const row = paletteRows[paletteActive];
+  if (!row) return null;
+  const action = row.action || {};
+  closePalette();
+  switch (action.kind) {
+    case 'view':
+      showView(action.id);
+      break;
+    case 'memory':
+      showView('memory');
+      if (action.query) {
+        memQuery = action.query.length > 40 ? action.query.slice(0, 40) : action.query;
+        if ($('#mem-query')) $('#mem-query').value = memQuery;
+        if ($('#mem-clear-search')) $('#mem-clear-search').hidden = false;
+        renderMemory();
+      }
+      break;
+    case 'task':
+    case 'event':
+      showView('calendar');
+      setSubtitle(row.title);
+      break;
+    case 'note':
+    case 'todo':
+      showView('memory');
+      setSubtitle(row.title);
+      break;
+    case 'tool':
+      showView('tools');
+      setSubtitle(`${row.emoji} ${row.title} — ${row.subtitle}`);
+      break;
+    case 'digest':
+      showView('calendar');
+      $('#digest-btn')?.click();
+      break;
+    case 'stop':
+      stopAll('หยุดจาก command palette');
+      break;
+    case 'new-chat': {
+      showView('chat');
+      $('#messages').innerHTML = '';
+      history = [];
+      addMessage('bot', tr('chat.greetingFallback', { lang: settings.uiLang }));
+      break;
+    }
+    default:
+      setSubtitle(row.title);
+  }
+  return row;
+}
+
+$('#palette-input')?.addEventListener('input', (e) => renderPalette(e.target.value));
+$('#palette-input')?.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); setPaletteActive(paletteActive + 1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); setPaletteActive(paletteActive - 1); }
+  else if (e.key === 'Enter') { e.preventDefault(); runPaletteAction(); }
+  else if (e.key === 'Escape') { e.preventDefault(); closePalette(); }
+});
+$('#palette')?.addEventListener('click', (e) => { if (e.target.id === 'palette') closePalette(); });
 
 /* -------------------------------------------------------------- startup */
 startDailyConsolidation(memory, () => consolidate(memory, { chat: llmChat, useLLM: !!settings.memoryLLM }));
