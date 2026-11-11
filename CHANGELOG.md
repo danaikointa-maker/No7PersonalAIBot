@@ -2,6 +2,20 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.16.0] — 2026-11-10
+
+รอบที่ยี่สิบเอ็ด: กู้คืน backup โดยรักษา API credentials ที่มีอยู่ในเครื่อง
+
+### เปลี่ยน
+- merge settings กับค่าในเครื่องแทนการแทนที่ทั้งก้อน
+- เมื่อไฟล์ redacted หรือคีย์ว่าง รักษา `apiKey`, `ttsApiKey`, `syncToken` เดิมไว้
+- จับคู่ MCP server ด้วย id/name/url และคง apiKey เดิมของรายการที่ตรงกัน
+- แสดงคำเตือนใน dry-run; secrets ที่แนบมาในไฟล์ยังเตือนและถูกใช้ตามที่เลือก
+
+### ตรวจรับ
+- 452 unit tests · 167 browser checks · `npm run check` 116 JS files
+- Performance/build ผ่าน; source ใหญ่สุด 149.9 KB; main gzip 106.9 KB
+
 ## [2.15.0] — 2026-11-10
 
 รอบที่ยี่สิบ: ป้องกันการนำเข้าไฟล์สำรองที่ใหญ่หรือผิดรูปเกินไป

@@ -287,10 +287,14 @@ $('#nav button[data-view="settings"]').click();
 $('#export-btn').click();
 check('backup: export reports a schema-2 file', $('#backup-status').textContent.includes('schema 2'), $('#backup-status').textContent.slice(0, 80));
 check('backup: export summary includes health history count', $('#backup-status').textContent.includes('ประวัติสุขภาพ'));
+$('#set-apikey').value = 'local-api-key';
+$('#set-ttsapikey').value = 'local-tts-key';
+$('#set-synctoken').value = 'local-sync-token';
+$('#save-settings-btn').click();
 const backupPayload = {
   app: 'no7-personal-ai', schema: 2, version: '2.2.0', createdAt: new Date().toISOString(), includeSecrets: false,
   data: {
-    settings: { language: 'th', uiLang: 'th' },
+    settings: { language: 'th', uiLang: 'th', apiKey: '', ttsApiKey: '', syncToken: '' },
     facts: [{ id: 'imp-1', text: 'ความจำจากการนำเข้า', ts: Date.now(), importance: 2 }],
     log: [], notes: [{ text: 'โน้ตจากไฟล์สำรอง', ts: Date.now() }], todos: [], tasks: [], events: [],
     log: [{ role: 'user', text: 'ข้อความสำรองทดสอบ', ts: 5000, extra: 'strip' }, { role: 'assistant', text: 'คำตอบสำรองทดสอบ', ts: 6000 }, { role: 'tool', text: 'invalid role', ts: 7000 }],
@@ -303,6 +307,8 @@ Object.defineProperty($('#import-file'), 'files', { value: [backupFile], configu
 $('#import-file').dispatchEvent(new window.Event('change'));
 await wait(120);
 check('backup: import succeeded', $('#backup-status').textContent.includes('นำเข้าแล้ว'), $('#backup-status').textContent.slice(0, 80));
+const restoredSettingsSecrets = JSON.parse(window.localStorage.getItem('no7.settings.v1') || '{}');
+check('backup: redacted restore preserves local API credentials', restoredSettingsSecrets.apiKey === 'local-api-key' && restoredSettingsSecrets.ttsApiKey === 'local-tts-key' && restoredSettingsSecrets.syncToken === 'local-sync-token');
 const restoredBackupHealth = JSON.parse(window.localStorage.getItem('no7.health.history.v1') || '{}').snapshots || [];
 check('backup: health summary restored without private fields', restoredBackupHealth.length === 1 && restoredBackupHealth[0].score === 41 && !JSON.stringify(restoredBackupHealth).includes('must stay private'));
 const restoredChatLog = JSON.parse(window.localStorage.getItem('no7.memory.v2') || '{}').log || [];

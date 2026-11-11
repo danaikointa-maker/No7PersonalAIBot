@@ -690,3 +690,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 67.1 version 2.15.0 + CHANGELOG
 - [x] 67.2 README (32 docs, 451 unit / 166 checks) + PHASES ปิดครบ
 - [x] 67.3 ตรวจรับรวม: check 116 files · unit 451 · browser 166 · perf · build → PR
+
+# รอบที่ 21 (v2.16)
+
+เป้าหมาย: การกู้คืน backup ที่ตัด secrets ออกตามค่าเริ่มต้นต้องไม่ล้าง API keys/credentials ที่ตั้งไว้ในเครื่องปลายทาง
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AJ1 | วางนโยบาย merge settings แบบรักษาความลับ | 68.1–68.3 | ✅ |
+| AJ2 | เชื่อม dry-run, UI และทดสอบ credential preservation | 69.1–69.3 | ✅ |
+| AJ3 | Release 2.16 | 70.1–70.3 | ✅ |
+
+## AJ1 — วางนโยบาย merge settings แบบรักษาความลับ
+
+- [x] 68.1 merge settings แบบไม่ล้าง keys ที่ว่าง/ขาดจากไฟล์เมื่อเครื่องนี้มีค่าอยู่
+- [x] 68.2 จับคู่ MCP server ด้วย id/name/url และรักษา apiKey เดิมเมื่อไฟล์ redacted
+- [x] 68.3 Tests ครอบคลุมไฟล์ redacted, includeSecrets และ replace/merge
+
+## AJ2 — เชื่อม dry-run, UI และทดสอบ credential preservation
+
+- [x] 69.1 ส่ง settings ปัจจุบันเข้า restore plan; แสดงคำเตือนว่าข้อมูลลับในเครื่องจะคงอยู่
+- [x] 69.2 ตรวจว่าไฟล์ที่มี secrets แสดงคำเตือนเดิมและไม่เปลี่ยนพฤติกรรมเขียนหลังยืนยัน
+- [x] 69.3 Browser smoke + อัปเดต `docs/BACKUP.md`
+
+## AJ3 — Release 2.16
+
+- [x] 70.1 version 2.16.0 + CHANGELOG
+- [x] 70.2 README (32 docs, 452 unit / 167 checks) + PHASES ปิดครบ
+- [x] 70.3 ตรวจรับรวม: check 116 files · unit 452 · browser 167 · perf · build → PR
