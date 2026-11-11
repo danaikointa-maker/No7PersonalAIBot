@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filterConversationLog } from '../web/src/ui/conversation-archive.js';
+import { conversationDatePresetRange, filterConversationLog } from '../web/src/ui/conversation-archive.js';
 
 const log = [
   { role: 'user', text: 'Hello No7', ts: 1000, privateMeta: 'strip' },
@@ -67,4 +67,14 @@ test('conversation archive returns no records for invalid or reversed date range
   assert.equal(filterConversationLog(dated, { dateFrom: '2026-02-30' }).total, 0);
   assert.equal(filterConversationLog(dated, { dateTo: 'not-a-date' }).total, 0);
   assert.equal(filterConversationLog(dated, { dateFrom: '2026-11-11', dateTo: '2026-11-10' }).total, 0);
+});
+
+test('conversation archive quick date presets use inclusive local calendar dates', () => {
+  const now = new Date(2024, 2, 1, 15, 30);
+  assert.deepEqual(conversationDatePresetRange('today', now), { dateFrom: '2024-03-01', dateTo: '2024-03-01' });
+  assert.deepEqual(conversationDatePresetRange('7days', now), { dateFrom: '2024-02-24', dateTo: '2024-03-01' });
+  assert.deepEqual(conversationDatePresetRange('30days', now), { dateFrom: '2024-02-01', dateTo: '2024-03-01' });
+  assert.deepEqual(conversationDatePresetRange('7days', new Date(2026, 0, 2, 12)), { dateFrom: '2025-12-27', dateTo: '2026-01-02' });
+  assert.deepEqual(conversationDatePresetRange('all', now), { dateFrom: '', dateTo: '' });
+  assert.deepEqual(conversationDatePresetRange('custom', now), { dateFrom: '', dateTo: '' });
 });

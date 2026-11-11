@@ -297,7 +297,7 @@ const backupPayload = {
     settings: { language: 'th', uiLang: 'th', apiKey: '', ttsApiKey: '', syncToken: '' },
     facts: [{ id: 'imp-1', text: 'ความจำจากการนำเข้า', ts: Date.now(), importance: 2 }],
     log: [], notes: [{ text: 'โน้ตจากไฟล์สำรอง', ts: Date.now() }], todos: [], tasks: [], events: [],
-    log: [{ role: 'user', text: 'ข้อความสำรองทดสอบ', ts: 5000, extra: 'strip' }, { role: 'assistant', text: 'คำตอบสำรองทดสอบ', ts: 6000 }, { role: 'user', text: '<img src=x onerror=alert(1)>', ts: 7000 }, { role: 'tool', text: 'invalid role', ts: 8000 }],
+    log: [{ role: 'user', text: 'ข้อความสำรองทดสอบ', ts: 5000, extra: 'strip' }, { role: 'assistant', text: 'คำตอบสำรองทดสอบ', ts: 6000 }, { role: 'user', text: '<img src=x onerror=alert(1)>', ts: 7000 }, { role: 'assistant', text: 'ข้อความวันนี้', ts: new Date().setHours(12, 0, 0, 0) }, { role: 'tool', text: 'invalid role', ts: 8000 }],
     healthHistory: [{ date: new Date().toISOString().slice(0, 10), score: 41, grade: 'D', issues: { high: 1, medium: 2, low: 3 }, privateText: 'must stay private' }],
     personas: [{ id: 'p-smoketest1', name: 'จากไฟล์สำรอง', system: 'ตัวตนที่นำเข้ามา', desc: 'persona custom', gender: 'neutral', createdAt: Date.now(), updatedAt: Date.now(), extra: 'strip' }],
   },
@@ -328,6 +328,11 @@ $('#chat-archive [data-archive-query]').value = '';
 $('#chat-archive [data-archive-query]').dispatchEvent(new window.Event('input', { bubbles: true }));
 $('#chat-archive [data-archive-role]').value = 'all';
 $('#chat-archive [data-archive-role]').dispatchEvent(new window.Event('change', { bubbles: true }));
+$('#chat-archive [data-archive-preset]').value = 'today';
+$('#chat-archive [data-archive-preset]').dispatchEvent(new window.Event('change', { bubbles: true }));
+check('memory archive: Today preset shows local-day messages without storage writes', $('#chat-archive').querySelectorAll('.chat-archive-entry').length > 0 && [...$('#chat-archive').querySelectorAll('time')].every((time) => new Date(time.dateTime).toDateString() === new Date().toDateString()) && $('#chat-archive').textContent.includes('ข้อความวันนี้') && window.localStorage.getItem('no7.memory.v2') === archiveStorageBeforeSearch, `${$('#chat-archive [data-archive-from]').value}..${$('#chat-archive [data-archive-to]').value} | ${$('#chat-archive [data-archive-status]').textContent} | ${$('#chat-archive').textContent.slice(-60)}`);
+$('#chat-archive [data-archive-preset]').value = 'all';
+$('#chat-archive [data-archive-preset]').dispatchEvent(new window.Event('change', { bubbles: true }));
 const archiveDate = new Date(5000);
 const archiveDateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const sameArchiveDay = archiveDateKey(archiveDate);

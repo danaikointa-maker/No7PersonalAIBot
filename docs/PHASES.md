@@ -802,3 +802,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 79.1 version 2.19.0 + CHANGELOG
 - [x] 79.2 README (32 docs, 458 unit / 172 checks) + PHASES ปิดครบ
 - [x] 79.3 ตรวจรับรวม: check 118 files · unit 458 · browser 172 · perf · build → PR
+
+# รอบที่ 25 (v2.20)
+
+เป้าหมาย: ทำให้การกรองบทสนทนาตามเวลาใช้ง่ายขึ้นด้วยตัวเลือกช่วงวันที่แบบเร็ว โดยยังใช้วันท้องถิ่นและไม่เปลี่ยน/ส่งข้อมูล
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AN1 | เพิ่ม quick date presets | 80.1–80.3 | ✅ |
+| AN2 | เชื่อม date picker และทดสอบ privacy | 81.1–81.3 | ✅ |
+| AN3 | Release 2.20 | 82.1–82.3 | ✅ |
+
+## AN1 — เพิ่ม quick date presets
+
+- [x] 80.1 helper สร้างช่วง All/Today/Last 7 days/Last 30 days ตามวันท้องถิ่น
+- [x] 80.2 preset กำหนด date inputs; แก้ input ด้วยมือเปลี่ยนเป็น Custom; All ล้างช่วง
+- [x] 80.3 Tests สำหรับขอบเขตช่วง, rollover เดือน/ปี/leap day และ DST-aware local calendar
+
+## AN2 — เชื่อม date picker และทดสอบ privacy
+
+- [x] 81.1 เพิ่ม select ที่แปลไทย/อังกฤษและติด label
+- [x] 81.2 Browser smoke preset กรองข้อความวันนี้โดยไม่เขียน memory storage
+- [x] 81.3 อัปเดต `docs/MEMORY.md`
+
+## AN3 — Release 2.20
+
+- [x] 82.1 version 2.20.0 + CHANGELOG
+- [x] 82.2 README (32 docs, 459 unit / 173 checks) + PHASES ปิดครบ
+- [x] 82.3 ตรวจรับรวม: check 118 files · unit 459 · browser 173 · perf · build → PR
