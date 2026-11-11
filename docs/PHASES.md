@@ -613,24 +613,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AG1 | ทำ persona data ให้สำรอง/นำเข้าได้ปลอดภัย | 59.1–59.3 | ⬜ |
-| AG2 | เชื่อม persona กับ backup/restore UI | 60.1–60.3 | ⬜ |
-| AG3 | Release 2.13 | 61.1–61.3 | ⬜ |
+| AG1 | ทำ persona data ให้สำรอง/นำเข้าได้ปลอดภัย | 59.1–59.3 | ✅ |
+| AG2 | เชื่อม persona กับ backup/restore UI | 60.1–60.3 | ✅ |
+| AG3 | Release 2.13 | 61.1–61.3 | ✅ |
 
 ## AG1 — ทำ persona data ให้สำรอง/นำเข้าได้ปลอดภัย
 
-- [ ] 59.1 normalize persona ที่นำเข้า: จำกัดจำนวน/ความยาว/รูปแบบและตัด metadata ที่ไม่รู้จัก
-- [ ] 59.2 ใช้ ID และ updatedAt สำหรับ merge; built-in personas ห้ามถูกแทนที่
-- [ ] 59.3 Tests สำหรับ sanitization, merge/replace และไฟล์รุ่นเก่า
+- [x] 59.1 normalize persona ที่นำเข้า: จำกัดจำนวน/ความยาว/รูปแบบและตัด metadata ที่ไม่รู้จัก
+- [x] 59.2 ใช้ ID และ updatedAt สำหรับ merge; built-in personas ห้ามถูกแทนที่
+- [x] 59.3 Tests สำหรับ sanitization, merge/replace และไฟล์รุ่นเก่า
 
 ## AG2 — เชื่อม persona กับ backup/restore UI
 
-- [ ] 60.1 Export เฉพาะ custom personas ที่ผู้ใช้สร้างเอง
-- [ ] 60.2 Restore ตามแผนที่ยืนยันแล้วและ refresh UI; replace/merge ไม่แก้ built-ins
-- [ ] 60.3 Browser smoke + อัปเดต `docs/BACKUP.md`/`docs/PERSONA.md`
+- [x] 60.1 Export เฉพาะ custom personas ที่ผู้ใช้สร้างเอง
+- [x] 60.2 Restore ตามแผนที่ยืนยันแล้วและ refresh UI; replace/merge ไม่แก้ built-ins
+- [x] 60.3 Browser smoke + อัปเดต `docs/BACKUP.md`/`docs/PERSONA.md`
 
 ## AG3 — Release 2.13
 
-- [ ] 61.1 version 2.13.0 + CHANGELOG
-- [ ] 61.2 README + PHASES ปิดครบ
-- [ ] 61.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 61.1 version 2.13.0 + CHANGELOG
+- [x] 61.2 README (32 docs, 446 unit / 164 checks) + PHASES ปิดครบ
+- [x] 61.3 ตรวจรับรวม: check 116 files · unit 446 · browser 164 · perf · build → PR

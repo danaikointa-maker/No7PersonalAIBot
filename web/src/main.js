@@ -1,6 +1,6 @@
 import './styles.css';
 import { StateMachine, STATES } from './core/state.js';
-import { allPersonas, customPersonas, getPersona, createPersona, updatePersona, deletePersona, duplicatePersona, personaVoice } from './core/persona-store.js';
+import { allPersonas, customPersonas, restoreCustomPersonas, getPersona, createPersona, updatePersona, deletePersona, duplicatePersona, personaVoice } from './core/persona-store.js';
 import { getCalendar, formatWhen } from './core/calendar.js';
 import { collectBundle, pushBundle, pullBundle, mergeBundle } from './core/sync.js';
 import { SYNC_STRATEGIES, summarizeSync, describeConflicts } from './core/sync-merge.js';
@@ -1557,7 +1557,6 @@ $('#dev-add').addEventListener('click', () => {
   }
 });
 
-/* --------------------------------------------------------------- settings */
 let permDraft = null;
 
 function renderPermList() {
@@ -1945,7 +1944,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.12.0',
+      version: window.NO7_VERSION || '2.13.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -3050,7 +3049,7 @@ function collectBackupState() {
     todos: readList('no7.todos.v1'),
     tasks: tasks.list({ done: null }),
     events: calendar.all(),
-    personas: [],
+    personas: customPersonas(),
     healthHistory: readHealthHistory().snapshots,
   };
 }
@@ -3089,9 +3088,12 @@ function applyRestore(plan) {
   calendar.replaceAll(plan.values.events || []);
   if (plan.settings) {
     settings = saveSettings({ ...plan.settings });
-    renderSettingsForm();
     applyUiLang(settings.uiLang);
   }
+  settings = saveSettings({ persona: restoreCustomPersonas(plan.values.personas, settings.persona) });
+  renderSettingsForm();
+  renderPersonaList();
+  updatePersonaHeader();
   renderMemory();
   renderCalendar();
   renderTasks?.();
@@ -3112,6 +3114,7 @@ function restoreFromText(text) {
     todos: readList('no7.todos.v1'),
     tasks: tasks.list({ done: null }),
     events: calendar.all(),
+    personas: customPersonas(),
     healthHistory: readHealthHistory().snapshots,
   }, { mode: 'merge' });
 
