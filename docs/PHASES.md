@@ -1229,24 +1229,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| BC1 | ทำ TokenStore แบบ persist-before-swap | 125.1–125.3 | ⬜ |
-| BC2 | ให้ OAuth refresh/exchange รายงาน storage failure อย่างปลอดภัย | 126.1–126.3 | ⬜ |
-| BC3 | Release 2.35 | 127.1–127.3 | ⬜ |
+| BC1 | ทำ TokenStore แบบ persist-before-swap | 125.1–125.3 | ✅ |
+| BC2 | ให้ OAuth refresh/exchange รายงาน storage failure อย่างปลอดภัย | 126.1–126.3 | ✅ |
+| BC3 | Release 2.35 | 127.1–127.3 | ✅ |
 
 ## BC1 — ทำ TokenStore แบบ persist-before-swap
 
-- [ ] 125.1 `_save(candidate)` โยน error ที่อ่านรู้เรื่องและเก็บข้อมูลเดิมเมื่อเขียนไม่ได้
-- [ ] 125.2 set/remove เขียน candidate ก่อนปรับ in-memory data; ลบชื่อที่ไม่มีอยู่ไม่เขียนซ้ำ
-- [ ] 125.3 Unit tests จำลอง quota failure สำหรับ set/remove และตรวจ token เดิมครบ
+- [x] 125.1 `_save(candidate)` โยน error ที่อ่านรู้เรื่องและเก็บข้อมูลเดิมเมื่อเขียนไม่ได้
+- [x] 125.2 set/remove เขียน candidate ก่อนปรับ in-memory data; ลบชื่อที่ไม่มีอยู่ไม่เขียนซ้ำ
+- [x] 125.3 Unit tests จำลอง quota failure สำหรับ set/remove และตรวจ token เดิมครบ
 
 ## BC2 — ให้ OAuth refresh/exchange รายงาน storage failure อย่างปลอดภัย
 
-- [ ] 126.1 exchange/refresh จะรายงาน success เฉพาะเมื่อ token เก็บได้
-- [ ] 126.2 MCP login/error paths แสดง storage error โดยไม่กลืนข้อผิดพลาด
-- [ ] 126.3 Unit/browser smoke ยืนยัน token ไม่หายและไม่มี auth success ปลอม
+- [x] 126.1 exchange/refresh จะรายงาน success เฉพาะเมื่อ token เก็บได้
+- [x] 126.2 MCP login/error paths แสดง storage error โดยไม่กลืนข้อผิดพลาด
+- [x] 126.3 Unit tests ยืนยัน token เดิมไม่หายและ exchange/refresh ไม่รายงาน success ปลอม
 
 ## BC3 — Release 2.35
 
-- [ ] 127.1 version 2.35.0 + CHANGELOG
-- [ ] 127.2 README + PHASES ปิดครบ
-- [ ] 127.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 127.1 version 2.35.0 + CHANGELOG
+- [x] 127.2 README + PHASES ปิดครบ
+- [x] 127.3 ตรวจรับรวม (check/test/browser/perf/build) + PR

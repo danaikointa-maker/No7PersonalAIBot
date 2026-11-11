@@ -115,15 +115,23 @@ export class TokenStore {
     } catch { return {}; }
   }
 
-  _save() {
-    try { this.storage?.setItem(this.key, JSON.stringify(this.data)); } catch { /* quota */ }
+  _save(candidate = this.data) {
+    try {
+      this.storage?.setItem(this.key, JSON.stringify(candidate));
+      return true;
+    } catch (cause) {
+      const error = new Error('บันทึก OAuth token ไม่สำเร็จ พื้นที่จัดเก็บอาจเต็ม — token เดิมยังคงอยู่', { cause });
+      error.name = 'OAuthStorageError';
+      throw error;
+    }
   }
 
   set(name, tokens) {
     const merged = { ...(this.data[name] || {}), ...(tokens || {}) };
     if (tokens?.refreshToken === '' && this.data[name]?.refreshToken) merged.refreshToken = this.data[name].refreshToken;
-    this.data[name] = merged;
-    this._save();
+    const candidate = { ...this.data, [name]: merged };
+    this._save(candidate);
+    this.data = candidate;
     return merged;
   }
 
@@ -132,8 +140,12 @@ export class TokenStore {
   }
 
   remove(name) {
-    delete this.data[name];
-    this._save();
+    if (!Object.hasOwn(this.data, name)) return false;
+    const candidate = { ...this.data };
+    delete candidate[name];
+    this._save(candidate);
+    this.data = candidate;
+    return true;
   }
 
   list() {
