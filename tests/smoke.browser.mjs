@@ -400,6 +400,21 @@ check('health history: CSV/Markdown/JSON export buttons are available', $('#heal
 $('#health-card').querySelector('[data-health-export="json"]').click();
 await wait(10);
 check('health history: export click keeps the card active', !$('#health-card').hidden);
+const healthHistoryBeforeImport = JSON.parse(window.localStorage.getItem('no7.health.history.v1'));
+const importedDay = new Date(Date.parse(`${healthHistoryBeforeImport.snapshots[0].date}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
+const historyBackupFile = new window.File([JSON.stringify({
+  format: 'no7-health-history', schema: 1, exportedAt: new Date().toISOString(),
+  snapshots: [
+    { ...healthHistoryBeforeImport.snapshots[0], score: 88, grade: 'B', privateText: 'must not import' },
+    { date: importedDay, score: 76, grade: 'B', issues: { high: 0, medium: 0, low: 1 }, title: 'private' },
+  ],
+})], 'health-history.json', { type: 'application/json' });
+Object.defineProperty($('#health-history-import'), 'files', { value: [historyBackupFile], configurable: true });
+$('#health-history-import').dispatchEvent(new window.Event('change'));
+await wait(50);
+const healthHistoryAfterImport = JSON.parse(window.localStorage.getItem('no7.health.history.v1'));
+check('health history: JSON import merges conflict by date', healthHistoryAfterImport.snapshots.length === 2 && healthHistoryAfterImport.snapshots.find((s) => s.date === healthHistoryBeforeImport.snapshots[0].date)?.score === 88);
+check('health history: JSON import strips extra personal fields', !JSON.stringify(healthHistoryAfterImport).includes('must not import') && !JSON.stringify(healthHistoryAfterImport).includes('private'));
 check('health: report posted to chat', $('#messages').textContent.includes('สุขภาพข้อมูล'));
 window.confirm = () => true;
 $('#health-clean-btn').click();

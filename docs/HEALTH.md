@@ -34,6 +34,8 @@
 
 ผู้ใช้สามารถกด **⬇️ Markdown**, **⬇️ CSV** หรือ **⬇️ JSON** เพื่อดาวน์โหลด snapshot สรุปด้วยตนเอง (CSV มี BOM และป้องกัน formula injection); หากดาวน์โหลดไม่ได้จะคัดลอกไป clipboard ตาม fallback เดิม ไม่มีการส่งข้อมูลอัตโนมัติ
 
+ปุ่ม **⬆️ นำเข้า JSON** รับเฉพาะ envelope `no7-health-history` schema 1 ที่ส่งออกจากระบบนี้ ตรวจรูปแบบ/วันที่/จำนวนรายการก่อน แล้วแสดง preview เพิ่ม/แทนที่/คงเดิม/ตัดเก่าก่อนยืนยัน ข้อมูลจากไฟล์จะถูกรวมตามวัน (ไฟล์นำเข้าชนะเมื่อวันตรงกัน), ตัดให้เหลือ 30 วันล่าสุด และเก็บเฉพาะ fields ที่อนุญาต; ฟิลด์อื่นถูกทิ้ง ไม่มีการเขียน storage ก่อนผู้ใช้ยืนยัน
+
 ## API
 
 `analyzeHealth({ facts, notes, todos, tasks, events, now, staleDays, unusedDays })` คืน `{ now, score, grade, gradeLabel, counts, issues, cleanup, suggestions, markdown }`.
@@ -42,7 +44,7 @@
 
 `recordHealthSnapshot(history, report, now)` เพิ่ม/แทนที่สรุปรายวันและตัดให้เหลือ 30 รายการ; `normalizeHealthHistory`, `readHealthHistory`, `writeHealthHistory`, `clearHealthHistory` จัดการข้อมูล versioned; `healthTrend` สรุปส่วนต่าง; `renderHealthHistory` สร้างกราฟ SVG พร้อมรายการข้อความที่อ่านได้
 
-`healthHistoryCsv(history, { lang })`, `healthHistoryMarkdown(history, { lang, now })` และ `healthHistoryJson(history, { now })` ส่งออกเฉพาะ snapshot ที่ normalize แล้ว (ไม่รับรายละเอียดรายการส่วนตัว) JSON ใช้ envelope `{ format: 'no7-health-history', schema: 1, exportedAt, snapshots }`
+`healthHistoryCsv(history, { lang })`, `healthHistoryMarkdown(history, { lang, now })` และ `healthHistoryJson(history, { now })` ส่งออกเฉพาะ snapshot ที่ normalize แล้ว (ไม่รับรายละเอียดรายการส่วนตัว) JSON ใช้ envelope `{ format: 'no7-health-history', schema: 1, exportedAt, snapshots }`. `parseHealthHistoryBackup`, `planHealthHistoryImport` และ `applyHealthHistoryImport` ตรวจไฟล์, ทำ preview merge แบบไม่เขียนข้อมูล และบันทึกหลังยืนยัน
 
 ไฟล์: `web/src/core/health.js` · tests: `tests/health.test.js` · UI: `web/src/main.js`
 

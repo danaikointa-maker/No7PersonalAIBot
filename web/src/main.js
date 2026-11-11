@@ -53,6 +53,7 @@ import { analyzeHealth, healthMarkdown, applyCleanup } from './core/health.js';
 import { healthUiCopy, healthSuggestion } from './core/health-i18n.js';
 import { readHealthHistory, writeHealthHistory, clearHealthHistory, recordHealthSnapshot } from './core/health-history.js';
 import { renderHealthHistory } from './ui/health-history.js';
+import { bindHealthHistoryImport } from './ui/health-history-import.js';
 import { healthHistoryCsv, healthHistoryMarkdown, healthHistoryJson } from './core/health-history-export.js';
 import {
   customToolDefs, validateCustomTools, PLUGIN_EXAMPLE, PLUGIN_LIMITS,
@@ -1288,6 +1289,12 @@ function renderHealthCard(report) {
     ${renderHealthHistory(readHealthHistory(), { lang: langOf(settings.uiLang), copy, range: healthHistoryRange })}
   </div>`;
   card.hidden = false;
+  bindHealthHistoryImport(card, {
+    copy, readHistory: readHealthHistory,
+    confirm: (message) => window.confirm(message),
+    render: () => renderHealthCard(lastHealth),
+    notify: (message) => addMessage('bot', message),
+  });
   card.querySelectorAll('[data-health-range]').forEach((button) => {
     button.addEventListener('click', () => {
       healthHistoryRange = Number(button.dataset.healthRange) === 7 ? 7 : 30;
@@ -1938,7 +1945,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.10.0',
+      version: window.NO7_VERSION || '2.11.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
