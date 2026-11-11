@@ -71,6 +71,25 @@ export function clearHealthHistory(storage = globalThis.localStorage) {
   catch { return false; }
 }
 
+export function withHealthHistoryRestore(history, applyMemory, storage = globalThis.localStorage) {
+  if (!Array.isArray(history)) return applyMemory();
+  const previous = storage.getItem(HEALTH_HISTORY_KEY);
+  if (!writeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: history }, storage)) {
+    throw new Error('Health summary restore could not be saved; existing memory and health history are unchanged');
+  }
+  try {
+    const result = applyMemory();
+    if (!result) throw new Error('Memory restore plan could not be applied');
+    return result;
+  } catch (error) {
+    try {
+      if (previous == null) clearHealthHistory(storage);
+      else storage.setItem(HEALTH_HISTORY_KEY, previous);
+    } catch { /* best-effort restore of the prior summary */ }
+    throw error;
+  }
+}
+
 export function filterHealthHistory(history, { days = 30, now = Date.now() } = {}) {
   const range = days === 7 ? 7 : 30;
   const end = new Date(now);

@@ -54,7 +54,7 @@
 | `personas` | `id` | `updatedAt` |
 | `healthHistory` | `date` | วันตามปฏิทิน |
 
-`healthHistory` เก็บเฉพาะ snapshot summary ที่ whitelist แล้ว (`date`, `score`, `grade`, `issues`) ไม่เก็บข้อความส่วนตัว และไม่ตัดวันเก่าอัตโนมัติ; restore แบบ merge ใช้วันที่เป็นคีย์ (ค่าจากไฟล์ชนะเมื่อวันตรงกัน)
+`healthHistory` เก็บเฉพาะ snapshot summary ที่ whitelist แล้ว (`date`, `score`, `grade`, `issues`) ไม่เก็บข้อความส่วนตัว และไม่ตัดวันเก่าอัตโนมัติ; restore แบบ merge ใช้วันที่เป็นคีย์ (ค่าจากไฟล์ชนะเมื่อวันตรงกัน) ก่อน commit คอลเลกชันอื่น ระบบต้องบันทึก health summary ให้สำเร็จก่อน; ถ้า health write ล้มเหลว restore จะหยุดโดยไม่เปลี่ยน memory/คอลเลกชันอื่น ถ้า memory write ล้มเหลวหลัง health summary ถูกเขียน ระบบจะพยายามคืนค่า summary เดิมและรายงาน restore failure
 
 ## 4) API (`core/backup.js`)
 

@@ -53,7 +53,7 @@ import { buildDigest, digestTool, shouldAutoDigest } from './core/digest.js';
 import { buildWeekly, weeklyTool } from './core/weekly.js';
 import { analyzeHealth, healthMarkdown, applyCleanup } from './core/health.js';
 import { healthUiCopy, healthSuggestion } from './core/health-i18n.js';
-import { readHealthHistory, writeHealthHistory, clearHealthHistory, recordHealthSnapshot } from './core/health-history.js';
+import { readHealthHistory, writeHealthHistory, clearHealthHistory, recordHealthSnapshot, withHealthHistoryRestore } from './core/health-history.js';
 import { renderHealthHistory } from './ui/health-history.js';
 import { bindHealthHistoryImport } from './ui/health-history-import.js';
 import { healthHistoryCsv, healthHistoryMarkdown, healthHistoryJson } from './core/health-history-export.js';
@@ -1944,7 +1944,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.27.0',
+      version: window.NO7_VERSION || '2.28.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -3073,12 +3073,13 @@ $('#export-btn').addEventListener('click', () => {
 /** เขียนข้อมูลตามแผนกู้คืน (เรียกหลังผู้ใช้ยืนยันแล้วเท่านั้น) */
 function applyRestore(plan) {
   const replace = plan.mode === 'replace';
-  memory.importData({ facts: plan.values.facts, log: plan.values.log }, { merge: !replace });
+  withHealthHistoryRestore(plan.values.healthHistory, () => memory.importData(
+    { facts: plan.values.facts, log: plan.values.log }, { merge: !replace },
+  ));
   try {
     localStorage.setItem('no7.notes.v1', JSON.stringify(plan.values.notes || []));
     localStorage.setItem('no7.todos.v1', JSON.stringify(plan.values.todos || []));
   } catch { /* พื้นที่เต็ม */ }
-  if (Array.isArray(plan.values.healthHistory)) writeHealthHistory({ schema: 1, snapshots: plan.values.healthHistory });
   if (replace) tasks.clear();
   if (plan.values.tasks?.length) tasks.merge(plan.values.tasks);
   calendar.replaceAll(plan.values.events || []);

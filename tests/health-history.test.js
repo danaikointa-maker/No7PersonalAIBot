@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   HEALTH_HISTORY_KEY, normalizeHealthHistory, recordHealthSnapshot,
   readHealthHistory, writeHealthHistory, clearHealthHistory, healthTrend,
-  filterHealthHistory, healthWindowSummary,
+  filterHealthHistory, healthWindowSummary, withHealthHistoryRestore,
 } from '../web/src/core/health-history.js';
 
 const nowFor = (day) => Date.parse(`2026-11-${String(day).padStart(2, '0')}T12:00:00Z`);
@@ -59,6 +59,43 @@ test('storage read/write/clear is guarded and versioned', () => {
   assert.equal(clearHealthHistory(store), true);
   assert.deepEqual(readHealthHistory(store).snapshots, []);
   assert.equal(writeHealthHistory(history, null), false);
+});
+
+test('failed health-history write preserves the previous summary', () => {
+  const store = storage();
+  const before = { schema: 1, snapshots: [{ date: '2026-11-10', score: 61, grade: 'C', issues: { high: 1, medium: 0, low: 0 } }] };
+  const next = { schema: 1, snapshots: [{ date: '2026-11-11', score: 90, grade: 'A', issues: { high: 0, medium: 0, low: 0 } }] };
+  assert.equal(writeHealthHistory(before, store), true);
+  const beforeRaw = store.getItem(HEALTH_HISTORY_KEY);
+  const originalSetItem = store.setItem;
+  store.setItem = () => { throw new Error('QuotaExceededError'); };
+  assert.equal(writeHealthHistory(next, store), false);
+  store.setItem = originalSetItem;
+  assert.equal(store.getItem(HEALTH_HISTORY_KEY), beforeRaw);
+});
+
+test('health history restore rolls back its summary if the memory commit fails', () => {
+  const store = storage();
+  const previous = { schema: 1, snapshots: [{ date: '2026-11-10', score: 61, grade: 'C', issues: { high: 1, medium: 0, low: 0 } }] };
+  const incoming = { schema: 1, snapshots: [{ date: '2026-11-11', score: 90, grade: 'A', issues: { high: 0, medium: 0, low: 0 } }] };
+  writeHealthHistory(previous, store);
+  const beforeRaw = store.getItem(HEALTH_HISTORY_KEY);
+  assert.throws(() => withHealthHistoryRestore(incoming.snapshots, () => { throw new Error('memory write failed'); }, store), /memory write failed/);
+  assert.equal(store.getItem(HEALTH_HISTORY_KEY), beforeRaw);
+});
+
+test('health history restore does not call memory commit if summary persistence fails', () => {
+  const store = storage();
+  const previous = { schema: 1, snapshots: [{ date: '2026-11-10', score: 61, grade: 'C', issues: { high: 1, medium: 0, low: 0 } }] };
+  writeHealthHistory(previous, store);
+  const beforeRaw = store.getItem(HEALTH_HISTORY_KEY);
+  const originalSetItem = store.setItem;
+  store.setItem = () => { throw new Error('QuotaExceededError'); };
+  let memoryCommitCalled = false;
+  assert.throws(() => withHealthHistoryRestore([], () => { memoryCommitCalled = true; return true; }, store), /Health summary restore could not be saved/);
+  store.setItem = originalSetItem;
+  assert.equal(memoryCommitCalled, false);
+  assert.equal(store.getItem(HEALTH_HISTORY_KEY), beforeRaw);
 });
 
 test('trend reports first scan and score delta in both languages', () => {
