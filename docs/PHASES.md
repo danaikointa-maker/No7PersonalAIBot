@@ -746,3 +746,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 73.1 version 2.17.0 + CHANGELOG
 - [x] 73.2 README (32 docs, 455 unit / 168 checks) + PHASES ปิดครบ
 - [x] 73.3 ตรวจรับรวม: check 118 files · unit 455 · browser 168 · perf · build → PR
+
+# รอบที่ 23 (v2.18)
+
+เป้าหมาย: ให้หน้า conversation archive เข้าถึง log ที่ restore/import มาได้ครบถึงเพดาน memory 800 ข้อความ และแสดงสถานะเมื่อเจอข้อมูลมากกว่าเพดาน
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AL1 | ขยาย pagination ของ archive | 74.1–74.3 | ⬜ |
+| AL2 | ตรวจ XSS และขอบเขต log เต็ม | 75.1–75.3 | ⬜ |
+| AL3 | Release 2.18 | 76.1–76.3 | ⬜ |
+
+## AL1 — ขยาย pagination ของ archive
+
+- [ ] 74.1 load more เข้าถึงรายการได้ครบถึง 800 แทนเพดานหน้า 200
+- [ ] 74.2 เมื่อมีข้อมูลเกิน 800 ให้ซ่อนปุ่มเมื่อถึงเพดานและแจ้งจำนวนที่ยังไม่แสดง
+- [ ] 74.3 Unit tests ขอบเขต 50/200/800 และรายการเกินเพดาน
+
+## AL2 — ตรวจ XSS และขอบเขต log เต็ม
+
+- [ ] 75.1 Browser smoke ข้อความ HTML ถูกแสดงเป็นข้อความ ไม่สร้าง element
+- [ ] 75.2 ทดสอบหน้า archive เปิดหลัง import/restore และ search/filter ไม่เขียน storage
+- [ ] 75.3 อัปเดต `docs/MEMORY.md` ให้ตรงกับเพดานที่เก็บจริง
+
+## AL3 — Release 2.18
+
+- [ ] 76.1 version 2.18.0 + CHANGELOG
+- [ ] 76.2 README + PHASES ปิดครบ
+- [ ] 76.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
