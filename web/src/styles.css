@@ -155,6 +155,12 @@ label input[type="checkbox"] { width: auto; }
 
 /* สรุปประจำวัน (digest) */
 .digest-card { border: 1px solid var(--line, #223); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; background: rgba(255,255,255,.02); }
+.digest-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.digest-actions button {
+  font-size: 12px; padding: 4px 10px; border-radius: 8px; cursor: pointer;
+  background: var(--bg2); color: var(--text); border: 1px solid var(--line);
+}
+.digest-actions button:hover { border-color: var(--accent, #6af); }
 .digest-sec-head { font-weight: 600; font-size: 13px; }
 .digest-item { font-size: 12px; opacity: .9; padding-left: 4px; }
 .digest-item small { opacity: .65; }

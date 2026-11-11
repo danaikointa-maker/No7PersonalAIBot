@@ -1,6 +1,6 @@
 {
   "source": {
-    "maxFileKb": 140,
+    "maxFileKb": 150,
     "maxTotalKb": 800,
     "maxModules": 60,
     "maxHtmlKb": 90

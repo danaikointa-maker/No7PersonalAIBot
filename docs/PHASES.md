@@ -357,7 +357,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 | # | งาน | ช่วง | สถานะ |
 | --- | --- | --- | --- |
 | X1 | ซิงก์แบบ conflict-aware | 32.1–32.4 | ✅ |
-| X2 | ส่งออกรายงาน (MD/CSV) | 33.1–33.4 | ⬜ |
+| X2 | ส่งออกรายงาน (MD/CSV) | 33.1–33.4 | ✅ |
 | X3 | Release 2.4 | 34.1–34.3 | ⬜ |
 
 ## X1 — ซิงก์แบบ conflict-aware
@@ -369,10 +369,10 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## X2 — ส่งออกรายงาน (MD/CSV)
 
-- 33.1 `core/report-export.js`: `toCsv`, `weeklyCsv`, `digestCsv`, `reportMarkdown` (escape CSV ถูกต้อง)
-- 33.2 UI: ปุ่ม ⬇️ Markdown / ⬇️ CSV บนการ์ดสรุปวันนี้และรายงานสัปดาห์
-- 33.3 ชื่อไฟล์มีวันที่ + BOM สำหรับ Excel (ภาษาไทย)
-- 33.4 Tests + smoke + `docs/REPORTS.md`
+- 33.1 ✅ `core/report-export.js`: `toCsv`, `weeklyCsv`, `digestCsv`, `reportMarkdown` (escape CSV ถูกต้อง)
+- 33.2 ✅ UI: ปุ่ม ⬇️ Markdown / ⬇️ CSV บนการ์ดสรุปวันนี้และรายงานสัปดาห์
+- 33.3 ✅ ชื่อไฟล์มีวันที่ + BOM สำหรับ Excel (ภาษาไทย)
+- 33.4 ✅ Tests + smoke + `docs/REPORTS.md`
 
 ## X3 — Release 2.4
 

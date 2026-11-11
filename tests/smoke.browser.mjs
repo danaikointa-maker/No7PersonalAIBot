@@ -340,6 +340,10 @@ check('weekly: card rendered', !$('#weekly-card').hidden, $('#weekly-card').hidd
 check('weekly: shows the range', /\d/.test($('#weekly-card').textContent), $('#weekly-card').textContent.slice(0, 70));
 check('weekly: focus section present', $('#weekly-card').textContent.includes('โฟกัสสัปดาห์หน้า'), $('#weekly-card').textContent.slice(0, 80));
 check('weekly: posted to chat', [...$('#messages').querySelectorAll('.msg.bot.digest')].length >= 1);
+check('weekly: export buttons present', $('#weekly-card').querySelectorAll('[data-export]').length === 2, String($('#weekly-card').querySelectorAll('[data-export]').length));
+$('#weekly-card').querySelector('[data-export="weekly-csv"]').click();
+await wait(10);
+check('weekly: CSV export does not break the app', !$('#weekly-card').hidden);
 
 // HTTP tool plugins
 $('#nav button[data-view="tools"]').click();
@@ -367,6 +371,10 @@ check('digest: card rendered', !$('#digest-card').hidden, $('#digest-card').hidd
 check('digest: includes today\'s task', $('#digest-card').textContent.includes('ทดสอบงาน') || $('#digest-card').textContent.includes('งานซ้ำทดสอบ'), `${JSON.parse(window.localStorage.getItem('no7.tasks.v1') || '[]').length} tasks / ${$('#digest-card').textContent.slice(0, 120)}`);
 check('digest: posted to chat', [...$('#messages').querySelectorAll('.msg.bot.digest')].length >= 2, String([...$('#messages').querySelectorAll('.msg.bot.digest')].length));
 check('digest: remembers the day', !!window.localStorage.getItem('no7.digest.last'));
+check('digest: export buttons present', $('#digest-card').querySelectorAll('[data-export]').length === 2, String($('#digest-card').querySelectorAll('[data-export]').length));
+$('#digest-card').querySelector('[data-export="digest-md"]').click();
+await wait(10);
+check('digest: Markdown export does not break the app', !$('#digest-card').hidden);
 $('#set-digest-auto').checked = true;
 $('#set-digest-auto').dispatchEvent(new window.Event('change'));
 check('digest: auto toggle persists', JSON.parse(window.localStorage.getItem('no7.settings.v1') || '{}').digestAuto === true);

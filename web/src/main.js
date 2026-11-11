@@ -5,6 +5,9 @@ import { getCalendar, formatWhen } from './core/calendar.js';
 import { collectBundle, pushBundle, pullBundle, mergeBundle } from './core/sync.js';
 import { SYNC_STRATEGIES, summarizeSync, describeConflicts } from './core/sync-merge.js';
 import {
+  weeklyCsv, digestCsv, reportMarkdown, datedFilename, downloadText,
+} from './core/report-export.js';
+import {
   getDeviceRegistry, sendCommand, deviceStatus, testConnection, QUICK_COMMANDS,
   helloDevice, sendEyes, getEyes, voiceStatus, linkCapabilities,
 } from './core/link.js';
@@ -1024,7 +1027,57 @@ digestToolDef = digestTool({
   lang: () => langOf(settings.uiLang),
 });
 
+let lastDigest = null;
+let lastWeekly = null;
+
+function exportBar(kind) {
+  return `<div class="digest-actions">
+    <button data-export="${kind}-md">⬇️ Markdown</button>
+    <button data-export="${kind}-csv">⬇️ CSV</button>
+  </div>`;
+}
+
+async function deliverReport(filename, text, type) {
+  const label = filename.replace(/^no7-/, '').replace(/-\d{4}-\d{2}-\d{2}/, '');
+  if (downloadText(filename, text, { type })) return true;
+  try {
+    await navigator.clipboard.writeText(text);
+    $('#settings-status').textContent = `📋 คัดลอก ${label} ไปคลิปบอร์ดแล้ว (เบราว์เซอร์นี้ไม่รองรับดาวน์โหลด)`;
+    return true;
+  } catch {
+    $('#settings-status').textContent = 'ดาวน์โหลดไม่สำเร็จ — เบราว์เซอร์นี้ไม่รองรับ';
+    return false;
+  }
+}
+
+function exportDigest(format) {
+  if (!lastDigest) return Promise.resolve(false);
+  const now = Date.now();
+  const lang = langOf(settings.uiLang);
+  return format === 'csv'
+    ? deliverReport(datedFilename('no7-digest', 'csv', now), digestCsv(lastDigest), 'text/csv;charset=utf-8')
+    : deliverReport(datedFilename('no7-digest', 'md', now), reportMarkdown(lastDigest, { kind: 'digest', lang, now }), 'text/markdown;charset=utf-8');
+}
+
+function exportWeekly(format) {
+  if (!lastWeekly) return Promise.resolve(false);
+  const now = Date.now();
+  const lang = langOf(settings.uiLang);
+  return format === 'csv'
+    ? deliverReport(datedFilename('no7-weekly', 'csv', now), weeklyCsv(lastWeekly), 'text/csv;charset=utf-8')
+    : deliverReport(datedFilename('no7-weekly', 'md', now), reportMarkdown(lastWeekly, { kind: 'weekly', lang, now }), 'text/markdown;charset=utf-8');
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target instanceof Element ? e.target.closest('[data-export]') : null;
+  if (!btn) return;
+  const [kind, format] = String(btn.dataset.export).split('-');
+  if (kind === 'weekly') exportWeekly(format);
+  else if (kind === 'digest') exportDigest(format);
+});
+
 function renderDigestCard(digest, target = null) {
+  lastDigest = digest;
   const box = $('#digest-card');
   const html = `<div class="digest-card">
     <strong>${esc(digest.headline)}</strong>
@@ -1033,6 +1086,7 @@ function renderDigestCard(digest, target = null) {
       ${sec.items.map((it) => `<div class="digest-item">· ${esc(it.label)}${it.meta ? ` <small>${esc(it.meta)}</small>` : ''}</div>`).join('')}
       ${sec.more ? `<div class="digest-item">· …อีก ${sec.more}</div>` : ''}
     </div>`).join('') || `<p class="hint">${settings.uiLang === 'en' ? 'Nothing pending today.' : 'วันนี้ไม่มีอะไรค้าง 🎉'}</p>`}
+    ${exportBar('digest')}
   </div>`;
   if (box) {
     box.innerHTML = html;
@@ -1084,6 +1138,7 @@ weeklyToolDef = weeklyTool({
 });
 
 function renderWeeklyCard(weekly, target = null) {
+  lastWeekly = weekly;
   const box = $('#weekly-card');
   const html = `<div class="digest-card weekly-card">
     <strong>${esc(`${weekly.range.label} · ${weekly.headline}`)}</strong>
@@ -1091,6 +1146,7 @@ function renderWeeklyCard(weekly, target = null) {
       <div class="digest-sec-head">${sec.emoji} ${esc(sec.title)}</div>
       ${sec.items.map((it) => `<div class="digest-item">· ${esc(it.label)}${it.meta ? ` <small>${esc(it.meta)}</small>` : ''}</div>`).join('')}
     </div>`).join('') || `<p class="hint">${esc(tr('weekly.empty', { lang: settings.uiLang }))}</p>`}
+    ${exportBar('weekly')}
   </div>`;
   if (box) { box.innerHTML = html; box.hidden = false; }
   if (target) {
