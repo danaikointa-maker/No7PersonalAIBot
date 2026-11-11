@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.24.0] — 2026-11-10
+
+- Memory import now persists the candidate before mutating in-memory state or removing legacy backups. Storage failures surface as an error, preserve the original data, and leave the plan retryable.
+
 ## [2.23.0] — 2026-11-10
 
 - Memory import plans are now opaque, bound to their originating store, and single-use. A changed in-memory snapshot or concurrent localStorage update invalidates the preview before any import write, preserving concurrent data.

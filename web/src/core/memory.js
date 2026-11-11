@@ -362,14 +362,19 @@ export class MemoryStore {
       this._importPlans.delete(plan);
       return null;
     }
+    const nextMeta = state.merge ? this.meta : {};
+    if (!saveRaw(KEY, { version: 2, facts: state.facts, log: state.log, meta: nextMeta })) {
+      const error = new Error('Memory storage write failed; existing data was not changed');
+      error.code = 'MEMORY_STORAGE_WRITE_FAILED';
+      throw error;
+    }
     this.facts = state.facts;
     this.log = state.log;
+    this.meta = nextMeta;
+    this._buildIndex();
     if (!state.merge) {
-      this.meta = {};
       try { localStorage.removeItem(LEGACY_FACTS); localStorage.removeItem(LEGACY_LOG); } catch {}
     }
-    this._buildIndex();
-    this._persist();
     state.applied = true;
     return { ...state.result };
   }
