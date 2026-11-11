@@ -36,7 +36,7 @@ import { Voice } from './core/voice.js';
 import { SentenceSplitter, SpeechQueue, withCursor } from './core/stream.js';
 import { WakeWord } from './core/wake.js';
 import { BargeIn, BARGE_MODES } from './core/bargein.js';
-import { TTSRouter, TTS_PROVIDERS } from './core/tts.js';
+import { TTSRouter, TTS_PROVIDERS, resolveTTSConfig, voicesFor } from './core/tts.js';
 import { EyeAvatar } from './ui/avatar.js';
 import { renderCard, renderError } from './ui/cards.js';
 import { loadSettings, saveSettings, resetSettings, hasProviderConfigured, loadPermissions } from './core/settings.js';
@@ -564,6 +564,23 @@ function syncWake() {
   try { wakeWord.start(); } catch (e) { $('#voice-status').textContent = e.message; }
 }
 
+/** เติมรายชื่อเสียงแนะนำ (datalist) ตามผู้ให้บริการ TTS ที่เลือก */
+function renderTTSVoiceOptions(provider, current = '') {
+  const list = voicesFor(provider);
+  const el = $('#set-ttsvoice');
+  if (!el) return;
+  if (!list.length) { el.removeAttribute('list'); return; }
+  let dl = document.getElementById('tts-voice-list');
+  if (!dl) {
+    dl = document.createElement('datalist');
+    dl.id = 'tts-voice-list';
+    document.body.appendChild(dl);
+  }
+  dl.innerHTML = list.map((v) => `<option value="${esc(v.id)}">${esc(v.label)}</option>`).join('');
+  el.setAttribute('list', 'tts-voice-list');
+  if (current) el.value = current;
+}
+
 /* ---------------------------------------------------------- tts + barge-in */
 const tts = new TTSRouter({
   settings: () => settings,
@@ -1082,11 +1099,14 @@ function renderSettingsForm() {
   ttsSel.innerHTML = Object.entries(TTS_PROVIDERS).map(([id, p]) => `<option value="${id}">${p.label}</option>`).join('');
   ttsSel.value = TTS_PROVIDERS[settings.ttsProvider] ? settings.ttsProvider : 'system';
   $('#tts-provider-hint').textContent = TTS_PROVIDERS[ttsSel.value].desc;
-  $('#tts-openai-fields').hidden = ttsSel.value !== 'openai';
+  $('#tts-openai-fields').hidden = !TTS_PROVIDERS[ttsSel.value].needsServer;
+  const resolved = resolveTTSConfig({ ...settings, ttsProvider: ttsSel.value });
   $('#set-ttsbaseurl').value = settings.ttsBaseUrl || '';
   $('#set-ttsapikey').value = settings.ttsApiKey || '';
-  $('#set-ttsmodel').value = settings.ttsModel || 'tts-1';
-  $('#set-ttsvoice').value = settings.ttsVoice || 'alloy';
+  $('#set-ttsmodel').value = resolved.model;
+  $('#set-ttsvoice').value = resolved.voice;
+  $('#set-ttscache').checked = settings.ttsCache !== false;
+  renderTTSVoiceOptions(ttsSel.value, resolved.voice);
 
   const bargeSel = $('#set-bargein');
   bargeSel.innerHTML = Object.entries(BARGE_MODES).map(([id, m]) => `<option value="${id}">${m.label}</option>`).join('');
@@ -1160,6 +1180,7 @@ function collectSettings() {
     ttsApiKey: $('#set-ttsapikey').value.trim(),
     ttsModel: $('#set-ttsmodel').value.trim(),
     ttsVoice: $('#set-ttsvoice').value.trim(),
+    ttsCache: $('#set-ttscache').checked,
     bargeIn: $('#set-bargein').value,
     controlPolicy: readControlPolicy(),
     streaming: $('#set-streaming').checked,
@@ -2197,7 +2218,12 @@ $('#test-ai-btn').addEventListener('click', async () => {
 $('#set-ttsprovider').addEventListener('change', (e) => {
   const p = TTS_PROVIDERS[e.target.value];
   $('#tts-provider-hint').textContent = p.desc;
-  $('#tts-openai-fields').hidden = e.target.value !== 'openai';
+  $('#tts-openai-fields').hidden = !p.needsServer;
+  // เปลี่ยนผู้ให้บริการ = ใช้ค่าเริ่มต้นของเจ้านั้น (ไม่พาค่าเดิมข้ามเจ้ามาปน)
+  const cfg = resolveTTSConfig({ ttsProvider: e.target.value, ttsCache: settings.ttsCache });
+  $('#set-ttsmodel').value = cfg.model;
+  $('#set-ttsvoice').value = cfg.voice;
+  renderTTSVoiceOptions(e.target.value, cfg.voice);
 });
 
 $('#set-rate').addEventListener('input', (e) => { $('#out-rate').textContent = Number(e.target.value).toFixed(2); });

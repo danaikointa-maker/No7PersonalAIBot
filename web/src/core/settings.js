@@ -24,11 +24,12 @@ export const DEFAULT_SETTINGS = {
   voiceRate: 1,
   voicePitch: 1,
   voiceName: '',
-  ttsProvider: 'system',   // system | openai | off
-  ttsVoice: 'alloy',       // OpenAI-compatible voice name
+  ttsProvider: 'system',   // system | openai | elevenlabs | off
+  ttsVoice: 'alloy',       // voice id ของผู้ให้บริการที่เลือก
   ttsModel: 'tts-1',
   ttsBaseUrl: '',
   ttsApiKey: '',
+  ttsCache: true,          // แคชเสียงในหน่วยความจำ (เล่นซ้ำไม่จ่ายซ้ำ)
   bargeIn: 'keyword',      // off | keyword | any
   mcpServers: [],          // [{id, name, url, apiKey, transport, enabled}]
   controlPolicy: {         // เดสก์ท็อปเท่านั้น — ค่าเริ่มต้นปิด

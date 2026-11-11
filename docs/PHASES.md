@@ -196,7 +196,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | เฟส | ชื่อ | งานย่อย | สถานะ |
 |---|---|---|---|
-| T1 | TTS พรีเมียม + แคชเสียง | 16.1–16.4 | ⬜ |
+| T1 | TTS พรีเมียม + แคชเสียง | 16.1–16.4 | ✅ |
 | T2 | โมเดลในเครื่อง (Ollama / LM Studio) | 17.1–17.4 | ⬜ |
 | T3 | สองภาษา ไทย/อังกฤษ | 18.1–18.4 | ⬜ |
 | T4 | Performance budget + E2E | 19.1–19.4 | ⬜ |
@@ -205,10 +205,10 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## T1 — TTS พรีเมียม + แคชเสียง
 
-- 16.1 `core/tts.js`: provider `elevenlabs` + `TTS_VOICES` (รายชื่อเสียงแนะนำ) + `resolveTTSConfig`
-- 16.2 server `/api/tts`: รองรับ `provider: 'elevenlabs'` (xi-api-key, baseUrl override, output_format)
-- 16.3 `AudioCache` ในหน่วยความจำ (LRU 20 รายการ/5 MB) — ข้อความเดิมเล่นซ้ำไม่ต้องจ่ายซ้ำ
-- 16.4 Tests + UI (ช่องตั้งค่าใช้ร่วมกันทุก provider ที่ต้องมี server) + `docs/VOICE.md`
+- [x] 16.1 `core/tts.js`: provider `elevenlabs`, `TTS_VOICES` (เสียงแนะนำต่อเจ้า), `voicesFor`, `resolveTTSConfig` (เติม default + กัน voice ข้ามเจ้า)
+- [x] 16.2 server `/api/tts`: branch `provider: 'elevenlabs'` (`xi-api-key`, `ELEVENLABS_API_KEY`/`BASE_URL`, `output_format=mp3_44100_128`, voice encode) + health `aiKeys.elevenlabs`
+- [x] 16.3 `AudioCache` LRU (20 รายการ/5 MB) — key ตาม provider/voice/model/lang/text, `cached` ในผลลัพธ์, `cacheStats`/`clearCache`, ปิดได้ด้วย `ttsCache`
+- [x] 16.4 Tests (`tts` 12, `server.tts` 1 integration, smoke +2) + UI ใช้ช่องร่วม (`needsServer`) + datalist เสียง + `docs/VOICE.md`
 
 ## T2 — โมเดลในเครื่อง
 

@@ -359,7 +359,14 @@ $('#mcp-transport').dispatchEvent(new window.Event('change'));
 // voice & streaming settings
 $('#nav button[data-view="settings"]').click();
 check('voice: thai voice listed', $('#set-voice').options.length >= 2, `${$('#set-voice').options.length} options`);
-check('voice: 3 tts providers offered', $('#set-ttsprovider').options.length === 3, `${$('#set-ttsprovider').options.length} options`);
+check('voice: 4 tts providers offered', $('#set-ttsprovider').options.length === 4, `${$('#set-ttsprovider').options.length} options`);
+$('#set-ttsprovider').value = 'elevenlabs';
+$('#set-ttsprovider').dispatchEvent(new window.Event('change'));
+await wait(20);
+check('voice: elevenlabs reveals server fields', $('#tts-openai-fields').hidden === false && $('#set-ttsmodel').value === 'eleven_multilingual_v2', `${$('#set-ttsmodel').value} / hidden=${$('#tts-openai-fields').hidden}`);
+check('voice: elevenlabs voice suggestions', $('#set-ttsvoice').getAttribute('list') === 'tts-voice-list' && window.document.getElementById('tts-voice-list').children.length === 5, String(window.document.getElementById('tts-voice-list')?.children.length));
+$('#set-ttsprovider').value = 'system';
+$('#set-ttsprovider').dispatchEvent(new window.Event('change'));
 check('voice: openai fields hidden by default', $('#tts-openai-fields').hidden === true);
 $('#set-ttsprovider').value = 'openai';
 $('#set-ttsprovider').dispatchEvent(new window.Event('change'));

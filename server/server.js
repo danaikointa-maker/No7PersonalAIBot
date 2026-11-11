@@ -478,6 +478,7 @@ async function handleApi(req, res, url) {
       aiKeys: {
         gemini: !!process.env.GEMINI_API_KEY,
         openai: !!process.env.OPENAI_API_KEY,
+        elevenlabs: !!process.env.ELEVENLABS_API_KEY,
       },
     });
   }
@@ -513,6 +514,42 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     const text = String(body.text || '').slice(0, 3000);
     if (!text) return json(res, 400, { error: 'ต้องมี text' });
+    const provider = String(body.provider || 'openai');
+
+    // ---- ElevenLabs: เสียงพรีเมียม (คืน mp3 เหมือนกัน) ----
+    if (provider === 'elevenlabs') {
+      const key = body.apiKey || process.env.ELEVENLABS_API_KEY;
+      if (!key) return json(res, 400, { error: 'ไม่มี API key — ตั้ง ELEVENLABS_API_KEY ที่ server หรือกรอกในแอป' });
+      const base = String(body.baseUrl || process.env.ELEVENLABS_BASE_URL || 'https://api.elevenlabs.io/v1').replace(/\/$/, '');
+      const voiceId = encodeURIComponent(String(body.voice || '21m00Tcm4TlvDq8ikWAM'));
+      try {
+        const r = await fetch(`${base}/text-to-speech/${voiceId}?output_format=mp3_44100_128`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'audio/mpeg', 'xi-api-key': String(key) },
+          body: JSON.stringify({
+            text,
+            model_id: body.model || 'eleven_multilingual_v2',
+            voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+          }),
+        });
+        if (!r.ok) {
+          const detail = await r.text().catch(() => '');
+          return json(res, 502, { error: `provider ${r.status}: ${detail.slice(0, 200)}` });
+        }
+        const buf = Buffer.from(await r.arrayBuffer());
+        res.writeHead(200, {
+          'Content-Type': 'audio/mpeg',
+          'Content-Length': buf.length,
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-store',
+        });
+        res.end(buf);
+      } catch (e) {
+        json(res, 502, { error: e.message });
+      }
+      return;
+    }
+
     const key = body.apiKey || process.env.OPENAI_API_KEY;
     if (!key) return json(res, 400, { error: 'ไม่มี API key — ตั้ง OPENAI_API_KEY ที่ server หรือกรอกในแอป' });
     const base = String(body.baseUrl || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');

@@ -377,16 +377,17 @@
           </label>
           <p class="hint" id="tts-provider-hint"></p>
           <div id="tts-openai-fields" hidden>
-            <label>Base URL ของผู้ให้บริการ (OpenAI-compatible)
+            <label>Base URL ของผู้ให้บริการ (เว้นว่าง = ค่าเริ่มต้นของผู้ให้บริการ)
               <input id="set-ttsbaseurl" placeholder="https://api.openai.com/v1" />
             </label>
-            <label>API key (เว้นว่าง = ใช้ OPENAI_API_KEY ที่ server)
+            <label>API key (เว้นว่าง = ใช้ key ที่ server)
               <input id="set-ttsapikey" type="password" placeholder="เก็บในเครื่องเท่านั้น" />
             </label>
             <div class="grid2">
-              <label>โมเดล <input id="set-ttsmodel" placeholder="tts-1" /></label>
-              <label>เสียง <input id="set-ttsvoice" placeholder="alloy" /></label>
+              <label>โมเดล <input id="set-ttsmodel" placeholder="tts-1 / eleven_multilingual_v2" /></label>
+              <label>เสียง <input id="set-ttsvoice" placeholder="alloy / voice id" list="tts-voice-list" /></label>
             </div>
+            <label><input type="checkbox" id="set-ttscache" checked /> แคชเสียงในเครื่อง (ข้อความเดิมเล่นซ้ำทันที)</label>
           </div>
           <label>พูดขัดจังหวะได้ (barge-in)
             <select id="set-bargein"></select>
