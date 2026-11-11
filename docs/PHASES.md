@@ -662,3 +662,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 64.1 version 2.14.0 + CHANGELOG
 - [x] 64.2 README (32 docs, 449 unit / 165 checks) + PHASES ปิดครบ
 - [x] 64.3 ตรวจรับรวม: check 116 files · unit 449 · browser 165 · perf · build → PR
+
+# รอบที่ 20 (v2.15)
+
+เป้าหมาย: ป้องกันไฟล์สำรองขนาดใหญ่หรือโครงสร้างผิดปกติทำให้หน้าเว็บค้าง/restore ล้ม; ปฏิเสธก่อนอ่านและก่อนเขียน storage
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AI1 | จำกัดขนาดและตรวจ schema ของ backup | 65.1–65.3 | ⬜ |
+| AI2 | เชื่อม file picker และแผน restore ที่ทน malformed rows | 66.1–66.3 | ⬜ |
+| AI3 | Release 2.15 | 67.1–67.3 | ⬜ |
+
+## AI1 — จำกัดขนาดและตรวจ schema ของ backup
+
+- [ ] 65.1 จำกัดขนาด JSON 20 MiB ก่อน parse; object API มี byte guard เช่นกัน
+- [ ] 65.2 ตรวจรูปแบบ collection/จำนวนแถวก่อนสร้าง restore plan
+- [ ] 65.3 Tests สำหรับขนาด, wrong shape, row caps และ legacy compatibility
+
+## AI2 — เชื่อม file picker และแผน restore ที่ทน malformed rows
+
+- [ ] 66.1 file picker ปฏิเสธไฟล์เกินขนาดก่อน FileReader และแสดงสาเหตุ
+- [ ] 66.2 dry-run/restore ไม่ throw เมื่อมี record แถวผิดรูป; storage ไม่เปลี่ยนหากไฟล์ไม่ผ่าน validation
+- [ ] 66.3 Browser smoke + `docs/BACKUP.md`
+
+## AI3 — Release 2.15
+
+- [ ] 67.1 version 2.15.0 + CHANGELOG
+- [ ] 67.2 README + PHASES ปิดครบ
+- [ ] 67.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
