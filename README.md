@@ -1,4 +1,4 @@
-# No7 Personal AI Bot `v2.6`
+# No7 Personal AI Bot `v2.7`
 
 > ผู้ช่วย AI ส่วนตัวที่ **โค้ดชุดเดียวกันรันได้ทั้งมือถือและ PC** — พูดไทยก่อน ฟังได้ด้วยเสียง มีความจำระยะยาว
 > เรียกเครื่องมือจริง ทำงานหลายก้าวได้ ซิงก์ข้ามเครื่อง และสั่งงานอุปกรณ์ผ่าน HMAC
@@ -22,15 +22,15 @@ npm run build         # dist/ ชุดเดียวสำหรับ PWA + E
 npm run server        # companion server: static + AI proxy + tools + sync + phone-link
 npm run desktop       # เปิดเป็นแอปเดสก์ท็อป (Electron)
 npm run mobile:sync   # ซิงก์ dist/ เข้าโปรเจค Android/iOS
-npm test              # 420 unit tests
-npm run test:browser  # 151 end-to-end checks (รันแอปจริงใน jsdom)
+npm test              # 427 unit tests
+npm run test:browser  # 154 end-to-end checks (รันแอปจริงใน jsdom)
 npm run check         # syntax + structure check
 npm run perf          # performance budget (ขนาด bundle/source)
 ```
 
 ---
 
-## ทำอะไรได้ (v2.6)
+## ทำอะไรได้ (v2.7)
 
 ### 🎭 เลือกได้ทั้งหมด — 5 บทบาทในที่เดียว
 `✨ ทั้งหมด` (สลับบทบาทเองตามคำขอ) · `💛 เพื่อนคุย` · `💼 งาน` · `📅 ชีวิตประจำวัน` · `🏠 อุปกรณ์`
@@ -152,7 +152,7 @@ npm run perf          # performance budget (ขนาด bundle/source)
 - ซิงก์มือถือ ↔ PC ผ่าน server ของคุณเอง (`/api/sync`, token) — ไม่มีคลาวด์ ไม่มีบัญชี
 - เลือกกลยุทธ์เมื่อข้อมูลชนกัน + ดูรายงาน "เพิ่ม/อัปเดต/คงเดิม/ชนกัน" (ดู [docs/SYNC.md](docs/SYNC.md))
 - ส่งออกสรุปวันนี้/รายงานสัปดาห์เป็น Markdown หรือ CSV (BOM พร้อม Excel ไทย) — [docs/REPORTS.md](docs/REPORTS.md)
-- ตรวจสุขภาพข้อมูล (คะแนน A–D), ล้างแบบยืนยันก่อน และย้อนกลับได้ใน 30 วินาที; UI ไทย/อังกฤษ — [docs/HEALTH.md](docs/HEALTH.md)
+- ตรวจสุขภาพข้อมูล (คะแนน A–D), ล้างแบบยืนยันและย้อนกลับได้ใน 30 วินาที, ดูแนวโน้มคะแนน 30 วัน; เก็บเฉพาะสรุป ไม่เก็บข้อความส่วนตัว — [docs/HEALTH.md](docs/HEALTH.md)
 - **งาน + เตือนข้ามเครื่อง**: เพิ่มงานด้วยเสียง/ข้อความ, เตือนตามเวลา, ซิงก์แบบ last-write-wins (tombstone สำหรับการลบ)
 - **งานซ้ำ + เตือนแม้ปิดแอป**: `daily/weekdays/weekly/monthly/hourly`, server tick ส่ง Telegram, ปิดงานแล้วเลื่อนรอบถัดไปเอง
 

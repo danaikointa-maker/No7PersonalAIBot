@@ -2,6 +2,9 @@ const COPY = {
   th: {
     title: 'สุขภาพข้อมูล', clean: '🧹 ล้างรายการซ้ำ/ว่าง', undo: '↶ ย้อนกลับการล้าง', noIssues: 'ข้อมูลอยู่ในสภาพดี — ไม่มีปัญหาที่พบ',
     suggestions: 'คำแนะนำ', cleanable: 'รายการที่ล้างได้อย่างปลอดภัย', dupFacts: 'ความจำซ้ำ', emptyNotes: 'โน้ตว่าง', todos: 'รายการซ้ำ/ว่าง',
+    history: 'ประวัติสุขภาพ 30 วัน', clearHistory: 'ล้างประวัติ', confirmClearHistory: 'ล้างเฉพาะประวัติคะแนนสุขภาพในเครื่องหรือไม่? ข้อมูลรายการส่วนตัวไม่ได้ถูกเก็บในประวัติ',
+    noHistory: 'สแกนสุขภาพข้อมูลเพื่อเริ่มบันทึกแนวโน้ม', historyChart: 'กราฟคะแนนสุขภาพย้อนหลัง', historyPrivacy: 'เก็บเฉพาะวันที่ คะแนน เกรด และจำนวนปัญหา — ไม่มีข้อความส่วนตัว',
+    historySaveError: 'บันทึกประวัติไม่ได้ — พื้นที่เก็บข้อมูลอาจไม่พร้อมใช้งาน', historyClearError: 'ล้างประวัติไม่ได้ — พื้นที่เก็บข้อมูลอาจไม่พร้อมใช้งาน',
     confirm: 'ลบเฉพาะรายการซ้ำ/ว่างที่ตรวจพบจำนวน {count} รายการหรือไม่?\nความจำ {facts} · โน้ต {notes} · สิ่งที่ต้องทำ {todos}\nรายการเก่า งาน และนัดหมายจะไม่ถูกลบ',
     cleanError: 'ล้างข้อมูลไม่สำเร็จ — พื้นที่จัดเก็บอาจไม่พร้อมใช้งาน', cleanDone: 'ล้างข้อมูลเรียบร้อย', undoDone: 'ย้อนกลับการล้างแล้ว',
     severity: { high: 'สูง', medium: 'กลาง', low: 'ต่ำ' }, grade: { A: 'ดีมาก', B: 'ดี', C: 'ควรตรวจสอบ', D: 'ต้องดูแล' },
@@ -10,6 +13,9 @@ const COPY = {
   en: {
     title: 'Data health', clean: '🧹 Clean duplicates/empty items', undo: '↶ Undo cleanup', noIssues: 'Your data looks good — no issues found.',
     suggestions: 'Suggestions', cleanable: 'Safe to clean', dupFacts: 'Duplicate memories', emptyNotes: 'Empty notes', todos: 'Duplicate/empty to-dos',
+    history: '30-day health history', clearHistory: 'Clear history', confirmClearHistory: 'Clear only the on-device health score history? No personal item text is stored in it.',
+    noHistory: 'Run a health scan to start tracking a trend.', historyChart: 'Health score history chart', historyPrivacy: 'Only dates, scores, grades, and issue counts are stored — never personal item text.',
+    historySaveError: 'Could not save history — local storage may be unavailable.', historyClearError: 'Could not clear history — local storage may be unavailable.',
     confirm: 'Remove only the {count} duplicate/empty items found?\nMemories {facts} · Notes {notes} · To-dos {todos}\nOld memories, tasks, and events will not be removed.',
     cleanError: 'Cleanup failed — local storage may be unavailable.', cleanDone: 'Cleanup complete', undoDone: 'Cleanup undone',
     severity: { high: 'HIGH', medium: 'MEDIUM', low: 'LOW' }, grade: { A: 'Excellent', B: 'Good', C: 'Needs review', D: 'Needs attention' },
