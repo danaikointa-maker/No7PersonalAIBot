@@ -51,6 +51,8 @@ import { buildDigest, digestTool, shouldAutoDigest } from './core/digest.js';
 import { buildWeekly, weeklyTool } from './core/weekly.js';
 import { analyzeHealth, healthMarkdown, applyCleanup } from './core/health.js';
 import { healthUiCopy, healthSuggestion } from './core/health-i18n.js';
+import { readHealthHistory, writeHealthHistory, clearHealthHistory, recordHealthSnapshot } from './core/health-history.js';
+import { renderHealthHistory } from './ui/health-history.js';
 import {
   customToolDefs, validateCustomTools, PLUGIN_EXAMPLE, PLUGIN_LIMITS,
 } from './core/custom-tools.js';
@@ -1271,8 +1273,17 @@ function renderHealthCard(report) {
     ${report.suggestions.length ? `<div><strong>${copy.suggestions}</strong>${report.suggestions.map((text) => `<div class="digest-item">· ${esc(healthSuggestion(text, langOf(settings.uiLang)))}</div>`).join('')}</div>` : ''}
     ${cleanupRows ? `<div class="health-cleanup"><strong>${copy.cleanable}</strong>${cleanupRows}</div>` : ''}
     <div class="digest-actions">${undo}<button id="health-clean-btn" ${fixableCount ? '' : 'disabled'}>${copy.clean}</button></div>
+    ${renderHealthHistory(readHealthHistory(), { lang: langOf(settings.uiLang), copy })}
   </div>`;
   card.hidden = false;
+  card.querySelector('#health-history-clear')?.addEventListener('click', () => {
+    if (!window.confirm(copy.confirmClearHistory)) return;
+    if (!clearHealthHistory()) {
+      addMessage('bot', copy.historyClearError);
+      return;
+    }
+    renderHealthCard(lastHealth);
+  });
   card.querySelector('#health-undo-btn')?.addEventListener('click', undoHealthCleanup);
   card.querySelector('#health-clean-btn')?.addEventListener('click', () => {
     const data = collectHealthData();
@@ -1361,7 +1372,9 @@ function undoHealthCleanup() {
 }
 $('#health-btn')?.addEventListener('click', () => {
   const report = analyzeHealth(collectHealthData());
+  const historySaved = writeHealthHistory(recordHealthSnapshot(readHealthHistory(), report));
   renderHealthCard(report);
+  if (!historySaved) addMessage('bot', healthCopy().historySaveError);
   addMessage('bot', healthMarkdown(report, langOf(settings.uiLang)));
 });
 $('#set-digest-auto')?.addEventListener('change', (e) => {

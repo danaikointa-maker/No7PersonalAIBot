@@ -387,6 +387,9 @@ check('health: scan button is available', !!$('#health-btn'));
 $('#health-btn').click();
 await wait(20);
 check('health: report card rendered with cleanup preview', !$('#health-card').hidden && $('#health-card').textContent.includes('รายการที่ล้างได้อย่างปลอดภัย'), $('#health-card').textContent.slice(0, 100));
+const healthHistory = JSON.parse(window.localStorage.getItem('no7.health.history.v1') || '{}');
+check('health history: stores only one score summary', healthHistory.snapshots?.length === 1 && Object.keys(healthHistory.snapshots[0]).sort().join(',') === 'date,grade,issues,score');
+check('health history: chart is accessible', !!$('#health-card svg[role="img"][aria-label]'));
 check('health: report posted to chat', $('#messages').textContent.includes('สุขภาพข้อมูล'));
 window.confirm = () => true;
 $('#health-clean-btn').click();
@@ -398,6 +401,9 @@ $('#health-undo-btn').click();
 await wait(20);
 check('health: undo restores deleted entries', JSON.parse(window.localStorage.getItem('no7.notes.v1')).length === 2 && JSON.parse(window.localStorage.getItem('no7.todos.v1')).length === 2);
 check('health: undo refreshes cleanup preview', $('#health-card').textContent.includes('รายการที่ล้างได้อย่างปลอดภัย'));
+$('#health-history-clear').click();
+await wait(10);
+check('health history: clear button removes only score history', window.localStorage.getItem('no7.health.history.v1') === null && $('#health-card').textContent.includes('สแกนสุขภาพข้อมูลเพื่อเริ่มบันทึกแนวโน้ม'));
 $('#nav button[data-view="settings"]').click();
 
 // memory 2.0: pin + consolidate run

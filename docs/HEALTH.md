@@ -24,11 +24,19 @@
 
 ปุ่มและการ์ดสุขภาพเปลี่ยนภาษาตาม ⚙️ → ภาษา UI; การสแกนไม่ต้องทำใหม่
 
+## ประวัติและแนวโน้ม 30 วัน
+
+เมื่อผู้ใช้กดสแกน ระบบบันทึกหรือแทนที่ snapshot ของวันตามปฏิทินในเครื่องนั้นใน `no7.health.history.v1` และเก็บไม่เกิน 30 วันล่าสุด แสดงกราฟคะแนน, เกรด, จำนวนปัญหา และส่วนต่างจากการสแกนครั้งก่อน ปุ่ม **ล้างประวัติ** ลบเฉพาะข้อมูลสรุปนี้หลังยืนยัน
+
+ประวัติเก็บเฉพาะ `{ date, score, grade, issues: { high, medium, low } }` พร้อม `schema: 1` — ไม่เก็บข้อความความจำ, โน้ต, งาน, นัดหมาย หรือรายละเอียดปัญหา ประวัติอยู่ใน localStorage ของเครื่องและไม่ได้ซิงก์/ส่งออก/ส่งไป AI; การสแกนรอบเดิมในวันเดียวกันจะแทนที่ ไม่เพิ่มแถวซ้ำ
+
 ## API
 
 `analyzeHealth({ facts, notes, todos, tasks, events, now, staleDays, unusedDays })` คืน `{ now, score, grade, gradeLabel, counts, issues, cleanup, suggestions, markdown }`.
 
 `applyCleanup(cleanup, { facts, notes, todos })` คืนสำเนารายการหลังล้างและจำนวนที่เอาออก โดยไม่แก้ข้อมูลต้นทาง ส่วน `healthMarkdown(report, 'th' | 'en')` สร้างรายงานให้อ่านหรือส่งเข้าแชทได้
+
+`recordHealthSnapshot(history, report, now)` เพิ่ม/แทนที่สรุปรายวันและตัดให้เหลือ 30 รายการ; `normalizeHealthHistory`, `readHealthHistory`, `writeHealthHistory`, `clearHealthHistory` จัดการข้อมูล versioned; `healthTrend` สรุปส่วนต่าง; `renderHealthHistory` สร้างกราฟ SVG พร้อมรายการข้อความที่อ่านได้
 
 ไฟล์: `web/src/core/health.js` · tests: `tests/health.test.js` · UI: `web/src/main.js`
 
