@@ -151,7 +151,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 | S2 | Desktop awareness + automation | 12.1–12.4 | ✅ |
 | S3 | Phone-Link ครบวงจร | 13.1–13.4 | ✅ |
 | S4 | MCP OAuth: device flow + DCR | 14.1–14.4 | ✅ |
-| S5 | Release 1.5 | 15.1–15.3 | ⬜ |
+| S5 | Release 1.5 | 15.1–15.3 | ✅ |
 
 ## S1 — งานซ้ำ + เตือนผ่าน server
 
@@ -183,6 +183,6 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## S5 — Release 1.5
 
-- 15.1 version 1.5.0 + CHANGELOG
-- 15.2 README + ROADMAP + PHASES ปิดครบ
-- 15.3 ตรวจรับรวม + PR
+- [x] 15.1 version 1.5.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics) + CHANGELOG 1.5.0
+- [x] 15.2 README (v1.5 + ตัวเลขใหม่) + ROADMAP + PHASES ปิดครบทั้ง S1–S5
+- [x] 15.3 ตรวจรับรวม: `npm run check` 75 ไฟล์ · `npm test` 266/0 · `npm run test:browser` 82/82 · `npx vite build` ผ่าน · เปิด PR
