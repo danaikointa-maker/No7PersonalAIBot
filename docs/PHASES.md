@@ -606,3 +606,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 58.1 version 2.12.0 + CHANGELOG
 - [x] 58.2 README (32 docs, 442 unit / 163 checks) + PHASES ปิดครบ
 - [x] 58.3 ตรวจรับรวม: check 115 files · unit 442 · browser 163 · perf · build → PR
+
+# รอบที่ 18 (v2.13)
+
+เป้าหมาย: ย้าย Persona Studio ที่ผู้ใช้สร้างเองผ่านไฟล์สำรองทั้งแอปได้ โดยตรวจ/จำกัดข้อมูลและไม่แตะ persona built-in
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AG1 | ทำ persona data ให้สำรอง/นำเข้าได้ปลอดภัย | 59.1–59.3 | ⬜ |
+| AG2 | เชื่อม persona กับ backup/restore UI | 60.1–60.3 | ⬜ |
+| AG3 | Release 2.13 | 61.1–61.3 | ⬜ |
+
+## AG1 — ทำ persona data ให้สำรอง/นำเข้าได้ปลอดภัย
+
+- [ ] 59.1 normalize persona ที่นำเข้า: จำกัดจำนวน/ความยาว/รูปแบบและตัด metadata ที่ไม่รู้จัก
+- [ ] 59.2 ใช้ ID และ updatedAt สำหรับ merge; built-in personas ห้ามถูกแทนที่
+- [ ] 59.3 Tests สำหรับ sanitization, merge/replace และไฟล์รุ่นเก่า
+
+## AG2 — เชื่อม persona กับ backup/restore UI
+
+- [ ] 60.1 Export เฉพาะ custom personas ที่ผู้ใช้สร้างเอง
+- [ ] 60.2 Restore ตามแผนที่ยืนยันแล้วและ refresh UI; replace/merge ไม่แก้ built-ins
+- [ ] 60.3 Browser smoke + อัปเดต `docs/BACKUP.md`/`docs/PERSONA.md`
+
+## AG3 — Release 2.13
+
+- [ ] 61.1 version 2.13.0 + CHANGELOG
+- [ ] 61.2 README + PHASES ปิดครบ
+- [ ] 61.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
