@@ -2,6 +2,19 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.17.0] — 2026-11-10
+
+รอบที่ยี่สิบสอง: เพิ่มหน้าอ่าน/ค้นหา conversation archive ที่เก็บในเครื่อง
+
+### เพิ่ม
+- หน้า memory แสดงบทสนทนาที่เก็บใน log รวมถึงรายการ restore/import
+- ค้นหาข้อความและกรอง user/assistant; เรียงใหม่→เก่า, โหลดทีละ 50 และจำกัด 200 ต่อหน้า
+- render ด้วย textContent; archive เป็น read-only และการค้นหาไม่ส่งข้อความไป AI/เครือข่าย
+
+### ตรวจรับ
+- 455 unit tests · 168 browser checks · `npm run check` 118 JS files
+- Performance/build ผ่าน; source ใหญ่สุด 149.9 KB; main gzip 108.1 KB
+
 ## [2.16.0] — 2026-11-10
 
 รอบที่ยี่สิบเอ็ด: กู้คืน backup โดยรักษา API credentials ที่มีอยู่ในเครื่อง
