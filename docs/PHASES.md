@@ -253,7 +253,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 | เฟส | ชื่อ | งานย่อย | สถานะ |
 |---|---|---|---|
 | U1 | Timeline + ยกเลิกกลางทาง | 22.1–22.4 | ✅ |
-| U2 | สรุปประจำวัน (digest) | 23.1–23.4 | ⬜ |
+| U2 | สรุปประจำวัน (digest) | 23.1–23.4 | ✅ |
 | U3 | ปลั๊กอินเครื่องมือ HTTP | 24.1–24.4 | ⬜ |
 | U4 | Release 2.1 | 25.1–25.3 | ⬜ |
 
@@ -266,10 +266,10 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## U2 — สรุปประจำวัน (digest)
 
-- 23.1 `core/digest.js`: `buildDigest({tasks, events, memories, now})` → ส่วนงานค้าง/เกินกำหนด/วันนี้/นัดหมาย/ความจำใหม่ + `digestMarkdown`
-- 23.2 tool `digest` (dynamic, risk 0) ให้ AI เรียกได้ + ปุ่ม "🌅 สรุปวันนี้" ในหน้าแชท/ตารางนัด
-- 23.3 แจ้งเตือนสรุปอัตโนมัติครั้งแรกของวัน (opt-in `settings.digest.auto`) + i18n
-- 23.4 Tests + smoke + `docs/DIGEST.md`
+- [x] 23.1 `core/digest.js`: `buildDigest` (เกินกำหนด/วันนี้/นัดหมาย/48 ชม./ถัดไป/ความจำใหม่/ไม่มีกำหนด) + `digestMarkdown` + `toMs` (รับ ISO string)
+- [x] 23.2 tool `digest` (dynamic, risk 0) + ปุ่ม "🌅 สรุปวันนี้" (การ์ด + โพสต์ในแชท) + `refreshDynamicTools()` รวม MCP/ปลั๊กอิน
+- [x] 23.3 สรุปอัตโนมัติครั้งแรกของวันหลัง 07:00 (`settings.digestAuto`, `no7.digest.last`) + i18n
+- [x] 23.4 `tests/digest.test.js` (12) + smoke +5 (105 checks) + `docs/DIGEST.md`
 
 ## U3 — ปลั๊กอินเครื่องมือ HTTP
 

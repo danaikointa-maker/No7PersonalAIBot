@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS = {
   persona: 'no7',
   language: 'th',
   uiLang: 'th',           // ภาษาของหน้าจอ: th | en (ไม่กระทบภาษาที่ AI ตอบ)
+  digestAuto: false,      // สรุปประจำวันอัตโนมัติ (ครั้งแรกของวัน หลัง 07:00)
   polite: true,
   tts: true,
   stt: true,

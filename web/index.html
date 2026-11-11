@@ -138,6 +138,11 @@
 
           <h3 data-i18n="tasks.title">✅ งานที่ต้องทำ</h3>
           <p class="hint">มีเวลาเตือน + ซิงก์ข้ามเครื่องผ่าน <code>/api/sync</code> (last-write-wins)</p>
+          <div class="row">
+            <button id="digest-btn" data-i18n="digest.button">🌅 สรุปวันนี้</button>
+            <label class="inline"><input type="checkbox" id="set-digest-auto" /> สรุปอัตโนมัติทุกเช้า</label>
+          </div>
+          <div id="digest-card" hidden></div>
           <div id="task-stats" class="hint"></div>
           <div id="task-server-status" class="hint"></div>
           <div class="row">

@@ -11,7 +11,7 @@ import { detectCapabilities, summarizeCapabilities, requestMicrophone, requestNo
 import { usageBreakdown, formatBytes, estimateQuota, isPersisted, requestPersistentStorage, clearGroup } from './core/storage.js';
 import { MemoryStore } from './core/memory.js';
 import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatWithFallbackStream } from './core/ai-providers.js';
-import { getTool, TOOL_IDS, runTool, toolMeta, restoreReminders, registerDynamicTools } from './core/tools.js';
+import { getTool, TOOL_IDS, allToolIds, runTool, toolMeta, restoreReminders, registerDynamicTools } from './core/tools.js';
 import { McpRegistry } from './core/mcp.js';
 import {
   createPkcePair, randomState, buildAuthorizeUrl, parseCallback,
@@ -43,6 +43,7 @@ import { loadSettings, saveSettings, resetSettings, hasProviderConfigured, loadP
 import { detectPlatform, platformLabel, isDesktopHost } from './core/platform.js';
 import { applyI18n, langOf, viewTitle, t as tr } from './core/i18n.js';
 import { AgentTimeline, statusIcon } from './core/timeline.js';
+import { buildDigest, digestTool, shouldAutoDigest } from './core/digest.js';
 import {
   LOCAL_PRESETS, probeLocal, warmModel, pickBestModel, normalizeOfflineBrain,
   offlineChainSettings, describeLocalBrain, LocalModelCache,
@@ -59,10 +60,18 @@ const mcp = new McpRegistry({
   serverUrl: () => settings.serverUrl || 'http://localhost:8787',
 });
 
-function applyMcpTools() {
-  const defs = mcp.toolDefs();
+/** เครื่องมือ dynamic ทั้งหมด: MCP + ปลั๊กอิน HTTP + digest (ลงทะเบียนที่เดียว) */
+let pluginToolDefs = {};
+let digestToolDef = null;
+
+function refreshDynamicTools() {
+  const defs = { ...mcp.toolDefs(), ...pluginToolDefs, digest: digestToolDef };
   registerDynamicTools(defs);
   return Object.keys(defs).length;
+}
+
+function applyMcpTools() {
+  return refreshDynamicTools();
 }
 
 function renderMcp() {
@@ -734,7 +743,7 @@ function renderToolsGrid(force = false) {
 
   const note = $('#tools-note');
   if (note) {
-    note.textContent = `${mode.emoji} โหมด ${mode.label}: แสดง ${ids.length}/${TOOL_IDS.length} เครื่องมือ`
+    note.textContent = `${mode.emoji} โหมด ${mode.label}: แสดง ${ids.length}/${allToolIds().length} เครื่องมือ`
       + (modeId === 'auto' ? ' — สลับโหมดเพื่อดูชุดอื่น' : '');
   }
 }
@@ -905,6 +914,68 @@ function downloadJson(data, filename) {
   URL.revokeObjectURL(a.href);
 }
 
+/* ------------------------------------------------------------------ digest */
+const DIGEST_KEY = 'no7.digest.last';
+
+// ใช้ closure (ไม่ใช่ getter) เพื่อไม่ให้แตะ `tasks`/`calendar` ก่อนถูกประกาศ (TDZ)
+digestToolDef = digestTool({
+  tasks: { list: (opts = {}) => tasks.list(opts) },
+  calendar: { list: () => calendar.all() },
+  memory: { recent: () => memory.listFacts({ sort: 'recent' }) },
+  lang: () => langOf(settings.uiLang),
+});
+
+function renderDigestCard(digest, target = null) {
+  const box = $('#digest-card');
+  const html = `<div class="digest-card">
+    <strong>${esc(digest.headline)}</strong>
+    ${digest.sections.map((sec) => `<div class="digest-sec">
+      <div class="digest-sec-head">${sec.emoji} ${esc(sec.title)} <small>(${sec.items.length}${sec.more ? `+${sec.more}` : ''})</small></div>
+      ${sec.items.map((it) => `<div class="digest-item">· ${esc(it.label)}${it.meta ? ` <small>${esc(it.meta)}</small>` : ''}</div>`).join('')}
+      ${sec.more ? `<div class="digest-item">· …อีก ${sec.more}</div>` : ''}
+    </div>`).join('') || `<p class="hint">${settings.uiLang === 'en' ? 'Nothing pending today.' : 'วันนี้ไม่มีอะไรค้าง 🎉'}</p>`}
+  </div>`;
+  if (box) {
+    box.innerHTML = html;
+    box.hidden = false;
+  }
+  if (target) {
+    const plain = [digest.headline]
+      .concat(digest.sections.flatMap((sec) => [
+        `${sec.emoji} ${sec.title}`,
+        ...sec.items.map((it) => `  · ${it.label}${it.meta ? ` (${it.meta})` : ''}`),
+      ]))
+      .join('\n');
+    const el = addMessage('bot', plain);
+    el.classList.add('digest');
+  }
+  return html;
+}
+
+/** สร้างสรุปวันนี้และแสดง (ปุ่ม / อัตโนมัติ / tool) */
+function showDigest({ inChat = true } = {}) {
+  const digest = buildDigest({
+    tasks: tasks.list({ done: null }),
+    events: calendar.all(),
+    memories: memory.listFacts({ sort: 'recent' }),
+    now: Date.now(),
+    lang: langOf(settings.uiLang),
+  });
+  renderDigestCard(digest, inChat ? {} : null);
+  setSubtitle(digest.headline);
+  return digest;
+}
+
+function maybeAutoDigest() {
+  if (!settings.digestAuto) return null;
+  let last = null;
+  try { last = Number(localStorage.getItem(DIGEST_KEY)) || null; } catch { last = null; }
+  if (!shouldAutoDigest({ lastDate: last, now: Date.now(), hour: 7 })) return null;
+  const digest = showDigest({ inChat: true });
+  try { localStorage.setItem(DIGEST_KEY, String(digest.date)); } catch { /* พื้นที่เต็ม */ }
+  return digest;
+}
+
 /* ---------------------------------------------------------------- calendar */
 const calendar = getCalendar();
 
@@ -962,6 +1033,17 @@ $('#cal-export-btn').addEventListener('click', () => {
   a.click();
   URL.revokeObjectURL(a.href);
   $('#cal-status').textContent = 'ส่งออกแล้ว';
+});
+
+$('#digest-btn')?.addEventListener('click', () => {
+  const digest = showDigest({ inChat: true });
+  try { localStorage.setItem(DIGEST_KEY, String(digest.date)); } catch { /* noop */ }
+});
+$('#set-digest-auto')?.addEventListener('change', (e) => {
+  Object.assign(settings, saveSettings({ digestAuto: e.target.checked }));
+  $('#settings-status').textContent = e.target.checked
+    ? (settings.uiLang === 'en' ? 'Morning digest: on' : 'สรุปอัตโนมัติทุกเช้า: เปิด')
+    : (settings.uiLang === 'en' ? 'Morning digest: off' : 'สรุปอัตโนมัติทุกเช้า: ปิด');
 });
 
 $('#cal-today-btn').addEventListener('click', () => {
@@ -1192,6 +1274,7 @@ function renderSettingsForm() {
   renderStorage();
   $('#set-language').value = settings.language;
   $('#set-uilang').value = langOf(settings.uiLang);
+  if ($('#set-digest-auto')) $('#set-digest-auto').checked = !!settings.digestAuto;
   $('#set-polite').checked = settings.polite;
   $('#set-tts').checked = settings.tts;
   $('#set-stt').checked = settings.stt;

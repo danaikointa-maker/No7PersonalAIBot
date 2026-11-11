@@ -163,7 +163,7 @@ const submit = (text) => {
 await wait(100);
 check('boot: initial state', ['IDLE', 'SETUP'].includes($('#state-label').textContent), $('#state-label').textContent);
 check('boot: welcome message', $('#messages').children.length >= 1);
-check('boot: 28 tools in auto mode', $('#tools-grid').children.length === 28, String($('#tools-grid').children.length));
+check('boot: 29 tools in auto mode (28 + digest)', $('#tools-grid').children.length === 29, String($('#tools-grid').children.length));
 check('boot: 5 role modes', $('#mode-chips').children.length === 5, String($('#mode-chips').children.length));
 check('boot: persona header', $('#persona-name').textContent.length > 0);
 
@@ -173,10 +173,10 @@ check('nav: memory view', $('#view-memory').classList.contains('active'));
 // mode switching filters tools
 window.document.querySelector('#mode-chips button[data-mode="hub"]').click();
 await wait(20);
-check('mode: hub filters tools', $('#tools-grid').children.length === 21, String($('#tools-grid').children.length));
+check('mode: hub filters tools', $('#tools-grid').children.length === 22, String($('#tools-grid').children.length));
 window.document.querySelector('#mode-chips button[data-mode="auto"]').click();
 await wait(20);
-check('mode: back to auto', $('#tools-grid').children.length === 28, String($('#tools-grid').children.length));
+check('mode: back to auto', $('#tools-grid').children.length === 29, String($('#tools-grid').children.length));
 
 $('#set-provider').value = 'pollinations';
 $('#save-settings-btn').click();
@@ -262,6 +262,18 @@ check('journey: completing recurring task advances it', /เลื่อนไ�
 const stillOpen = [...$('#task-list').querySelectorAll('.fact')].some((r) => r.textContent.includes('งานซ้ำทดสอบ'));
 check('journey: recurring task stays open', stillOpen, $('#task-list').textContent.slice(0, 60));
 $('#task-repeat').value = '';
+
+// daily digest
+$('#digest-btn').click();
+await wait(30);
+check('digest: card rendered', !$('#digest-card').hidden, $('#digest-card').hidden ? 'hidden' : 'shown');
+check('digest: includes today\'s task', $('#digest-card').textContent.includes('ทดสอบงาน') || $('#digest-card').textContent.includes('งานซ้ำทดสอบ'), `${JSON.parse(window.localStorage.getItem('no7.tasks.v1') || '[]').length} tasks / ${$('#digest-card').textContent.slice(0, 120)}`);
+check('digest: posted to chat', [...$('#messages').querySelectorAll('.msg.bot.digest')].length === 1);
+check('digest: remembers the day', !!window.localStorage.getItem('no7.digest.last'));
+$('#set-digest-auto').checked = true;
+$('#set-digest-auto').dispatchEvent(new window.Event('change'));
+check('digest: auto toggle persists', JSON.parse(window.localStorage.getItem('no7.settings.v1') || '{}').digestAuto === true);
+$('#nav button[data-view="settings"]').click();
 
 // memory 2.0: pin + consolidate run
 $('#nav button[data-view="memory"]').click();
