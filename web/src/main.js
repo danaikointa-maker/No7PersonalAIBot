@@ -1,6 +1,7 @@
 import './styles.css';
 import { StateMachine, STATES } from './core/state.js';
 import { allPersonas, customPersonas, restoreCustomPersonas, getPersona, createPersona, updatePersona, deletePersona, duplicatePersona, personaVoice } from './core/persona-store.js';
+import { mountConversationArchive } from './ui/conversation-archive.js';
 import { getCalendar, formatWhen } from './core/calendar.js';
 import { collectBundle, pushBundle, pullBundle, mergeBundle } from './core/sync.js';
 import { SYNC_STRATEGIES, summarizeSync, describeConflicts } from './core/sync-merge.js';
@@ -237,7 +238,6 @@ function showView(name) {
 document.querySelectorAll('#nav button').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
 $('#menu-btn').addEventListener('click', () => $('#sidebar').classList.toggle('open'));
 
-/* ------------------------------------------------------------------ modes */
 /** โหมดคือ "เลือกทั้งหมดได้" — auto สลับบทบาทเอง, หรือล็อกโหมดเดียวก็ได้ */
 function renderModeChips() {
   const nav = $('#mode-chips');
@@ -264,7 +264,6 @@ function selectMode(id) {
   if (sel) sel.value = id;
 }
 
-/* ------------------------------------------------------------------- chat */
 function addMessage(role, text) {
   const el = document.createElement('div');
   el.className = `msg ${role}`;
@@ -703,7 +702,6 @@ const speechVoice = {
   stopSpeaking: () => tts.stop(),
 };
 
-/* ---------------------------------------------- stop speaking / stop agent */
 let currentAgent = null;
 let currentTimeline = null;
 
@@ -793,6 +791,7 @@ function renderToolsGrid(force = false) {
 /* ----------------------------------------------------------------- memory */
 let memFilter = 'all';
 let memQuery = '';
+let archiveRender = null;
 
 const MEM_FILTERS = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -830,6 +829,8 @@ function renderMemFilters() {
 }
 
 function renderMemory() {
+  if (archiveRender) archiveRender();
+  else archiveRender = mountConversationArchive($('#chat-archive'), () => memory.log, () => settings.uiLang);
   renderMemStats();
   renderMemFilters();
 
@@ -1938,7 +1939,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.16.0',
+      version: window.NO7_VERSION || '2.17.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },

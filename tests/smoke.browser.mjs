@@ -316,6 +316,7 @@ check('backup: chat log restored with safe roles and fields', restoredChatLog.so
 const restoredCustomPersonas = JSON.parse(window.localStorage.getItem('no7.personas.v1') || '[]');
 check('backup: custom persona restored and unknown fields stripped', restoredCustomPersonas.some((p) => p.id === 'p-smoketest1' && p.name === 'จากไฟล์สำรอง') && !JSON.stringify(restoredCustomPersonas).includes('strip'));
 $('#nav button[data-view="memory"]').click();
+check('memory archive: restored chat log is searchable and local', $('#chat-archive').textContent.includes('ข้อความสำรองทดสอบ') && !$('#chat-archive').textContent.includes('invalid role'));
 $('#mem-query').value = 'นำเข้า';
 $('#mem-search-btn').click();
 check('backup: imported fact searchable', $('#mem-results').textContent.includes('ความจำจากการนำเข้า'), $('#mem-results').textContent.slice(0, 60));

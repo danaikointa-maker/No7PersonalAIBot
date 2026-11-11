@@ -8,7 +8,7 @@
 {
   version: 2,
   facts: [{ id, text, tokens, importance(1-5), pinned, used, source, created, ts }],
-  log:   [{ role, text, ts }],           // episodic log สูงสุด 800 บทสนทนา
+  log:   [{ role, text, ts }],           // episodic log สูงสุด 800 ข้อความ
   meta:  { lastConsolidated, migratedFrom }
 }
 ```
@@ -46,6 +46,8 @@ pinBonus   = 1.25
 LLM ถูกจำกัด: สูงสุด 8 ข้อ, ข้ามข้อความชั่วคราว, และล้มเหลวเงียบๆ ได้ (heuristic ทำงานไปแล้ว)
 
 ## การจัดการของผู้ใช้
+
+หน้า memory มี **ประวัติบทสนทนา** สำหรับอ่าน log ที่เก็บใน localStorage รวมถึงข้อมูลที่กู้คืนจาก backup ค้นหาข้อความและกรองผู้ใช้/No7 ได้ เรียงล่าสุดก่อน แสดงครั้งละ 50 และโหลดเพิ่มได้ถึง 200 รายการในหน้าเดียว การค้นหาเป็น local-only ไม่ส่งข้อความให้ AI/เครือข่าย; archive นี้อ่านอย่างเดียว ไม่มีปุ่มลบหรือแก้ไข
 
 | ทำอะไร | ที่ไหน |
 |---|---|

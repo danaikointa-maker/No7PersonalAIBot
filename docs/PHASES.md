@@ -725,24 +725,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AK1 | ตัวกรอง local chat archive | 71.1–71.3 | ⬜ |
-| AK2 | เชื่อมหน้า memory และ UX เข้าถึงได้ | 72.1–72.3 | ⬜ |
-| AK3 | Release 2.17 | 73.1–73.3 | ⬜ |
+| AK1 | ตัวกรอง local chat archive | 71.1–71.3 | ✅ |
+| AK2 | เชื่อมหน้า memory และ UX เข้าถึงได้ | 72.1–72.3 | ✅ |
+| AK3 | Release 2.17 | 73.1–73.3 | ✅ |
 
 ## AK1 — ตัวกรอง local chat archive
 
-- [ ] 71.1 ค้นหาข้อความและกรอง user/assistant จาก local memory log เท่านั้น
-- [ ] 71.2 เรียงล่าสุดก่อน, แสดงทีละ 50 พร้อม load-more และข้าม records ผิดรูป
-- [ ] 71.3 Unit tests สำหรับ search, role, ordering, malformed entries และ limits
+- [x] 71.1 ค้นหาข้อความและกรอง user/assistant จาก local memory log เท่านั้น
+- [x] 71.2 เรียงล่าสุดก่อน, แสดงทีละ 50 พร้อม load-more และข้าม records ผิดรูป
+- [x] 71.3 Unit tests สำหรับ search, role, ordering, malformed entries และ limits
 
 ## AK2 — เชื่อมหน้า memory และ UX เข้าถึงได้
 
-- [ ] 72.1 เพิ่มส่วนอ่านประวัติในหน้า memory; ข้อความใช้ textContent และไม่มีปุ่มลบ/แก้
-- [ ] 72.2 แสดงผลหลัง restore/import โดยไม่เพิ่มข้อมูลเข้า prompt หรือส่งออก network
-- [ ] 72.3 Browser smoke + อัปเดต `docs/MEMORY.md`
+- [x] 72.1 เพิ่มส่วนอ่านประวัติในหน้า memory; ข้อความใช้ textContent และไม่มีปุ่มลบ/แก้
+- [x] 72.2 แสดงผลหลัง restore/import โดยไม่เพิ่มข้อมูลเข้า prompt หรือส่งออก network
+- [x] 72.3 Browser smoke + อัปเดต `docs/MEMORY.md`
 
 ## AK3 — Release 2.17
 
-- [ ] 73.1 version 2.17.0 + CHANGELOG
-- [ ] 73.2 README + PHASES ปิดครบ
-- [ ] 73.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 73.1 version 2.17.0 + CHANGELOG
+- [x] 73.2 README (32 docs, 455 unit / 168 checks) + PHASES ปิดครบ
+- [x] 73.3 ตรวจรับรวม: check 118 files · unit 455 · browser 168 · perf · build → PR
