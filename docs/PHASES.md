@@ -446,7 +446,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 |---|---|---|---|
 | AA1 | ประวัติสุขภาพ 30 วัน | 41.1–41.4 | ✅ |
 | AA2 | กราฟ/สรุปแนวโน้ม | 42.1–42.3 | ✅ |
-| AA3 | Release 2.7 | 43.1–43.3 | ⬜ |
+| AA3 | Release 2.7 | 43.1–43.3 | ✅ |
 
 ## AA1 — ประวัติสุขภาพ 30 วัน
 
@@ -463,6 +463,6 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## AA3 — Release 2.7
 
-- [ ] 43.1 version 2.7.0 + CHANGELOG
-- [ ] 43.2 README + PHASES ปิดครบ
-- [ ] 43.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 43.1 version 2.7.0 + CHANGELOG
+- [x] 43.2 README (32 docs, 427 unit / 154 checks) + PHASES ปิดครบ
+- [x] 43.3 ตรวจรับรวม: check 110 files · unit 427 · browser 154 · perf · build → PR
