@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.26.0] — 2026-11-10
+
+- Memory imports containing only malformed/skipped records now stop before confirmation and storage writes, with a clear no-importable-entries status.
+
 ## [2.25.0] — 2026-11-10
 
 - Validate memory JSON kind/version and collection shapes before preview. Unsupported, malformed, or unrelated files are rejected before confirmation without touching storage; legacy exports without kind/version remain supported.

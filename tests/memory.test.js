@@ -243,6 +243,20 @@ test('failed replace import leaves memory/storage/legacy backups intact and the 
   assert.equal(localStorage.getItem('no7.memory.log.v1'), null);
 });
 
+test('malformed-only import plans contain no applicable records and remain read-only', () => {
+  const mem = fresh();
+  mem.addFact('preserved existing fact');
+  const before = localStorage.getItem('no7.memory.v2');
+  const plan = mem.planImport({
+    facts: [{ text: '  ' }],
+    log: [{ role: 'tool', text: 'not an importable turn', ts: 10 }],
+  });
+  assert.deepEqual(plan.result, { added: 0, merged: 0, skipped: 1, logAdded: 0, logSkipped: 1 });
+  assert.equal(localStorage.getItem('no7.memory.v2'), before);
+  assert.deepEqual(mem.facts.map((fact) => fact.text), ['preserved existing fact']);
+  assert.equal(mem.log.length, 0);
+});
+
 test('replace import plans stay read-only until explicitly applied', () => {
   const mem = fresh();
   mem.addFact('keep me until replacement is confirmed');

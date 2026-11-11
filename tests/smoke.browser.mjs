@@ -382,6 +382,14 @@ for (const [index, payload] of [{}, { kind: 'no7-backup', version: 2, facts: [],
   await wait(10);
 }
 check('memory: malformed or wrong-kind JSON rejected before confirmation without storage changes', $('#mem-status').textContent.includes('โครงสร้าง memory JSON') && invalidMemoryConfirmCount === 0 && window.localStorage.getItem('no7.memory.v2') === memoryBeforeOversizeImport);
+const memoryBeforeMalformedOnlyImport = window.localStorage.getItem('no7.memory.v2');
+const malformedOnlyFile = new window.File([JSON.stringify({ facts: [{ text: '  ' }], log: [{ role: 'tool', text: 'invalid', ts: 1 }] })], 'malformed-only-memory.json', { type: 'application/json' });
+Object.defineProperty($('#mem-import-file'), 'files', { value: [malformedOnlyFile], configurable: true });
+let malformedOnlyConfirmCount = 0;
+window.confirm = () => { malformedOnlyConfirmCount++; return true; };
+$('#mem-import-file').dispatchEvent(new window.Event('change'));
+await wait(10);
+check('memory: no-op import skips confirmation and storage write', $('#mem-status').textContent.includes('ไม่มีรายการความจำที่นำเข้าได้') && malformedOnlyConfirmCount === 0 && window.localStorage.getItem('no7.memory.v2') === memoryBeforeMalformedOnlyImport);
 const memoryImportPayload = JSON.stringify({ facts: [{ text: 'memory import confirmation fact', importance: 3 }], log: [{ role: 'user', text: 'memory import confirmation log', ts: Date.now() - 1 }] });
 const memoryImportFile = new window.File([memoryImportPayload], 'memory.json', { type: 'application/json' });
 Object.defineProperty($('#mem-import-file'), 'files', { value: [memoryImportFile], configurable: true });
