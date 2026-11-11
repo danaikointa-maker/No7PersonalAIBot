@@ -15,6 +15,14 @@ export function healthHistoryCsv(history, { lang = 'th' } = {}) {
   return `${BOM}${toCsv(rows, { header: [l.date, l.score, l.grade, l.high, l.medium, l.low, l.issues] })}\r\n`;
 }
 
+export function healthHistoryJson(history, { now = Date.now() } = {}) {
+  const normalized = normalizeHealthHistory(history);
+  return `${JSON.stringify({
+    format: 'no7-health-history', schema: 1, exportedAt: new Date(now).toISOString(),
+    snapshots: normalized.snapshots.slice(-30).map(({ date, score, grade, issues }) => ({ date, score, grade, issues })),
+  }, null, 2)}\n`;
+}
+
 export function healthHistoryMarkdown(history, { lang = 'th', now = Date.now() } = {}) {
   const en = lang === 'en';
   const l = labels(lang);

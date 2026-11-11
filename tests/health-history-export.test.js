@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { healthHistoryCsv, healthHistoryMarkdown } from '../web/src/core/health-history-export.js';
+import { healthHistoryCsv, healthHistoryMarkdown, healthHistoryJson } from '../web/src/core/health-history-export.js';
 import { recordHealthSnapshot } from '../web/src/core/health-history.js';
 
 const at = (day) => Date.parse(`2026-11-${String(day).padStart(2, '0')}T12:00:00Z`);
@@ -36,8 +36,22 @@ test('CSV drops formula-like dates and private payload fields before export', ()
   assert.match(csv, /2026-11-10,90,A,0,0,0,0/);
 });
 
+test('JSON export adds a versioned envelope and strips unrecognized private fields', () => {
+  const json = healthHistoryJson({ schema: 1, snapshots: [{
+    date: '2026-11-10', score: 91, grade: 'A', issues: { high: 0, medium: 1, low: 2 },
+    text: 'private note', title: 'personal event', custom: { secret: true },
+  }] }, { now: Date.parse('2026-11-11T12:00:00Z') });
+  const data = JSON.parse(json);
+  assert.equal(data.format, 'no7-health-history');
+  assert.equal(data.schema, 1);
+  assert.equal(data.exportedAt, '2026-11-11T12:00:00.000Z');
+  assert.deepEqual(data.snapshots, [{ date: '2026-11-10', score: 91, grade: 'A', issues: { high: 0, medium: 1, low: 2 } }]);
+  assert.doesNotMatch(json, /private note|personal event|secret/);
+});
+
 test('empty reports still return localized safe output', () => {
   assert.match(healthHistoryCsv(null), /^\ufeffวันที่,/);
   assert.match(healthHistoryMarkdown(null), /ยังไม่มีประวัติสุขภาพ/);
   assert.match(healthHistoryMarkdown(null, { lang: 'en' }), /No saved health history/);
+  assert.deepEqual(JSON.parse(healthHistoryJson(null, { now: at(10) })).snapshots, []);
 });
