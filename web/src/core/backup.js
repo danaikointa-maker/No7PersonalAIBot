@@ -11,6 +11,8 @@ import { normalizeImportedPersonas } from './persona-store.js';
 
 export const BACKUP_APP = 'no7-personal-ai';
 export const BACKUP_SCHEMA = 2;
+export const BACKUP_MAX_BYTES = 20 * 1024 * 1024;
+export const BACKUP_COLLECTION_LIMITS = { facts: 3000, log: 500, notes: 50_000, todos: 50_000, tasks: 50_000, events: 50_000, personas: 100, healthHistory: 30 };
 export const SETTINGS_SECRET_KEYS = ['apiKey', 'ttsApiKey', 'syncToken'];
 
 /** คอลเลกชันที่สำรอง + คีย์หลัก/เวลาสำหรับ merge */
@@ -46,6 +48,13 @@ export function hasSecrets(settings = {}) {
 function checksumOf(payload) {
   const body = JSON.stringify({ ...payload, checksum: undefined });
   return fnvHash(body);
+}
+
+export function backupByteSize(input) {
+  try {
+    const text = typeof input === 'string' ? input : JSON.stringify(input);
+    return typeof text === 'string' ? new TextEncoder().encode(text).byteLength : Infinity;
+  } catch { return Infinity; }
 }
 
 export function normalizeBackupLog(input, limit = 800) {
@@ -128,6 +137,9 @@ export function validateBackup(input) {
   const errors = [];
   const warnings = [];
   let parsed = input;
+  const tooLarge = (typeof input === 'string' && (input.length > BACKUP_MAX_BYTES || backupByteSize(input) > BACKUP_MAX_BYTES))
+    || (input && typeof input === 'object' && backupByteSize(input) > BACKUP_MAX_BYTES);
+  if (tooLarge) return { ok: false, errors: ['ไฟล์สำรองเกินขนาดสูงสุด 20 MiB'], warnings, backup: null, migrated: false };
 
   if (typeof input === 'string') {
     const text = input.trim();
@@ -146,7 +158,15 @@ export function validateBackup(input) {
   if (backup.app !== BACKUP_APP) errors.push(`ไม่ใช่ไฟล์ของ No7 (app="${backup.app ?? 'ไม่ระบุ'}")`);
   if (!Number.isFinite(Number(backup.schema))) errors.push('ไม่มี schema');
   else if (Number(backup.schema) > BACKUP_SCHEMA) errors.push(`schema ${backup.schema} ใหม่เกินไป (รองรับถึง ${BACKUP_SCHEMA}) — อัปเดตแอปก่อน`);
-  if (!backup.data || typeof backup.data !== 'object') errors.push('ไม่มีข้อมูล (data)');
+  if (!backup.data || typeof backup.data !== 'object' || Array.isArray(backup.data)) errors.push('ไม่มีข้อมูล (data)');
+  if (backup.data && typeof backup.data === 'object' && !Array.isArray(backup.data)) {
+    if (backup.data.settings != null && (typeof backup.data.settings !== 'object' || Array.isArray(backup.data.settings))) errors.push('settings ต้องเป็น object');
+    for (const [key, limit] of Object.entries(BACKUP_COLLECTION_LIMITS)) {
+      if (backup.data[key] === undefined) continue;
+      if (!Array.isArray(backup.data[key])) errors.push(`${key} ต้องเป็น array`);
+      else if (backup.data[key].length > limit) errors.push(`${key} มีรายการเกินขีดจำกัด ${limit}`);
+    }
+  }
 
   if (!errors.length && backup.checksum != null) {
     const actual = checksumOf(backup);
@@ -228,10 +248,12 @@ export function planRestore(backup = {}, local = {}, { mode = 'merge' } = {}) {
   for (const [key, meta] of Object.entries(COLLECTIONS)) {
     const rawIncoming = Array.isArray(data[key]) ? data[key] : [];
     const rawExisting = Array.isArray(local[key]) ? local[key] : [];
-    const sanitize = (items, logLimit = 800) => key === 'healthHistory'
-      ? normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: items }).snapshots
-      : key === 'personas' ? normalizeImportedPersonas(items)
-        : key === 'log' ? normalizeBackupLog(items, logLimit) : items;
+    const sanitize = (items, logLimit = 800) => {
+      const records = items.filter((item) => item && typeof item === 'object' && !Array.isArray(item));
+      if (key === 'healthHistory') return normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: records }).snapshots;
+      if (key === 'personas') return normalizeImportedPersonas(records);
+      return key === 'log' ? normalizeBackupLog(records, logLimit) : records;
+    };
     const incoming = sanitize(rawIncoming, 500);
     const existing = sanitize(rawExisting);
     if (mode === 'replace') {

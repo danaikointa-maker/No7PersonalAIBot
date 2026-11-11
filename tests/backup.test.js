@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  BACKUP_APP, BACKUP_SCHEMA, COLLECTIONS, redactSettings, hasSecrets, createBackup,
+  BACKUP_APP, BACKUP_SCHEMA, BACKUP_MAX_BYTES, COLLECTIONS, redactSettings, hasSecrets, createBackup, backupByteSize,
   migrateBackup, validateBackup, summarizeBackup, mergeRecords, planRestore, describePlan, normalizeBackupLog,
 } from '../web/src/core/backup.js';
 
@@ -126,6 +126,17 @@ test('validateBackup accepts objects and strings, rejects broken input', () => {
   assert.match(noData.errors.join(' '), /ไม่มีข้อมูล/);
 });
 
+test('validateBackup rejects byte-oversized payloads and malformed collection shapes before planning', () => {
+  const backup = createBackup(state);
+  const unicodePayload = { text: 'สวัสดี' };
+  assert.equal(backupByteSize(unicodePayload), Buffer.byteLength(JSON.stringify(unicodePayload), 'utf8'));
+  assert.match(validateBackup(' '.repeat(BACKUP_MAX_BYTES + 1)).errors[0], /เกินขนาดสูงสุด/);
+  assert.match(validateBackup({ ...backup, payload: 'x'.repeat(BACKUP_MAX_BYTES) }).errors[0], /เกินขนาดสูงสุด/);
+  assert.match(validateBackup({ ...backup, data: { ...backup.data, facts: {} } }).errors.join(' '), /facts ต้องเป็น array/);
+  assert.match(validateBackup({ ...backup, data: { ...backup.data, settings: [] } }).errors.join(' '), /settings ต้องเป็น object/);
+  assert.match(validateBackup({ ...backup, data: { ...backup.data, log: Array(501).fill(null) } }).errors.join(' '), /log มีรายการเกินขีดจำกัด/);
+});
+
 test('a tampered file yields a checksum warning but still validates', () => {
   const b = createBackup(state);
   b.data.facts[0].text = 'ถูกแก้';
@@ -206,6 +217,14 @@ test('planRestore merge mode reports per-collection actions', () => {
   assert.equal(plan.values.facts.length, 1);
   assert.equal(plan.values.notes.length, 1);
   assert.equal(plan.totals.added, 6);
+});
+
+test('planRestore skips malformed collection rows instead of throwing', () => {
+  const plan = planRestore({ data: { facts: [null, 'bad', { text: 'valid fact' }], notes: [null], tasks: [[], { id: 't1' }], log: [null, { role: 'user', text: 'ok', ts: 1000 }] } });
+  assert.deepEqual(plan.values.facts, [{ text: 'valid fact' }]);
+  assert.deepEqual(plan.values.notes, []);
+  assert.deepEqual(plan.values.tasks, [{ id: 't1' }]);
+  assert.deepEqual(plan.values.log, [{ role: 'user', text: 'ok', ts: 1000 }]);
 });
 
 test('planRestore replace mode clears existing data', () => {

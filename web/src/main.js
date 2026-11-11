@@ -158,7 +158,6 @@ function saveMcpServers(next) {
   renderMcp();
 }
 
-/* ------------------------------------------------------- metrics / outbox */
 const metrics = new Metrics();
 const outbox = new OfflineQueue();
 const recentErrors = [];
@@ -168,7 +167,6 @@ function noteError(err, where) {
   if (recentErrors.length > 10) recentErrors.shift();
 }
 
-/* ------------------------------------------------------------------ boot */
 const $ = (sel) => document.querySelector(sel);
 
 let settings = loadSettings();
@@ -215,7 +213,6 @@ voice.onSubtitle = (text) => { if (text) setSubtitle(text); };
 $('#platform-badge').textContent = platformLabel(platform);
 $('#device-info').textContent = `${platformLabel(platform)} · จอ ${window.innerWidth}×${window.innerHeight} · STT ${voice.sttSupported ? '✅' : '❌'} · TTS ${voice.ttsSupported ? '✅' : '❌'}`;
 
-/* -------------------------------------------------------------- navigation */
 let currentView = 'chat';
 
 function showView(name) {
@@ -1941,7 +1938,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.14.0',
+      version: window.NO7_VERSION || '2.15.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -3137,6 +3134,11 @@ $('#import-btn')?.addEventListener('click', () => $('#import-file')?.click());
 $('#import-file')?.addEventListener('change', (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
+  if (file.size > 20 * 1024 * 1024) {
+    setBackupStatus('❌ ไฟล์สำรองเกินขนาดสูงสุด 20 MiB');
+    e.target.value = '';
+    return;
+  }
   setBackupStatus('กำลังอ่านไฟล์…');
   const reader = new FileReader();
   reader.onload = () => {

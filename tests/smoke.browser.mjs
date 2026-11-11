@@ -319,6 +319,11 @@ Object.defineProperty($('#import-file'), 'files', { value: [badFile], configurab
 $('#import-file').dispatchEvent(new window.Event('change'));
 await wait(80);
 check('backup: broken file rejected', $('#backup-status').textContent.includes('❌'), $('#backup-status').textContent.slice(0, 60));
+const oversizedBackupFile = new window.File(['{}'], 'oversized.json', { type: 'application/json' });
+Object.defineProperty(oversizedBackupFile, 'size', { value: 20 * 1024 * 1024 + 1, configurable: true });
+Object.defineProperty($('#import-file'), 'files', { value: [oversizedBackupFile], configurable: true });
+$('#import-file').dispatchEvent(new window.Event('change'));
+check('backup: oversized file rejected before reading', $('#backup-status').textContent.includes('20 MiB'));
 
 // command palette (Ctrl/⌘ K)
 window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));

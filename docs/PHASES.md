@@ -669,24 +669,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AI1 | จำกัดขนาดและตรวจ schema ของ backup | 65.1–65.3 | ⬜ |
-| AI2 | เชื่อม file picker และแผน restore ที่ทน malformed rows | 66.1–66.3 | ⬜ |
-| AI3 | Release 2.15 | 67.1–67.3 | ⬜ |
+| AI1 | จำกัดขนาดและตรวจ schema ของ backup | 65.1–65.3 | ✅ |
+| AI2 | เชื่อม file picker และแผน restore ที่ทน malformed rows | 66.1–66.3 | ✅ |
+| AI3 | Release 2.15 | 67.1–67.3 | ✅ |
 
 ## AI1 — จำกัดขนาดและตรวจ schema ของ backup
 
-- [ ] 65.1 จำกัดขนาด JSON 20 MiB ก่อน parse; object API มี byte guard เช่นกัน
-- [ ] 65.2 ตรวจรูปแบบ collection/จำนวนแถวก่อนสร้าง restore plan
-- [ ] 65.3 Tests สำหรับขนาด, wrong shape, row caps และ legacy compatibility
+- [x] 65.1 จำกัดขนาด JSON 20 MiB ก่อน parse; object API มี byte guard เช่นกัน
+- [x] 65.2 ตรวจรูปแบบ collection/จำนวนแถวก่อนสร้าง restore plan
+- [x] 65.3 Tests สำหรับขนาด, wrong shape, row caps และ legacy compatibility
 
 ## AI2 — เชื่อม file picker และแผน restore ที่ทน malformed rows
 
-- [ ] 66.1 file picker ปฏิเสธไฟล์เกินขนาดก่อน FileReader และแสดงสาเหตุ
-- [ ] 66.2 dry-run/restore ไม่ throw เมื่อมี record แถวผิดรูป; storage ไม่เปลี่ยนหากไฟล์ไม่ผ่าน validation
-- [ ] 66.3 Browser smoke + `docs/BACKUP.md`
+- [x] 66.1 file picker ปฏิเสธไฟล์เกินขนาดก่อน FileReader และแสดงสาเหตุ
+- [x] 66.2 dry-run/restore ไม่ throw เมื่อมี record แถวผิดรูป; storage ไม่เปลี่ยนหากไฟล์ไม่ผ่าน validation
+- [x] 66.3 Browser smoke + `docs/BACKUP.md`
 
 ## AI3 — Release 2.15
 
-- [ ] 67.1 version 2.15.0 + CHANGELOG
-- [ ] 67.2 README + PHASES ปิดครบ
-- [ ] 67.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 67.1 version 2.15.0 + CHANGELOG
+- [x] 67.2 README (32 docs, 451 unit / 166 checks) + PHASES ปิดครบ
+- [x] 67.3 ตรวจรับรวม: check 116 files · unit 451 · browser 166 · perf · build → PR
