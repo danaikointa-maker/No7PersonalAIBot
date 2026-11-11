@@ -2,6 +2,7 @@ import './styles.css';
 import { StateMachine, STATES } from './core/state.js';
 import { allPersonas, customPersonas, restoreCustomPersonas, getPersona, createPersona, updatePersona, deletePersona, duplicatePersona, personaVoice } from './core/persona-store.js';
 import { mountConversationArchive } from './ui/conversation-archive.js';
+import { bindMemoryImport } from './ui/memory-import.js';
 import { getCalendar, formatWhen } from './core/calendar.js';
 import { collectBundle, pushBundle, pullBundle, mergeBundle } from './core/sync.js';
 import { SYNC_STRATEGIES, summarizeSync, describeConflicts } from './core/sync-merge.js';
@@ -929,32 +930,15 @@ $('#mem-export-btn').addEventListener('click', () => {
 });
 
 $('#mem-import-btn').addEventListener('click', () => $('#mem-import-file').click());
-$('#mem-import-file').addEventListener('change', async (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  try {
-    if (file.size > BACKUP_MAX_BYTES) throw new Error('ไฟล์เกินขนาด 20 MiB');
-    const text = await file.text();
-    if (backupByteSize(text) > BACKUP_MAX_BYTES) throw new Error('ไฟล์เกินขนาด 20 MiB');
-    const payload = JSON.parse(text);
-    for (const key of ['facts', 'log']) {
-      if (Array.isArray(payload?.[key]) && payload[key].length > BACKUP_COLLECTION_LIMITS[key]) {
-        throw new Error(`${key} เกินขีดจำกัด ${BACKUP_COLLECTION_LIMITS[key]} รายการ`);
-      }
-    }
-    const factCount = Array.isArray(payload?.facts) ? payload.facts.length : 0;
-    const logCount = Array.isArray(payload?.log) ? payload.log.length : 0;
-    if (!window.confirm(`นำเข้าไฟล์ความจำแบบรวมข้อมูลหรือไม่? มี ${factCount} ความจำและ ${logCount} บทสนทนา — ของเดิมจะคงอยู่ ไม่มีการลบ`)) {
-      $('#mem-status').textContent = 'ยกเลิกการนำเข้าแล้ว';
-      return;
-    }
-    const res = memory.importData(payload, { merge: true });
-    $('#mem-status').textContent = `นำเข้าแล้ว: เพิ่ม ${res.added} · รวม ${res.merged} · ข้าม ${res.skipped} · บทสนทนา +${res.logAdded || 0}`;
-    renderMemory();
-  } catch (err) {
-    $('#mem-status').textContent = `ไฟล์ไม่ถูกต้อง: ${err.message}`;
-  }
-  e.target.value = '';
+bindMemoryImport($('#mem-import-file'), {
+  memory,
+  maxBytes: BACKUP_MAX_BYTES,
+  collectionLimits: BACKUP_COLLECTION_LIMITS,
+  byteSize: backupByteSize,
+  confirm: (message) => window.confirm(message),
+  getLang: () => settings.uiLang,
+  setStatus: (message) => { $('#mem-status').textContent = message; },
+  onImported: () => renderMemory(),
 });
 
 $('#mem-llm-toggle').checked = !!settings.memoryLLM;
@@ -1952,7 +1936,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.21.0',
+      version: window.NO7_VERSION || '2.22.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },

@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.22.0] — 2026-11-10
+
+- Memory JSON import now previews the actual fact merge and chat-log counts before confirmation. Cancelling the prompt makes no storage changes; explicit confirmation applies the previewed plan.
+
 ## [2.21.0] — 2026-11-10
 
 รอบที่ยี่สิบหก: หยุดตัด memory/history เก่าอัตโนมัติ
