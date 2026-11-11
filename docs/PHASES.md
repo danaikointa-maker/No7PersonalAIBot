@@ -200,8 +200,8 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 | T2 | โมเดลในเครื่อง (Ollama / LM Studio) | 17.1–17.4 | ✅ |
 | T3 | สองภาษา ไทย/อังกฤษ | 18.1–18.4 | ✅ |
 | T4 | Performance budget + E2E | 19.1–19.4 | ✅ |
-| T5 | Auto-update + CI 3 แพลตฟอร์ม | 20.1–20.3 | ⬜ |
-| T6 | Release 2.0 | 21.1–21.3 | ⬜ |
+| T5 | Auto-update + CI 3 แพลตฟอร์ม | 20.1–20.3 | ✅ |
+| T6 | Release 2.0 | 21.1–21.3 | ✅ |
 
 ## T1 — TTS พรีเมียม + แคชเสียง
 
@@ -233,12 +233,53 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## T5 — Auto-update + CI 3 แพลตฟอร์ม
 
-- 20.1 `desktop/main.js`: electron-updater แบบ opt-in (`NO7_AUTO_UPDATE=1`) + เมนูตรวจอัปเดต
-- 20.2 `.github/workflows/release.yml`: matrix win/mac/linux build artifacts + tag
-- 20.3 เอกสาร `docs/BUILD.md` (การออก release + code signing)
+- [x] 20.1 `desktop/updater.js`: `updaterConfig`/`describeUpdateEvent`/`setupAutoUpdater` (inject ได้) + `main.js` opt-in (`NO7_AUTO_UPDATE=1`, packaged เท่านั้น) + เมนู tray "ตรวจอัปเดต"
+- [x] 20.2 `.github/workflows/release.yml`: verify (check/test/smoke/build/perf) → matrix win/mac/linux → draft release + `latest*.yml`
+- [x] 20.3 `docs/BUILD.md` §2.1 (ออก release, env ของ updater, signing) + `tests/updater.test.js` (6)
 
 ## T6 — Release 2.0
 
-- 21.1 version 2.0.0 + CHANGELOG 2.0.0
-- 21.2 README + ROADMAP + PHASES ปิดครบ
-- 21.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 21.1 version 2.0.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics, `window.NO7_VERSION` จาก vite define) + CHANGELOG 2.0.0
+- [x] 21.2 README v2.0 + ตารางเอกสาร (QUALITY/I18N/LOCAL_MODELS) + PHASES ปิดครบ
+- [x] 21.3 ตรวจรับรวม: check 86 ไฟล์ · unit 306 · browser 97 · build · perf ผ่าน → PR #6 merged (`22f005d`)
+
+---
+
+# รอบที่ 6 (v2.1)
+
+เป้าหมาย: ทำให้ "การทำงานหลายขั้น" มองเห็นและหยุดได้จริง, ให้ No7 สรุปวันให้ทุกเช้า,
+และเปิดให้ผู้ใช้ต่อยอดเครื่องมือของตัวเองได้ (HTTP plugin) โดยไม่ต้องแก้โค้ด
+
+| เฟส | ชื่อ | งานย่อย | สถานะ |
+|---|---|---|---|
+| U1 | Timeline + ยกเลิกกลางทาง | 22.1–22.4 | ⬜ |
+| U2 | สรุปประจำวัน (digest) | 23.1–23.4 | ⬜ |
+| U3 | ปลั๊กอินเครื่องมือ HTTP | 24.1–24.4 | ⬜ |
+| U4 | Release 2.1 | 25.1–25.3 | ⬜ |
+
+## U1 — Timeline + ยกเลิกกลางทาง
+
+- 22.1 `core/timeline.js`: `AgentTimeline` (push event → ขั้นตอนมีสถานะ running/ok/error/denied/cancelled), `summary()`, `toMarkdown()`
+- 22.2 `core/agent.js`: `cancel()` + ตรวจธงทุกจุดในลูป, event `cancelled`, ผลลัพธ์ `{ cancelled }`
+- 22.3 UI: แผง timeline ระหว่างทำงาน (`#run-timeline`) + ปุ่มหยุดกลางทาง (Esc/ปุ่ม ⏹) ที่ยกเลิกทั้ง agent/TTS
+- 22.4 Tests (`timeline` + agent cancel) + smoke + `docs/AGENT.md`
+
+## U2 — สรุปประจำวัน (digest)
+
+- 23.1 `core/digest.js`: `buildDigest({tasks, events, memories, now})` → ส่วนงานค้าง/เกินกำหนด/วันนี้/นัดหมาย/ความจำใหม่ + `digestMarkdown`
+- 23.2 tool `digest` (dynamic, risk 0) ให้ AI เรียกได้ + ปุ่ม "🌅 สรุปวันนี้" ในหน้าแชท/ตารางนัด
+- 23.3 แจ้งเตือนสรุปอัตโนมัติครั้งแรกของวัน (opt-in `settings.digest.auto`) + i18n
+- 23.4 Tests + smoke + `docs/DIGEST.md`
+
+## U3 — ปลั๊กอินเครื่องมือ HTTP
+
+- 24.1 `core/custom-tools.js`: `normalizeCustomTool` (id/ชื่อ/คำอธิบาย/วิธี/URL template/header/params), `renderTemplate`, `validateCustomTools`, `buildHttpTool`, `customToolDefs`
+- 24.2 ความปลอดภัย: https เท่านั้น (ยกเว้น `allowInsecure`), บล็อก host วงในเว้นแต่เปิด, timeout 10 วิ, จำกัดขนาด response, ไม่รับ `body` ที่ผู้ใช้ไม่ได้ประกาศ
+- 24.3 UI หน้าเครื่องมือ: ช่อง JSON + ตรวจสอบ/บันทึก + รายการที่ใช้ได้ (ผสานกับ MCP ผ่าน `refreshDynamicTools()`)
+- 24.4 Tests + smoke + `docs/PLUGINS.md`
+
+## U4 — Release 2.1
+
+- 25.1 version 2.1.0 + CHANGELOG
+- 25.2 README + PHASES ปิดครบ
+- 25.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
