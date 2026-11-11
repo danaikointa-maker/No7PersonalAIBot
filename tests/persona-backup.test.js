@@ -28,6 +28,7 @@ test('persona backup normalization whitelists fields, caps values, and rejects b
   assert.equal(saved.builtin, false);
   assert.equal('privateText' in saved, false);
   assert.equal(normalizeImportedPersonas([custom('no7', 'built-in', 1)]).length, 0);
+  assert.equal(normalizeImportedPersonas(Array.from({ length: 101 }, (_, i) => custom(`p-limit${i}`, `P${i}`, i + 1))).length, 100);
 });
 
 test('app backups contain custom personas only; restore merge uses updatedAt and never replaces built-ins', () => {
