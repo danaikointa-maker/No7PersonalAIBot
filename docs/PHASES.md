@@ -1278,3 +1278,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 130.1 version 2.36.0 + CHANGELOG
 - [x] 130.2 README + PHASES ปิดครบ
 - [x] 130.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 42 (v2.37)
+
+เป้าหมาย: ป้องกันข้อมูลจับคู่อุปกรณ์และ secret ใน DeviceRegistry สูญหายหรือ state ในหน่วยความจำไม่ตรงกับ localStorage เมื่อเขียนไม่สำเร็จ โดยให้ registry mutations persist candidate ก่อน และแยกแจ้งผลคำสั่งที่ส่งถึงอุปกรณ์แล้วออกจากความล้มเหลวในการบันทึก metadata
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| BE1 | ทำ DeviceRegistry แบบ persist-before-swap | 131.1–131.3 | ⬜ |
+| BE2 | แสดง storage failure ในการจัดการอุปกรณ์และ touch metadata | 132.1–132.3 | ⬜ |
+| BE3 | Release 2.37 | 133.1–133.3 | ⬜ |
+
+## BE1 — ทำ DeviceRegistry แบบ persist-before-swap
+
+- [ ] 131.1 เพิ่ม `DeviceStorageError` และ persist candidate ก่อนเปลี่ยน registry ใน memory
+- [ ] 131.2 add/remove/clear/touch คงอุปกรณ์เดิมเมื่อ persist ล้มเหลว และไม่เขียนเมื่อไม่มีการเปลี่ยนแปลง
+- [ ] 131.3 Unit tests จำลอง quota failure ยืนยันข้อมูลอุปกรณ์/secret เดิมใน storage และ memory
+
+## BE2 — แสดง storage failure ในการจัดการอุปกรณ์และ touch metadata
+
+- [ ] 132.1 UI เพิ่ม/ลบอุปกรณ์แสดงข้อผิดพลาดและคงฟอร์ม/รายการเดิมเมื่อบันทึกไม่ได้
+- [ ] 132.2 hello/test/command แยกผลการสื่อสารที่สำเร็จจากการบันทึก metadata ที่ล้มเหลว
+- [ ] 132.3 Browser smoke จำลอง quota failure และตรวจว่าไม่มีการรายงานผลผิดหรือข้อมูลหาย
+
+## BE3 — Release 2.37
+
+- [ ] 133.1 version 2.37.0 + CHANGELOG
+- [ ] 133.2 README + PHASES ปิดครบ
+- [ ] 133.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
