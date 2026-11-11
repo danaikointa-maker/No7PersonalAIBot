@@ -393,6 +393,11 @@ $('#health-clean-btn').click();
 await wait(20);
 check('health: cleanup removes only flagged empty entries', JSON.parse(window.localStorage.getItem('no7.notes.v1')).length === 1 && JSON.parse(window.localStorage.getItem('no7.todos.v1')).length === 1);
 check('health: cleanup refreshes report', !$('#health-card').hidden && !$('#health-card').textContent.includes('รายการที่ล้างได้อย่างปลอดภัย'));
+check('health: undo is available after cleanup', !!$('#health-undo-btn'));
+$('#health-undo-btn').click();
+await wait(20);
+check('health: undo restores deleted entries', JSON.parse(window.localStorage.getItem('no7.notes.v1')).length === 2 && JSON.parse(window.localStorage.getItem('no7.todos.v1')).length === 2);
+check('health: undo refreshes cleanup preview', $('#health-card').textContent.includes('รายการที่ล้างได้อย่างปลอดภัย'));
 $('#nav button[data-view="settings"]').click();
 
 // memory 2.0: pin + consolidate run
@@ -536,12 +541,15 @@ $('#set-uilang').dispatchEvent(new window.Event('change'));
 await wait(30);
 check('i18n: nav switched to English', $('#nav button[data-view="chat"]').textContent === '💬 Chat', $('#nav button[data-view="chat"]').textContent);
 check('i18n: view title translated', $('#view-title').textContent === 'Settings', $('#view-title').textContent);
+check('health i18n: existing card updates to English', $('#health-card').textContent.includes('Data health') && $('#health-card').textContent.includes('Clean duplicates/empty items'), $('#health-card').textContent.slice(0, 100));
+check('health i18n: scan button updates to English', $('#health-btn').textContent === '🩺 Check data health');
 check('i18n: html lang attribute', window.document.documentElement.getAttribute('lang') === 'en', window.document.documentElement.getAttribute('lang'));
 check('i18n: placeholder translated', $('#input').getAttribute('placeholder') === 'Type or talk to No7…', $('#input').getAttribute('placeholder'));
 $('#set-uilang').value = 'th';
 $('#set-uilang').dispatchEvent(new window.Event('change'));
 await wait(30);
 check('i18n: back to Thai', $('#nav button[data-view="chat"]').textContent === '💬 แชท' && $('#view-title').textContent === 'ตั้งค่า', $('#view-title').textContent);
+check('health i18n: card and scan button return to Thai', $('#health-card').textContent.includes('สุขภาพข้อมูล') && $('#health-btn').textContent === '🩺 ตรวจสุขภาพข้อมูล');
 
 // local brain panel (stubbed server probe)
 $('#local-scan').click();

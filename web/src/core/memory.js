@@ -159,6 +159,25 @@ export class MemoryStore {
     this._persist();
   }
 
+  /** Restore exact fact records without overwriting edits made since removal. */
+  restoreFacts(records = []) {
+    const result = { restored: 0, skipped: 0 };
+    for (const raw of records) {
+      const text = String(raw?.text || '').trim();
+      if (!text || !raw?.id || this.facts.some((fact) => fact.id === raw.id || fact.text === text) || this.facts.length >= MAX_FACTS) {
+        result.skipped++;
+        continue;
+      }
+      this.facts.push({ ...raw, text, tokens: tokenize(text) });
+      result.restored++;
+    }
+    if (result.restored) {
+      this._buildIndex();
+      this._persist();
+    }
+    return result;
+  }
+
   /** listFacts({query, pinnedOnly, sort}) — pinned first, then recency */
   listFacts(opts = {}) {
     let list = [...this.facts];

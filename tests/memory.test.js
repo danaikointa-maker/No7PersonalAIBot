@@ -139,3 +139,17 @@ test('search increments usage counters', () => {
   mem.search('กาแฟ');
   assert.equal(mem.getFact(f.id).used, 2);
 });
+
+test('restoreFacts restores exact metadata but skips records recreated after deletion', () => {
+  const mem = fresh();
+  const fact = mem.addFact('ผู้ใช้ชอบชามะลิ', { importance: 4, pinned: true });
+  fact.used = 7;
+  const snapshot = JSON.parse(JSON.stringify(fact));
+  mem.removeFact(fact.id);
+  assert.deepEqual(mem.restoreFacts([snapshot]), { restored: 1, skipped: 0 });
+  assert.deepEqual(mem.getFact(fact.id), snapshot);
+  mem.removeFact(fact.id);
+  mem.addFact('ผู้ใช้ชอบชามะลิ', { importance: 2 });
+  assert.deepEqual(mem.restoreFacts([snapshot]), { restored: 0, skipped: 1 });
+  assert.equal(mem.listFacts().length, 1);
+});

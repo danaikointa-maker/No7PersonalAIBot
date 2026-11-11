@@ -50,6 +50,7 @@ import { AgentTimeline, statusIcon } from './core/timeline.js';
 import { buildDigest, digestTool, shouldAutoDigest } from './core/digest.js';
 import { buildWeekly, weeklyTool } from './core/weekly.js';
 import { analyzeHealth, healthMarkdown, applyCleanup } from './core/health.js';
+import { healthUiCopy, healthSuggestion } from './core/health-i18n.js';
 import {
   customToolDefs, validateCustomTools, PLUGIN_EXAMPLE, PLUGIN_LIMITS,
 } from './core/custom-tools.js';
@@ -1242,44 +1243,53 @@ $('#digest-btn')?.addEventListener('click', () => {
 $('#weekly-btn')?.addEventListener('click', () => showWeekly({ inChat: true }));
 
 let lastHealth = null;
+let healthUndo = null;
+let healthUndoTimer = null;
+const HEALTH_UNDO_MS = 30_000;
+const healthCopy = () => healthUiCopy(langOf(settings.uiLang));
 function collectHealthData() {
   return {
-    facts: memory.listFacts(),
-    notes: readList('no7.notes.v1'),
-    todos: readList('no7.todos.v1'),
-    tasks: tasks.list({ done: null }),
-    events: calendar.all(),
+    facts: memory.listFacts(), notes: readList('no7.notes.v1'), todos: readList('no7.todos.v1'),
+    tasks: tasks.list({ done: null }), events: calendar.all(),
   };
 }
 function renderHealthCard(report) {
   lastHealth = report;
   const card = $('#health-card');
   if (!card) return;
-  const fixable = report.issues.filter((entry) => entry.fixable);
+  const copy = healthCopy();
+  const fixableCount = report.cleanup.facts.length + report.cleanup.notes.length + report.cleanup.todos.length;
   const list = report.issues.length
-    ? report.issues.map((entry) => `<div class="digest-item health-issue"><span class="health-severity ${entry.severity}">${entry.severity.toUpperCase()}</span> ${esc(entry.detail)} <small>(${entry.count})</small></div>`).join('')
-    : '<p class="hint">ข้อมูลอยู่ในสภาพดี — ไม่มีปัญหาที่พบ</p>';
-  const cleanupRows = [
-    ['ความจำซ้ำ', report.cleanup.facts.length],
-    ['โน้ตว่าง', report.cleanup.notes.length],
-    ['รายการซ้ำ/ว่าง', report.cleanup.todos.length],
-  ].filter(([, count]) => count > 0).map(([name, count]) => `<div class="digest-item">· ${name}: ${count}</div>`).join('');
+    ? report.issues.map((entry) => `<div class="digest-item health-issue"><span class="health-severity ${entry.severity}">${esc(copy.severity[entry.severity] || entry.severity)}</span> ${esc(copy.issues[entry.id] || entry.detail)} <small>(${entry.count})</small></div>`).join('')
+    : `<p class="hint">${copy.noIssues}</p>`;
+  const cleanupRows = [[copy.dupFacts, report.cleanup.facts.length], [copy.emptyNotes, report.cleanup.notes.length], [copy.todos, report.cleanup.todos.length]]
+    .filter(([, count]) => count > 0).map(([name, count]) => `<div class="digest-item">· ${esc(name)}: ${count}</div>`).join('');
+  const undo = healthUndo && healthUndo.expiresAt > Date.now() ? `<button id="health-undo-btn">${copy.undo}</button>` : '';
   card.innerHTML = `<div class="digest-card health-card">
-    <strong>🩺 สุขภาพข้อมูล: ${report.score}/100 · ${report.grade} (${report.gradeLabel})</strong>
+    <strong>🩺 ${esc(copy.title)}: ${report.score}/100 · ${report.grade} (${esc(copy.grade[report.grade] || report.gradeLabel)})</strong>
     <div class="health-issues">${list}</div>
-    ${report.suggestions.length ? `<div><strong>คำแนะนำ</strong>${report.suggestions.map((s) => `<div class="digest-item">· ${esc(s)}</div>`).join('')}</div>` : ''}
-    ${cleanupRows ? `<div class="health-cleanup"><strong>รายการที่ล้างได้อย่างปลอดภัย</strong>${cleanupRows}</div>` : ''}
-    <div class="digest-actions"><button id="health-clean-btn" ${fixable.length ? '' : 'disabled'}>🧹 ล้างรายการซ้ำ/ว่าง</button></div>
+    ${report.suggestions.length ? `<div><strong>${copy.suggestions}</strong>${report.suggestions.map((text) => `<div class="digest-item">· ${esc(healthSuggestion(text, langOf(settings.uiLang)))}</div>`).join('')}</div>` : ''}
+    ${cleanupRows ? `<div class="health-cleanup"><strong>${copy.cleanable}</strong>${cleanupRows}</div>` : ''}
+    <div class="digest-actions">${undo}<button id="health-clean-btn" ${fixableCount ? '' : 'disabled'}>${copy.clean}</button></div>
   </div>`;
   card.hidden = false;
+  card.querySelector('#health-undo-btn')?.addEventListener('click', undoHealthCleanup);
   card.querySelector('#health-clean-btn')?.addEventListener('click', () => {
     const data = collectHealthData();
     const currentReport = analyzeHealth(data);
     const action = applyCleanup(currentReport.cleanup, data);
     const count = action.removed.facts + action.removed.notes + action.removed.todos;
     if (!count) return;
-    const message = `ลบเฉพาะรายการซ้ำ/ว่างที่ตรวจพบจำนวน ${count} รายการหรือไม่?\nความจำ ${action.removed.facts} · โน้ต ${action.removed.notes} · สิ่งที่ต้องทำ ${action.removed.todos}\nรายการเก่า งาน และนัดหมายจะไม่ถูกลบ`;
-    if (!window.confirm(message)) return;
+    const confirmText = copy.confirm.replace('{count}', count).replace('{facts}', action.removed.facts)
+      .replace('{notes}', action.removed.notes).replace('{todos}', action.removed.todos);
+    if (!window.confirm(confirmText)) return;
+    const factIds = new Set(currentReport.cleanup.facts);
+    const snapshot = {
+      facts: data.facts.filter((fact) => factIds.has(fact.id)).map((fact) => JSON.parse(JSON.stringify(fact))),
+      notes: currentReport.cleanup.notes.map((index) => ({ index, item: JSON.parse(JSON.stringify(data.notes[index])) })),
+      todos: currentReport.cleanup.todos.map((index) => ({ index, item: JSON.parse(JSON.stringify(data.todos[index])) })),
+      expiresAt: Date.now() + HEALTH_UNDO_MS,
+    };
     const oldNotes = localStorage.getItem('no7.notes.v1');
     const oldTodos = localStorage.getItem('no7.todos.v1');
     try {
@@ -1287,20 +1297,67 @@ function renderHealthCard(report) {
       localStorage.setItem('no7.todos.v1', JSON.stringify(action.todos));
     } catch {
       try {
-        if (oldNotes == null) localStorage.removeItem('no7.notes.v1');
-        else localStorage.setItem('no7.notes.v1', oldNotes);
-        if (oldTodos == null) localStorage.removeItem('no7.todos.v1');
-        else localStorage.setItem('no7.todos.v1', oldTodos);
-      } catch { /* best-effort rollback when quota/storage is unavailable */ }
-      addMessage('bot', 'ล้างข้อมูลไม่สำเร็จ — พื้นที่จัดเก็บอาจไม่พร้อมใช้งาน');
+        if (oldNotes == null) localStorage.removeItem('no7.notes.v1'); else localStorage.setItem('no7.notes.v1', oldNotes);
+        if (oldTodos == null) localStorage.removeItem('no7.todos.v1'); else localStorage.setItem('no7.todos.v1', oldTodos);
+      } catch { /* best-effort rollback */ }
+      addMessage('bot', copy.cleanError);
       return;
     }
     for (const id of currentReport.cleanup.facts) memory.removeFact(id);
+    healthUndo = snapshot;
+    clearTimeout(healthUndoTimer);
+    healthUndoTimer = setTimeout(() => {
+      if (healthUndo === snapshot) {
+        healthUndo = null;
+        renderHealthCard(analyzeHealth(collectHealthData()));
+      }
+    }, HEALTH_UNDO_MS);
     renderMemory();
-    const next = analyzeHealth(collectHealthData());
-    renderHealthCard(next);
-    addMessage('bot', `🧹 ล้างข้อมูลเรียบร้อย: ${count} รายการ (ความจำ ${action.removed.facts}, โน้ต ${action.removed.notes}, สิ่งที่ต้องทำ ${action.removed.todos})`);
+    renderHealthCard(analyzeHealth(collectHealthData()));
+    addMessage('bot', `${copy.cleanDone}: ${count} (${copy.dupFacts} ${action.removed.facts}, ${copy.emptyNotes} ${action.removed.notes}, ${copy.todos} ${action.removed.todos}).`);
   });
+}
+function undoHealthCleanup() {
+  const snapshot = healthUndo;
+  const copy = healthCopy();
+  if (!snapshot || snapshot.expiresAt <= Date.now()) {
+    healthUndo = null;
+    renderHealthCard(analyzeHealth(collectHealthData()));
+    return;
+  }
+  const oldNotes = localStorage.getItem('no7.notes.v1');
+  const oldTodos = localStorage.getItem('no7.todos.v1');
+  const restoreList = (current, removed) => {
+    const next = [...current];
+    let restored = 0;
+    for (const entry of [...removed].sort((a, b) => a.index - b.index)) {
+      if (next.some((item) => JSON.stringify(item) === JSON.stringify(entry.item))) continue;
+      next.splice(Math.max(0, Math.min(entry.index, next.length)), 0, entry.item);
+      restored++;
+    }
+    return { items: next, restored };
+  };
+  const data = collectHealthData();
+  const notes = restoreList(data.notes, snapshot.notes);
+  const todos = restoreList(data.todos, snapshot.todos);
+  try {
+    localStorage.setItem('no7.notes.v1', JSON.stringify(notes.items));
+    localStorage.setItem('no7.todos.v1', JSON.stringify(todos.items));
+  } catch {
+    try {
+      if (oldNotes == null) localStorage.removeItem('no7.notes.v1'); else localStorage.setItem('no7.notes.v1', oldNotes);
+      if (oldTodos == null) localStorage.removeItem('no7.todos.v1'); else localStorage.setItem('no7.todos.v1', oldTodos);
+    } catch { /* best-effort rollback */ }
+    addMessage('bot', copy.cleanError);
+    return;
+  }
+  const facts = memory.restoreFacts(snapshot.facts);
+  healthUndo = null;
+  clearTimeout(healthUndoTimer);
+  renderMemory();
+  renderHealthCard(analyzeHealth(collectHealthData()));
+  const total = facts.restored + notes.restored + todos.restored;
+  addMessage('bot', `${copy.undoDone}: ${total} (memories ${facts.restored}, notes ${notes.restored}, to-dos ${todos.restored}).`);
 }
 $('#health-btn')?.addEventListener('click', () => {
   const report = analyzeHealth(collectHealthData());
@@ -1847,7 +1904,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.5.0',
+      version: window.NO7_VERSION || '2.6.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -2271,6 +2328,9 @@ function applyUiLang(lang) {
   applyI18n(document, langOf(lang));
   $('#view-title').textContent = viewTitle(currentView, settings.uiLang);
   renderModeChips();
+  const healthButton = $('#health-btn');
+  if (healthButton) healthButton.textContent = langOf(settings.uiLang) === 'en' ? '🩺 Check data health' : '🩺 ตรวจสุขภาพข้อมูล';
+  if (lastHealth) renderHealthCard(lastHealth);
   if (currentView === 'tools') renderToolsGrid(true);
 }
 
