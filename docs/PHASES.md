@@ -1005,24 +1005,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AU1 | เพิ่ม commit state แบบเขียนก่อนสลับ memory | 101.1–101.3 | ⬜ |
-| AU2 | รักษาข้อมูลเมื่อ CRUD/log/reset บันทึกไม่ได้ | 102.1–102.3 | ⬜ |
-| AU3 | Release 2.27 | 103.1–103.3 | ⬜ |
+| AU1 | เพิ่ม commit state แบบเขียนก่อนสลับ memory | 101.1–101.3 | ✅ |
+| AU2 | รักษาข้อมูลเมื่อ CRUD/log/reset บันทึกไม่ได้ | 102.1–102.3 | ✅ |
+| AU3 | Release 2.27 | 103.1–103.3 | ✅ |
 
 ## AU1 — เพิ่ม commit state แบบเขียนก่อนสลับ memory
 
-- [ ] 101.1 helper เขียน candidate facts/log/meta ก่อนสลับ instance
-- [ ] 101.2 ใช้กับ add/edit/pin/delete/restore/log/decay/consolidate/clear
-- [ ] 101.3 Unit tests สำหรับ failed write ไม่เปลี่ยน state และ storage
+- [x] 101.1 helper เขียน candidate facts/log/meta ก่อนสลับ instance
+- [x] 101.2 ใช้กับ add/edit/pin/delete/restore/log/decay/consolidate/clear
+- [x] 101.3 Unit tests สำหรับ failed write ไม่เปลี่ยน state และ storage
 
 ## AU2 — รักษาข้อมูลเมื่อ CRUD/log/reset บันทึกไม่ได้
 
-- [ ] 102.1 ลบ legacy storage keys หลัง clear สำเร็จเท่านั้น
-- [ ] 102.2 UI เพิ่ม/แก้ memory ไม่แสดง success และไม่ล้าง input เมื่อ persist ล้มเหลว; reset ยกเลิกต่อ
-- [ ] 102.3 Browser smoke ตรวจ failure แล้ว memory/settings เก่ายังอยู่
+- [x] 102.1 ลบ legacy storage keys หลัง clear สำเร็จเท่านั้น
+- [x] 102.2 UI เพิ่ม/แก้ memory ไม่แสดง success และไม่ล้าง input เมื่อ persist ล้มเหลว; reset ยกเลิกต่อ
+- [x] 102.3 Browser smoke ตรวจ failed fact save แล้ว input และ memory storage เดิมยังอยู่
 
 ## AU3 — Release 2.27
 
-- [ ] 103.1 version 2.27.0 + CHANGELOG
-- [ ] 103.2 README + PHASES ปิดครบ
-- [ ] 103.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 103.1 version 2.27.0 + CHANGELOG
+- [x] 103.2 README + PHASES ปิดครบ
+- [x] 103.3 ตรวจรับรวม (check/test/browser/perf/build) + PR

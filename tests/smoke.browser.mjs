@@ -193,6 +193,24 @@ $('#test-ai-btn').click();
 await wait(80);
 check('settings: test AI', $('#settings-status').textContent.includes('OK'), $('#settings-status').textContent);
 
+const memoryBeforeFailedAdd = window.localStorage.getItem('no7.memory.v2');
+const storagePrototype = Object.getPrototypeOf(window.localStorage);
+const originalMemorySetItem = storagePrototype.setItem;
+storagePrototype.setItem = function (key, value) {
+  if (key === 'no7.memory.v2') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalMemorySetItem.call(this, key, value);
+};
+$('#mem-new').value = 'unsaved fact should remain in the editor';
+$('#mem-add-btn').click();
+await wait(10);
+storagePrototype.setItem = originalMemorySetItem;
+check('memory: failed fact save preserves input and stored state', $('#mem-status').textContent.includes('บันทึกความจำไม่สำเร็จ') && $('#mem-new').value === 'unsaved fact should remain in the editor' && window.localStorage.getItem('no7.memory.v2') === memoryBeforeFailedAdd && !JSON.parse(memoryBeforeFailedAdd).facts.some((fact) => fact.text === 'unsaved fact should remain in the editor'));
+$('#offline-banner').hidden = true;
+$('#offline-banner').textContent = '';
 $('#mem-new').value = 'ฉันชอบกาแฟดำ';
 $('#mem-add-btn').click();
 await wait(20);
@@ -414,20 +432,20 @@ await wait(10);
 check('memory: stale preview refuses to overwrite concurrent storage update', $('#mem-status').textContent.includes('เปลี่ยนหลังแสดงตัวอย่าง') && window.localStorage.getItem('no7.memory.v2') === memoryAfterConcurrentWrite && !JSON.parse(memoryAfterConcurrentWrite).facts.some((fact) => fact.text === 'memory import confirmation fact'));
 window.localStorage.setItem('no7.memory.v2', memoryBeforeConcurrentWrite);
 const memoryBeforeQuotaFailure = window.localStorage.getItem('no7.memory.v2');
-const storagePrototype = Object.getPrototypeOf(window.localStorage);
-const originalMemorySetItem = storagePrototype.setItem;
-storagePrototype.setItem = function (key, value) {
+const memoryQuotaStoragePrototype = Object.getPrototypeOf(window.localStorage);
+const originalMemoryQuotaSetItem = memoryQuotaStoragePrototype.setItem;
+memoryQuotaStoragePrototype.setItem = function (key, value) {
   if (key === 'no7.memory.v2') {
     const error = new Error('QuotaExceededError');
     error.name = 'QuotaExceededError';
     throw error;
   }
-  return originalMemorySetItem.call(this, key, value);
+  return originalMemoryQuotaSetItem.call(this, key, value);
 };
 window.confirm = () => true;
 $('#mem-import-file').dispatchEvent(new window.Event('change'));
 await wait(20);
-storagePrototype.setItem = originalMemorySetItem;
+memoryQuotaStoragePrototype.setItem = originalMemoryQuotaSetItem;
 check('memory: storage write failure reports no success and preserves memory', $('#mem-status').textContent.includes('บันทึกการนำเข้าไม่สำเร็จ') && window.localStorage.getItem('no7.memory.v2') === memoryBeforeQuotaFailure && !JSON.parse(memoryBeforeQuotaFailure).facts.some((fact) => fact.text === 'memory import confirmation fact') && $('#offline-banner').textContent.includes('พื้นที่เก็บข้อมูลเต็ม'));
 $('#offline-banner').hidden = true;
 $('#offline-banner').textContent = '';
@@ -780,6 +798,23 @@ Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () 
 window.dispatchEvent(new window.Event('online'));
 await wait(250);
 check('offline: queue flushed when back online', $('#messages').textContent.includes('ส่งข้อความที่ค้างไว้'), $('#messages').textContent.slice(-120));
+
+const memoryBeforeFailedReset = window.localStorage.getItem('no7.memory.v2');
+const settingsBeforeFailedReset = window.localStorage.getItem('no7.settings.v1');
+const resetStoragePrototype = Object.getPrototypeOf(window.localStorage);
+const originalResetSetItem = resetStoragePrototype.setItem;
+resetStoragePrototype.setItem = function (key, value) {
+  if (key === 'no7.memory.v2') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalResetSetItem.call(this, key, value);
+};
+window.confirm = () => true;
+$('#reset-btn').click();
+resetStoragePrototype.setItem = originalResetSetItem;
+check('reset: storage failure aborts reset and preserves settings and memory', $('#settings-status').textContent.includes('ล้างข้อมูลไม่สำเร็จ') && window.localStorage.getItem('no7.memory.v2') === memoryBeforeFailedReset && window.localStorage.getItem('no7.settings.v1') === settingsBeforeFailedReset);
 
 const failed = results.filter((r) => !r.ok);
 for (const r of results) console.log(`${r.ok ? '✓' : '✗'} ${r.name}${r.ok ? '' : `  → ${r.extra}`}`);

@@ -77,6 +77,41 @@ test('adding facts past the former 3000-entry limit never prunes existing memori
   assert.equal(JSON.parse(localStorage.getItem('no7.memory.v2')).facts.length, 3001);
 });
 
+test('memory writes are transactional when storage rejects updates', () => {
+  const mem = fresh();
+  const fact = mem.addFact('existing fact remains untouched', 3);
+  mem.logTurn('user', 'existing conversation remains');
+  localStorage.setItem('no7.memory.facts.v1', 'legacy facts');
+  localStorage.setItem('no7.memory.log.v1', 'legacy log');
+  fact.ts = Date.now() - 90 * 24 * 60 * 60 * 1000;
+  const beforeState = JSON.stringify([mem.facts, mem.log, mem.meta]);
+  const beforeStorage = localStorage.getItem('no7.memory.v2');
+  const originalSetItem = localStorage.setItem;
+  localStorage.setItem = (key, value) => {
+    if (key === 'no7.memory.v2') throw new Error('QuotaExceededError');
+    originalSetItem(key, value);
+  };
+  let outcome;
+  try {
+    assert.equal(mem.addFact('new unsaved fact'), null);
+    assert.equal(mem.updateFact(fact.id, { text: 'edited unsaved fact' }), null);
+    assert.equal(mem.togglePin(fact.id), null);
+    assert.equal(mem.removeFact(fact.id), false);
+    assert.equal(mem.logTurn('assistant', 'unsaved response'), false);
+    assert.equal(mem.restoreFacts([{ id: 'restored', text: 'restored fact' }]).failed, true);
+    assert.equal(mem.decay({ now: Date.now() }), 0);
+    assert.equal(mem.markConsolidated(123), false);
+    assert.equal(mem.clearAll(), false);
+  } finally {
+    localStorage.setItem = originalSetItem;
+  }
+  outcome = JSON.stringify([mem.facts, mem.log, mem.meta]);
+  assert.equal(outcome, beforeState);
+  assert.equal(localStorage.getItem('no7.memory.v2'), beforeStorage);
+  assert.equal(localStorage.getItem('no7.memory.facts.v1'), 'legacy facts');
+  assert.equal(localStorage.getItem('no7.memory.log.v1'), 'legacy log');
+});
+
 test('clearAll empties facts and log', () => {
   const mem = new MemoryStore();
   mem.addFact('x y z');
@@ -114,7 +149,7 @@ test('decay lowers importance of stale unused facts only', () => {
   const stale = mem.addFact('ผู้ใช้เคยชอบฟุตบอล', 3);
   const pinned = mem.addFact('ชื่อผู้ใช้คือ ต้า', 3);
   mem.togglePin(pinned.id);
-  stale.ts = Date.now() - 90 * 24 * 60 * 60 * 1000;
+  mem.getFact(stale.id).ts = Date.now() - 90 * 24 * 60 * 60 * 1000;
   const changed = mem.decay();
   assert.equal(changed, 1);
   assert.equal(mem.getFact(stale.id).importance, 2);

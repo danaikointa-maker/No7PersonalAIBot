@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.27.0] — 2026-11-10
+
+- Memory writes now persist candidate facts/log/meta before changing live state. Failed add/edit/pin/delete/restore/log/clear operations keep prior memory intact; the UI preserves unsaved input and aborts reset if memory cannot be cleared safely.
+
 ## [2.26.0] — 2026-11-10
 
 - Memory imports containing only malformed/skipped records now stop before confirmation and storage writes, with a clear no-importable-entries status.

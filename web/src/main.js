@@ -856,15 +856,19 @@ function renderMemory() {
     const pin = document.createElement('button');
     pin.textContent = f.pinned ? '📌' : '📍';
     pin.title = f.pinned ? 'เอาปักหมุดออก' : 'ปักหมุด';
-    pin.addEventListener('click', () => { memory.togglePin(f.id); renderMemory(); });
+    pin.addEventListener('click', () => { if (!memory.togglePin(f.id)) showMemoryWriteError(); else renderMemory(); });
 
     const del = document.createElement('button');
     del.textContent = 'ลบ';
-    del.addEventListener('click', () => { memory.removeFact(f.id); renderMemory(); });
+    del.addEventListener('click', () => { if (!memory.removeFact(f.id)) showMemoryWriteError(); else renderMemory(); });
 
     row.append(text, meta, pin, del);
     box.appendChild(row);
   }
+}
+
+function showMemoryWriteError() {
+  $('#mem-status').textContent = 'บันทึกความจำไม่สำเร็จ พื้นที่อาจเต็ม — ข้อมูลเดิมยังอยู่ กรุณาจัดการพื้นที่แล้วลองใหม่';
 }
 
 function startEdit(row, fact) {
@@ -877,7 +881,10 @@ function startEdit(row, fact) {
   const cancel = document.createElement('button');
   cancel.textContent = 'ยกเลิก';
   const commit = () => {
-    if (input.value.trim()) memory.updateFact(fact.id, { text: input.value.trim() });
+    if (input.value.trim() && !memory.updateFact(fact.id, { text: input.value.trim() })) {
+      showMemoryWriteError();
+      return;
+    }
     renderMemory();
   };
   save.addEventListener('click', commit);
@@ -900,7 +907,8 @@ $('#mem-clear-search').addEventListener('click', () => {
 $('#mem-add-btn').addEventListener('click', () => {
   const v = $('#mem-new').value.trim();
   if (!v) return;
-  memory.addFact(v, { importance: 3, source: 'user' });
+  const saved = memory.addFact(v, { importance: 3, source: 'user' });
+  if (!saved) { showMemoryWriteError(); return; }
   $('#mem-new').value = '';
   $('#mem-status').textContent = 'จำไว้แล้ว ✅';
   renderMemory();
@@ -1936,7 +1944,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.26.0',
+      version: window.NO7_VERSION || '2.27.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -3065,7 +3073,6 @@ $('#export-btn').addEventListener('click', () => {
 /** เขียนข้อมูลตามแผนกู้คืน (เรียกหลังผู้ใช้ยืนยันแล้วเท่านั้น) */
 function applyRestore(plan) {
   const replace = plan.mode === 'replace';
-  if (replace) memory.clearAll();
   memory.importData({ facts: plan.values.facts, log: plan.values.log }, { merge: !replace });
   try {
     localStorage.setItem('no7.notes.v1', JSON.stringify(plan.values.notes || []));
@@ -3147,7 +3154,10 @@ $('#import-file')?.addEventListener('change', (e) => {
 
 $('#reset-btn').addEventListener('click', () => {
   if (!confirm('ล้างข้อมูลทั้งหมดในเครื่องนี้? (ความจำ, ตั้งค่า, โน้ต)')) return;
-  memory.clearAll();
+  if (!memory.clearAll()) {
+    $('#settings-status').textContent = 'ล้างข้อมูลไม่สำเร็จ พื้นที่อาจเต็ม — ข้อมูลเดิมยังอยู่';
+    return;
+  }
   settings = resetSettings();
   ['no7.todos.v1', 'no7.notes.v1'].forEach((k) => localStorage.removeItem(k));
   renderSettingsForm();
