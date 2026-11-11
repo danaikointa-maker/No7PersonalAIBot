@@ -295,7 +295,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 |---|---|---|---|
 | V1 | ค้นหาทุกอย่าง (⌘K) | 26.1–26.4 | ✅ |
 | V2 | สำรอง/กู้คืนข้อมูล | 27.1–27.4 | ✅ |
-| V3 | Release 2.2 | 28.1–28.3 | ⬜ |
+| V3 | Release 2.2 | 28.1–28.3 | ✅ |
 
 ## V1 — ค้นหาทุกอย่าง (Command palette)
 
@@ -313,6 +313,6 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## V3 — Release 2.2
 
-- 28.1 version 2.2.0 + CHANGELOG
-- 28.2 README + PHASES ปิดครบ
-- 28.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 28.1 version 2.2.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics) + CHANGELOG 2.2.0
+- [x] 28.2 README v2.2 (⌘K, backup/restore, 368 unit / 123 checks, 28 docs) + PHASES ปิดครบ
+- [x] 28.3 ตรวจรับรวม: check 96 ไฟล์ · unit 368 · browser 123 · build · perf → PR
