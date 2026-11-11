@@ -8,24 +8,78 @@
 
 ---
 
-## เริ่มใช้ใน 60 วินาที
+## เริ่มต้นใช้งาน
+
+### ข้อกำหนดก่อนติดตั้ง
+
+- Node.js **20 ขึ้นไป** และ npm (แนะนำ Node.js 22 ซึ่งใช้ใน CI)
+- Git สำหรับ clone repository
+- ใช้เว็บ/PWA ได้โดยไม่ต้องติดตั้งเครื่องมืออื่น; สร้างเดสก์ท็อปต้องใช้ Electron; Android ต้องมี Android Studio/SDK; iOS ต้องใช้ macOS และ Xcode
+
+### ติดตั้งและเปิดเว็บ/PWA
 
 ```bash
-npm install
-npm run dev          # → http://localhost:5173  (เปิดในมือถือผ่าน Wi-Fi ก็ได้)
+git clone https://github.com/danaikointa-maker/No7PersonalAIBot.git
+cd No7PersonalAIBot
+npm ci
+npm run dev
 ```
 
-ค่าเริ่มต้นใช้ **Pollinations** (AI ฟรี ไม่ต้องใช้คีย์) — เปลี่ยนสมองได้ที่ ⚙️ ตั้งค่า
+เปิด `http://localhost:5173` บนคอมพิวเตอร์ ค่าเริ่มต้นใช้ **Pollinations** โดยไม่ต้องใส่ API key; ปรับผู้ให้บริการ/ภาษา/เสียงได้ที่ ⚙️ ตั้งค่า ข้อมูลการตั้งค่าและความจำอยู่ใน storage ของ browser บนอุปกรณ์นั้น
+
+ใช้ build สำหรับ production หรือ preview build ได้ด้วย:
 
 ```bash
-npm run build         # dist/ ชุดเดียวสำหรับ PWA + Electron + Capacitor
-npm run server        # companion server: static + AI proxy + tools + sync + phone-link
-npm run desktop       # เปิดเป็นแอปเดสก์ท็อป (Electron)
-npm run mobile:sync   # ซิงก์ dist/ เข้าโปรเจค Android/iOS
-npm test              # 507 unit tests
-npm run test:browser  # 205 end-to-end checks (รันแอปจริงใน jsdom)
+npm run build       # สร้าง dist/ สำหรับ PWA, Electron และ Capacitor
+npm run preview     # preview dist/ ที่ http://localhost:4173
+```
+
+ต้องการติดตั้ง PWA ให้เปิดเว็บผ่าน HTTPS แล้วเลือก “ติดตั้งแอป” ใน Chrome/Edge หรือ “เพิ่มไปยังหน้าจอโฮม” ใน Safari บน iOS การใช้ไมโครโฟนใน browser ต้องเป็น secure context (`https://` หรือ `localhost`); การเปิด IP ภายในบ้านผ่าน HTTP อาจถูก browser บล็อกไมโครโฟน
+
+### ตั้งค่า AI และเริ่มใช้งาน
+
+1. เปิดแอป แล้วไปที่ ⚙️ ตั้งค่า → เลือก provider: Pollinations (ไม่ต้องใช้ key), Gemini, OpenAI, Ollama หรือ OpenAI-compatible
+2. ถ้า provider ต้องใช้ key ให้กรอกในช่อง API key ของตั้งค่า; สำหรับ Ollama ให้เปิด Ollama ในเครื่องและเลือก model/base URL ที่ใช้งานได้
+3. กลับหน้าแชท เลือกโหมดหรือ “ทั้งหมด” แล้วพิมพ์/กดไมค์เพื่อถาม; หาก AI ขอเรียกเครื่องมือที่มีความเสี่ยง แอปจะแสดงหน้าต่างขออนุญาตก่อนทำงาน
+4. ตั้งค่า TTS, persona, ความจำ, backup, sync หรือ connectors เพิ่มได้ตามต้องการ โดยแต่ละฟีเจอร์มีเอกสารเฉพาะด้านใน [docs](#เอกสาร)
+
+**ข้อควรทราบ:** เมื่อเลือก provider บนคลาวด์ ข้อความสนทนาที่จำเป็นต่อคำขอจะถูกส่งไปยัง provider นั้นตามการตั้งค่าของผู้ใช้ อย่าใส่ข้อมูลที่ไม่ต้องการส่งออก; API key ใน browser เก็บใน storage ของอุปกรณ์นี้ แต่ต้องถือว่าเข้าถึงได้โดยผู้ใช้เครื่องเดียวกัน
+
+### ใช้ companion server (ไม่บังคับ)
+
+Server ใช้เสิร์ฟ `dist/`, proxy บาง API, ซิงก์ข้อมูล, Phone-Link, reminders, bots และ MCP stdio ตามการตั้งค่าของผู้ดูแล:
+
+```bash
+npm run build
+NO7_SYNC_TOKEN='ใส่ค่าสุ่มยาวและเก็บเป็นความลับ' npm run server
+```
+
+ค่าเริ่มต้นฟังที่ `0.0.0.0:8787`; ตรวจสุขภาพบริการได้ที่ `http://localhost:8787/api/health` และเปิดเว็บที่ `http://localhost:8787` หากเปิดให้เครื่องอื่นเข้าถึง ต้องจำกัดใน LAN หรือวางหลัง HTTPS/reverse proxy พร้อม firewall และตั้ง `NO7_SYNC_TOKEN` ก่อนใช้ sync — หากไม่ตั้ง token endpoint sync จะไม่มีการยืนยันตัวตนตามที่ server แจ้งเตือน ข้อมูลซิงก์เก็บใน `.no7/` (เปลี่ยนที่เก็บได้ด้วย `NO7_DATA_DIR`) อย่าเปิดโฟลเดอร์นี้ให้สาธารณะหรือ commit เข้า Git
+
+ตัวแปร server ที่ใช้บ่อย: `NO7_PORT`, `NO7_HOST`, `NO7_DATA_DIR`, `NO7_SYNC_TOKEN`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `OLLAMA_URL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`, `MCP_STDIO_SERVERS` ดูรายละเอียดการตั้งค่าใน [docs/BUILD.md](docs/BUILD.md), [docs/BOTS.md](docs/BOTS.md), [docs/MCP.md](docs/MCP.md) และ [docs/SYNC.md](docs/SYNC.md)
+
+### แอปเดสก์ท็อปและมือถือ
+
+```bash
+npm run desktop          # build แล้วเปิดแอป Electron
+npm run desktop:dev      # ใช้คู่กับ npm run dev ที่เปิดค้างไว้อีก terminal
+npm run desktop:dist     # สร้าง installer ของ OS ปัจจุบันใน release/
+
+npm run mobile:add:android  # ครั้งแรก: เพิ่ม native Android project
+npm run mobile:sync         # build และ sync ไปยังโปรเจกต์ Capacitor
+npm run mobile:open:android # เปิด Android Studio
+```
+
+iOS ต้องใช้ macOS + Xcode: รัน `npm run mobile:add:ios`, `npm run mobile:sync`, แล้ว `npx cap open ios` การสร้าง native project เป็นขั้นตอนครั้งแรก; Android/iOS project อาจต้องตั้ง signing และสิทธิ์ไมโครโฟนตามคู่มือแพลตฟอร์ม
+
+### ตรวจสอบโค้ด
+
+```bash
+npm test              # 507 tests (unit + integration)
+npm run test:browser  # 205 browser-flow checks ใน jsdom
 npm run check         # syntax + structure check
-npm run perf          # performance budget (ขนาด bundle/source)
+npm run build         # production build
+npm run perf          # performance budget ของ source/bundle
 ```
 
 ---
@@ -51,7 +105,7 @@ npm run perf          # performance budget (ขนาด bundle/source)
 ### 🧠 ความจำที่โตขึ้น
 - BM25 (k1=1.2, b=0.5) × importance × recency × pin — ตัดคำไทยเป็น bigram, strip tone mark
 - Consolidation: heuristic + AI (opt-in) สรุปบทสนทนาเป็นข้อเท็จจริง, merge ซ้ำ, decay ของเก่า, รายวัน
-- ปักหมุด/แก้/ลบ/ค้น/กรอง/Nำเข้า-ส่งออก JSON
+- ปักหมุด/แก้/ลบ/ค้น/กรอง/นำเข้า-ส่งออก JSON
 
 ### 🔊 เสียงและการตอบ
 - สตรีมคำตอบทีละคำ (SSE/NDJSON) + **เริ่มพูดก่อนคำตอบจบ** แล้วหยุดทันทีถ้าเป็นการเรียกเครื่องมือ
@@ -122,7 +176,7 @@ npm run perf          # performance budget (ขนาด bundle/source)
 
 ### 📦 คุณภาพที่วัดได้
 - `npm run perf` = performance budget จริง (source + gzip bundle) ทำงานใน CI ทุก PR
-- E2E 97 จุดครอบเส้นทางหลัก: แชท → เครื่องมือ → งานซ้ำ → เดสก์ท็อป → MCP → i18n → ออฟไลน์
+- Browser smoke 205 checks ครอบเส้นทางหลัก: แชท → เครื่องมือ → งานซ้ำ → เดสก์ท็อป → MCP → i18n → ออฟไลน์
 
 ### 🔄 อัปเดตเวอร์ชัน (opt-in)
 - เดสก์ท็อปแอปเช็คอัปเดตเองเมื่อเปิด `NO7_AUTO_UPDATE=1` (แจ้งเตือนเมื่อมีใหม่, ติดตั้งตอนปิดแอป)
@@ -169,25 +223,72 @@ tray · hotkey ระดับระบบ (`Ctrl/Cmd+Shift+Space`) · overlay a
 
 ---
 
-## โครงสร้าง
+## Architecture: ระบบทำงานอย่างไร
 
+หลักการคือ **แอปและ business logic อยู่ใน `web/` ชุดเดียว** แล้วนำไปใช้ผ่าน host ที่เหมาะกับแต่ละอุปกรณ์ ไม่ทำสำเนา logic แยกในเว็บ, Electron และ Capacitor ส่วน companion server เป็นบริการเสริมที่ผู้ใช้โฮสต์เอง ไม่จำเป็นสำหรับการทดลองใช้หน้าเว็บ
+
+```mermaid
+flowchart TB
+  subgraph CLIENT[แอป No7 — web/ ชุดเดียว]
+    UI[UI: แชท · ตั้งค่า · timeline · cards]
+    CORE[Core: agent loop · AI providers · memory · tools]
+    GATE[Permission gate · risk · user confirmation]
+    STORE[(Storage ในอุปกรณ์: localStorage)]
+    UI --> CORE --> GATE
+    CORE <--> STORE
+  end
+  subgraph HOSTS[วิธีเปิดแอป]
+    PWA[Browser / PWA]
+    ELECTRON[Electron desktop<br/>main process + preload bridge]
+    CAP[Capacitor Android / iOS]
+  end
+  UI --> PWA
+  UI --> ELECTRON
+  UI --> CAP
+  GATE -->|เฉพาะ tool ที่ผ่านนโยบาย/การยืนยัน| HOSTAPI[Platform APIs / local tools]
+  CORE -->|ตาม provider ที่ผู้ใช้เลือก| AI[Cloud AI หรือ Ollama / LM Studio]
+  CLIENT <-->|ผู้ใช้สั่ง sync / API request| SERVER[companion server<br/>static · proxy · sync · bots · MCP · reminders]
+  SERVER --> FILES[(.no7/ บนเครื่อง server)]
+  SERVER <-->|HMAC Phone-Link| DEV[PC / ESP32 clients]
 ```
-web/                 ชุด UI + core ที่ทุกแพลตฟอร์มใช้
-  src/core/          state · memory · consolidate · tools · agent · permissions · modes
-                     · ai-providers (stream/fallback) · voice · stream · wake · bargein · tts
-                     · local-models · i18n · oauth · desktop · tasks
-                     · timeline · digest · weekly · custom-tools · search · backup
-                     · mcp · retry · metrics · diagnostics · capabilities · storage
-                     · calendar · net · sync · link · prompt · settings · platform
-  src/ui/            avatar (14 emotions) · cards
-  overlay.html       อวาตาร์โปร่งใสสำหรับเดสก์ท็อป
-desktop/             Electron host + preload bridge
-mobile/              ที่สำหรับ native project (Capacitor)
-server/              companion server (zero deps): static · AI proxy · tools · sync · phone-link
-devices/esp32/       reference client (no7_link.h) + คู่มือ
-tests/               unit tests + jsdom end-to-end
-docs/                เอกสาร 32 ไฟล์
+
+### เส้นทางคำขอและขอบเขตความปลอดภัย
+
+1. ข้อความจากผู้ใช้เข้าสู่ agent loop; AI สร้างคำตอบหรือคำขอเรียก tool
+2. แอปตรวจหมวดสิทธิ์และ risk ของ tool ก่อนเรียกใช้; งานที่ต้องยืนยันจะหยุดรอผู้ใช้ และปุ่มหยุดยกเลิกลูปได้
+3. core เรียก API ของ provider ที่เลือก และเก็บความจำ/การตั้งค่าใน storage ของอุปกรณ์ ไม่ต้องมีบัญชี No7 หรือคลาวด์กลาง
+4. การใช้ companion server เป็นทางเลือก: client ติดต่อ server ที่ผู้ใช้ดูแลสำหรับ API บางประเภท, sync, bots, MCP bridge, reminders และ Phone-Link
+5. sync เริ่มจากผู้ใช้; secrets ถูก redact ก่อนสร้าง sync bundle; ประวัติสุขภาพมีเฉพาะ summary metrics และไม่อัปโหลดเอง การนำเข้า backup/history ต้องเริ่มและยืนยันโดยผู้ใช้ก่อนเขียน storage
+
+| ส่วนประกอบ | หน้าที่ | จุดเริ่มต้นใน repo |
+|---|---|---|
+| Web app | UI, agent loop, providers, permissions, tools, memory, backup/sync | `web/index.html`, `web/src/main.js`, `web/src/core/` |
+| Desktop host | หน้าต่าง Electron, tray, global shortcut, overlay และ IPC ที่จำกัดขอบเขต | `desktop/main.js`, `desktop/preload.cjs` |
+| Mobile host | Capacitor wrapper; ใช้ web build เดียวกัน | `capacitor.config.json`, `mobile/` |
+| Companion server | static server และ API สำหรับ AI proxy, sync, device link, reminders, bots, MCP/OAuth | `server/server.js`, `server/bots.js` |
+| Device reference | HMAC Phone-Link client สำหรับ ESP32 | `devices/esp32/` |
+| Build/test | Vite, release workflow, unit/integration/browser tests | `vite.config.js`, `.github/workflows/`, `tests/` |
+
+### โครงสร้าง repository
+
+```text
+web/
+  index.html, overlay.html, src/main.js, src/overlay.js, src/styles.css
+  src/core/       agent, AI providers, permissions, tools, memory, voice,
+                  backup/restore, sync, tasks, calendar, MCP, OAuth, health, metrics…
+  src/ui/         cards, archive และ UI controllers ที่แยกไว้
+  public/         icon และ static assets
+ desktop/         Electron main process, preload bridge, updater
+ mobile/          โฟลเดอร์รองรับ native project ของ Capacitor
+ server/          companion server, bots และ atomic file writes
+ devices/esp32/   Phone-Link reference client
+ build/           ไอคอนสำหรับ installer ของ macOS/Windows/Linux
+ tests/           node:test, server integration และ browser smoke บน jsdom
+ docs/             คู่มือฟีเจอร์/โปรโตคอล/การ build
+ tools/            check และ performance-budget scripts
 ```
+
+**หลักการแบ่งชั้น:** `web/src/core/` ทำงานหลักโดยไม่พึ่ง Node/Electron; `desktop/` ใช้ main process/preload เป็นสะพานเฉพาะ capability ของ desktop; `server/` ทำงานเป็น process แยก; `devices/` เป็น client reference สำหรับ protocol ไม่ใช่ส่วนที่ต้องใช้เพื่อเปิดแอปทั่วไป อ่านรายละเอียดเพิ่มเติมได้ที่ [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) และ [docs/BUILD.md](docs/BUILD.md)
 
 ## เอกสาร
 
