@@ -911,6 +911,34 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## AQ3 — Release 2.23
 
-- [ ] 91.1 version 2.23.0 + CHANGELOG
-- [ ] 91.2 README + PHASES ปิดครบ
-- [ ] 91.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 91.1 version 2.23.0 + CHANGELOG
+- [x] 91.2 README + PHASES ปิดครบ
+- [x] 91.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 29 (v2.24)
+
+เป้าหมาย: ทำให้การยืนยัน import เป็น transactional เมื่อ storage เต็ม/เขียนไม่สำเร็จ โดยต้องไม่เปลี่ยน instance, ลบ legacy backup หรือแจ้งว่าสำเร็จก่อน persist สำเร็จ
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AR1 | Persist แผน import แบบ atomic ก่อนเปลี่ยน instance | 92.1–92.3 | ⬜ |
+| AR2 | แสดง failure ที่ตรงจริงและรักษาแผนให้ retry ได้ | 93.1–93.3 | ⬜ |
+| AR3 | Release 2.24 | 94.1–94.3 | ⬜ |
+
+## AR1 — Persist แผน import แบบ atomic ก่อนเปลี่ยน instance
+
+- [ ] 92.1 เขียน candidate state ให้สำเร็จก่อนเปลี่ยน facts/log/meta ในหน่วยความจำ
+- [ ] 92.2 replace ลบ legacy keys หลัง v2 write สำเร็จเท่านั้น
+- [ ] 92.3 Unit tests จำลอง quota/write error, ตรวจ instance/storage/legacy ไม่เปลี่ยน และ retry สำเร็จ
+
+## AR2 — แสดง failure ที่ตรงจริงและรักษาแผนให้ retry ได้
+
+- [ ] 93.1 write failure คืน error ที่แยกจาก stale/invalid plan และแผนยัง retry ได้
+- [ ] 93.2 UI แจ้งว่าบันทึกไม่สำเร็จและข้อมูลเดิมยังอยู่
+- [ ] 93.3 Browser smoke ตรวจ failure ไม่แสดง success และไม่เปลี่ยนข้อมูล
+
+## AR3 — Release 2.24
+
+- [ ] 94.1 version 2.24.0 + CHANGELOG
+- [ ] 94.2 README + PHASES ปิดครบ
+- [ ] 94.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
