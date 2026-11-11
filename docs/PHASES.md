@@ -949,24 +949,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AS1 | เพิ่ม validator schema memory import | 95.1–95.3 | ⬜ |
-| AS2 | UI ปฏิเสธไฟล์ผิดรูปก่อน confirm โดยไม่เขียน storage | 96.1–96.3 | ⬜ |
-| AS3 | Release 2.25 | 97.1–97.3 | ⬜ |
+| AS1 | เพิ่ม validator schema memory import | 95.1–95.3 | ✅ |
+| AS2 | UI ปฏิเสธไฟล์ผิดรูปก่อน confirm โดยไม่เขียน storage | 96.1–96.3 | ✅ |
+| AS3 | Release 2.25 | 97.1–97.3 | ✅ |
 
 ## AS1 — เพิ่ม validator schema memory import
 
-- [ ] 95.1 รับเฉพาะ JSON object memory kind ที่รู้จัก; รองรับไฟล์เก่าที่ไม่มี kind/version
-- [ ] 95.2 ปฏิเสธ kind/version ที่ไม่รองรับ, collection ที่ชนิดผิด หรือไม่มี facts/log array
-- [ ] 95.3 Unit tests สำหรับ schema รุ่นเก่า/ปัจจุบัน/อนาคตและ malformed payload
+- [x] 95.1 รับเฉพาะ JSON object memory kind ที่รู้จัก; รองรับไฟล์เก่าที่ไม่มี kind/version
+- [x] 95.2 ปฏิเสธ kind/version ที่ไม่รองรับ, collection ที่ชนิดผิด หรือไม่มี facts/log array
+- [x] 95.3 Unit tests สำหรับ schema รุ่นเก่า/ปัจจุบัน/อนาคตและ malformed payload
 
 ## AS2 — UI ปฏิเสธไฟล์ผิดรูปก่อน confirm โดยไม่เขียน storage
 
-- [ ] 96.1 แสดงข้อความ invalid format ที่แปลไทย/อังกฤษก่อนขอคำยืนยัน
-- [ ] 96.2 Browser smoke ยืนยัน wrong kind/empty shape ไม่เปิด confirm และไม่เปลี่ยน storage
-- [ ] 96.3 อัปเดต `docs/MEMORY.md`
+- [x] 96.1 แสดงข้อความ invalid format ที่แปลไทย/อังกฤษก่อนขอคำยืนยัน
+- [x] 96.2 Browser smoke ยืนยัน wrong kind/empty shape ไม่เปิด confirm และไม่เปลี่ยน storage
+- [x] 96.3 อัปเดต `docs/MEMORY.md`
 
 ## AS3 — Release 2.25
 
-- [ ] 97.1 version 2.25.0 + CHANGELOG
-- [ ] 97.2 README + PHASES ปิดครบ
-- [ ] 97.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 97.1 version 2.25.0 + CHANGELOG
+- [x] 97.2 README + PHASES ปิดครบ
+- [x] 97.3 ตรวจรับรวม (check/test/browser/perf/build) + PR

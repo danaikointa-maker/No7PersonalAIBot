@@ -373,6 +373,15 @@ Object.defineProperty(oversizedMemoryFile, 'size', { value: 20 * 1024 * 1024 + 1
 Object.defineProperty($('#mem-import-file'), 'files', { value: [oversizedMemoryFile], configurable: true });
 $('#mem-import-file').dispatchEvent(new window.Event('change'));
 check('memory: oversized import rejected without changing existing history', $('#mem-status').textContent.includes('20 MiB') && window.localStorage.getItem('no7.memory.v2') === memoryBeforeOversizeImport);
+let invalidMemoryConfirmCount = 0;
+window.confirm = () => { invalidMemoryConfirmCount++; return true; };
+for (const [index, payload] of [{}, { kind: 'no7-backup', version: 2, facts: [], log: [] }].entries()) {
+  const invalidFile = new window.File([JSON.stringify(payload)], `invalid-memory-${index}.json`, { type: 'application/json' });
+  Object.defineProperty($('#mem-import-file'), 'files', { value: [invalidFile], configurable: true });
+  $('#mem-import-file').dispatchEvent(new window.Event('change'));
+  await wait(10);
+}
+check('memory: malformed or wrong-kind JSON rejected before confirmation without storage changes', $('#mem-status').textContent.includes('โครงสร้าง memory JSON') && invalidMemoryConfirmCount === 0 && window.localStorage.getItem('no7.memory.v2') === memoryBeforeOversizeImport);
 const memoryImportPayload = JSON.stringify({ facts: [{ text: 'memory import confirmation fact', importance: 3 }], log: [{ role: 'user', text: 'memory import confirmation log', ts: Date.now() - 1 }] });
 const memoryImportFile = new window.File([memoryImportPayload], 'memory.json', { type: 'application/json' });
 Object.defineProperty($('#mem-import-file'), 'files', { value: [memoryImportFile], configurable: true });
