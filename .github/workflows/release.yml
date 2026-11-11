@@ -88,6 +88,7 @@ jobs:
             exit "$build_status"
           fi
         env:
+          DEBUG: electron-builder
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # macOS signing (ไม่ตั้ง = unsigned build, ใช้ได้แต่ผู้ใช้ต้องอนุญาตเอง)
           CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
