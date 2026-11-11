@@ -244,6 +244,22 @@ check('tasks: completed task shown in done filter', $('#task-list').textContent.
 $('#task-filter').value = 'open';
 $('#task-filter').dispatchEvent(new window.Event('change'));
 
+// E2E journey: recurring task advances instead of closing
+$('#nav button[data-view="calendar"]').click();
+$('#task-title').value = 'งานซ้ำทดสอบ';
+$('#task-when').value = '2026-12-02T08:00';
+$('#task-repeat').value = 'daily';
+$('#task-add').click();
+await wait(30);
+check('journey: recurring task shown with 🔁', $('#task-list').textContent.includes('งานซ้ำทดสอบ') && $('#task-list').textContent.includes('🔁'), $('#task-list').textContent.slice(0, 80));
+const recurringRow = [...$('#task-list').querySelectorAll('.fact')].find((r) => r.textContent.includes('งานซ้ำทดสอบ'));
+recurringRow?.querySelectorAll('button')[0]?.click();
+await wait(30);
+check('journey: completing recurring task advances it', /เลื่อนไปรอบถัดไป/.test($('#task-status').textContent), $('#task-status').textContent.slice(0, 60));
+const stillOpen = [...$('#task-list').querySelectorAll('.fact')].some((r) => r.textContent.includes('งานซ้ำทดสอบ'));
+check('journey: recurring task stays open', stillOpen, $('#task-list').textContent.slice(0, 60));
+$('#task-repeat').value = '';
+
 // memory 2.0: pin + consolidate run
 $('#nav button[data-view="memory"]').click();
 await wait(20);

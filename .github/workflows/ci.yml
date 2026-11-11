@@ -31,6 +31,8 @@ jobs:
         run: npm run test:browser
       - name: Build PWA
         run: npm run build
+      - name: Performance budget
+        run: npm run perf
       - name: Upload dist
         if: matrix.node == 22
         uses: actions/upload-artifact@v4

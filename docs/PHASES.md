@@ -199,7 +199,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 | T1 | TTS พรีเมียม + แคชเสียง | 16.1–16.4 | ✅ |
 | T2 | โมเดลในเครื่อง (Ollama / LM Studio) | 17.1–17.4 | ✅ |
 | T3 | สองภาษา ไทย/อังกฤษ | 18.1–18.4 | ✅ |
-| T4 | Performance budget + E2E | 19.1–19.4 | ⬜ |
+| T4 | Performance budget + E2E | 19.1–19.4 | ✅ |
 | T5 | Auto-update + CI 3 แพลตฟอร์ม | 20.1–20.3 | ⬜ |
 | T6 | Release 2.0 | 21.1–21.3 | ⬜ |
 
@@ -226,10 +226,10 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## T4 — Performance budget + E2E
 
-- 19.1 `tools/perf.js`: วัดขนาด bundle (raw/gzip) + จำนวนไฟล์/โมดูล เทียบ budget
-- 19.2 `npm run perf` + `tests/perf.test.js` (ด่านใน CI) + budget ใน `perf-budget.json`
-- 19.3 E2E เส้นทางหลัก (บูต → แชท → tool → งาน → เดสก์ท็อป → MCP) เพิ่มใน smoke
-- 19.4 `docs/QUALITY.md`
+- [x] 19.1 `tools/perf.js`: `measureSource`/`measureDist` (gzip ระดับ 9), `checkBudget`, `formatReport` + CLI
+- [x] 19.2 `npm run perf` + `perf-budget.json` + `tests/perf.test.js` (6 tests) + ขั้น CI ใหม่
+- [x] 19.3 E2E journey: งานซ้ำเลื่อนรอบใน UI (+3 checks) — smoke รวม 97
+- [x] 19.4 `docs/QUALITY.md`
 
 ## T5 — Auto-update + CI 3 แพลตฟอร์ม
 
