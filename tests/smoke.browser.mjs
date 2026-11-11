@@ -163,7 +163,7 @@ const submit = (text) => {
 await wait(100);
 check('boot: initial state', ['IDLE', 'SETUP'].includes($('#state-label').textContent), $('#state-label').textContent);
 check('boot: welcome message', $('#messages').children.length >= 1);
-check('boot: 28 tools in auto mode', $('#tools-grid').children.length === 28, String($('#tools-grid').children.length));
+check('boot: 29 tools in auto mode (28 + digest)', $('#tools-grid').children.length === 29, String($('#tools-grid').children.length));
 check('boot: 5 role modes', $('#mode-chips').children.length === 5, String($('#mode-chips').children.length));
 check('boot: persona header', $('#persona-name').textContent.length > 0);
 
@@ -173,10 +173,10 @@ check('nav: memory view', $('#view-memory').classList.contains('active'));
 // mode switching filters tools
 window.document.querySelector('#mode-chips button[data-mode="hub"]').click();
 await wait(20);
-check('mode: hub filters tools', $('#tools-grid').children.length === 21, String($('#tools-grid').children.length));
+check('mode: hub filters tools', $('#tools-grid').children.length === 22, String($('#tools-grid').children.length));
 window.document.querySelector('#mode-chips button[data-mode="auto"]').click();
 await wait(20);
-check('mode: back to auto', $('#tools-grid').children.length === 28, String($('#tools-grid').children.length));
+check('mode: back to auto', $('#tools-grid').children.length === 29, String($('#tools-grid').children.length));
 
 $('#set-provider').value = 'pollinations';
 $('#save-settings-btn').click();
@@ -206,6 +206,9 @@ const lastBot = [...$('#messages').querySelectorAll('.msg.bot')].at(-1);
 check('tool: card rendered', !!lastBot?.querySelector('.card'));
 check('tool: provider API called', calls.some((c) => c.url.includes('gold-api')));
 check('tool: spoken summary', lastBot?.textContent.includes('2,412'), lastBot?.textContent.slice(0, 60));
+check('timeline: visible after a tool run', !$('#run-timeline').hidden, $('#run-timeline').hidden ? 'hidden' : 'shown');
+check('timeline: lists thinking + tool steps', $('#run-timeline').querySelectorAll('.tl-row').length >= 2, String($('#run-timeline').querySelectorAll('.tl-row').length));
+check('timeline: headline says finished', /เสร็จใน|Done in/.test($('#run-timeline').textContent), $('#run-timeline').textContent.slice(0, 70));
 
 $('#mic-btn').click();
 await wait(80);
@@ -259,6 +262,37 @@ check('journey: completing recurring task advances it', /เลื่อนไ�
 const stillOpen = [...$('#task-list').querySelectorAll('.fact')].some((r) => r.textContent.includes('งานซ้ำทดสอบ'));
 check('journey: recurring task stays open', stillOpen, $('#task-list').textContent.slice(0, 60));
 $('#task-repeat').value = '';
+
+// HTTP tool plugins
+$('#nav button[data-view="tools"]').click();
+$('#plugin-example').click();
+await wait(10);
+$('#plugin-validate').click();
+check('plugins: example validates', $('#plugin-status').textContent.includes('ผ่านทั้งหมด 2'), $('#plugin-status').textContent);
+$('#plugin-save').click();
+await wait(20);
+check('plugins: saved to settings', (JSON.parse(window.localStorage.getItem('no7.settings.v1') || '{}').customPlugins || []).length === 2);
+check('plugins: listed in panel', $('#plugin-list').textContent.includes('เกร็ดแมว'), $('#plugin-list').textContent.slice(0, 60));
+check('plugins: tools grid grows', $('#tools-grid').children.length === 31, String($('#tools-grid').children.length));
+$('#plugin-json').value = '[{"id":"bad","label":"ไม่ดี","url":"http://insecure.example.com/x"}]';
+$('#plugin-save').click();
+check('plugins: http url rejected', $('#plugin-status').textContent.includes('❌'), $('#plugin-status').textContent.slice(0, 60));
+$('#plugin-json').value = '[]';
+$('#plugin-save').click();
+await wait(10);
+check('plugins: cleared back to 29 tools', $('#tools-grid').children.length === 29, String($('#tools-grid').children.length));
+
+// daily digest
+$('#digest-btn').click();
+await wait(30);
+check('digest: card rendered', !$('#digest-card').hidden, $('#digest-card').hidden ? 'hidden' : 'shown');
+check('digest: includes today\'s task', $('#digest-card').textContent.includes('ทดสอบงาน') || $('#digest-card').textContent.includes('งานซ้ำทดสอบ'), `${JSON.parse(window.localStorage.getItem('no7.tasks.v1') || '[]').length} tasks / ${$('#digest-card').textContent.slice(0, 120)}`);
+check('digest: posted to chat', [...$('#messages').querySelectorAll('.msg.bot.digest')].length === 1);
+check('digest: remembers the day', !!window.localStorage.getItem('no7.digest.last'));
+$('#set-digest-auto').checked = true;
+$('#set-digest-auto').dispatchEvent(new window.Event('change'));
+check('digest: auto toggle persists', JSON.parse(window.localStorage.getItem('no7.settings.v1') || '{}').digestAuto === true);
+$('#nav button[data-view="settings"]').click();
 
 // memory 2.0: pin + consolidate run
 $('#nav button[data-view="memory"]').click();

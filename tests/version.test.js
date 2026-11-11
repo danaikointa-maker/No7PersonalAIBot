@@ -9,18 +9,20 @@ import { MCP_CLIENT_INFO } from '../web/src/core/mcp.js';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 
-test('package.json is 2.0.0 and the lockfile agrees', () => {
+const PKG_VERSION = JSON.parse(read('package.json')).version;
+
+test('lockfile agrees with package.json', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
-  assert.equal(pkg.version, '2.0.0');
-  assert.equal(lock.version, '2.0.0');
+  assert.match(pkg.version, /^\d+\.\d+\.\d+$/);
+  assert.equal(lock.version, pkg.version);
   assert.equal(lock.packages[''].version, pkg.version);
 });
 
 test('MCP clientInfo and diagnostics use the package version', () => {
   const pkg = JSON.parse(read('package.json'));
   assert.equal(MCP_CLIENT_INFO.version, pkg.version);
-  assert.match(read('web/src/main.js'), /window\.NO7_VERSION \|\| '2\.0\.0'/);
+  assert.ok(read('web/src/main.js').includes(`window.NO7_VERSION || '${pkg.version}'`), 'fallback ใน main.js ต้องตรงกับ package.json');
 });
 
 test('build injects the version from package.json (single source of truth)', () => {
@@ -29,10 +31,11 @@ test('build injects the version from package.json (single source of truth)', () 
   assert.match(vite, /'window\.NO7_VERSION': JSON\.stringify\(pkg\.version\)/);
 });
 
-test('CHANGELOG and README describe the current major version', () => {
+test('CHANGELOG and README describe the current version', () => {
   const changelog = read('CHANGELOG.md');
-  assert.match(changelog, /## \[2\.0\.0\] — \d{4}-\d{2}-\d{2}/);
-  assert.match(read('README.md'), /# No7 Personal AI Bot `v2\.0`/);
+  assert.ok(changelog.includes(`## [${PKG_VERSION}]`), `CHANGELOG ต้องมีหัวข้อ ${PKG_VERSION}`);
+  const [major, minor] = PKG_VERSION.split('.');
+  assert.match(read('README.md'), new RegExp(`# No7 Personal AI Bot \`v${major}\\.${minor}\``));
 });
 
 test('release workflow triggers on version tags and builds all 3 platforms', () => {

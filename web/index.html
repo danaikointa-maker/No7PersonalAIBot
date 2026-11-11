@@ -68,6 +68,7 @@
 
         <!-- Views -->
         <section id="view-chat" class="view active">
+          <div id="run-timeline" class="run-timeline" hidden aria-live="polite"></div>
           <div id="messages" aria-live="polite"></div>
           <span id="outbox-badge" class="pill" hidden></span>
           <form id="composer">
@@ -82,6 +83,17 @@
           <div id="tools-note"></div>
           <div id="tools-grid"></div>
           <div id="tool-result"></div>
+
+          <h3 data-i18n="plugins.title">🧩 ปลั๊กอินเครื่องมือ (HTTP)</h3>
+          <p class="hint">ประกาศเครื่องมือของตัวเองด้วย JSON — https เท่านั้น, ไม่ยิงเข้าวง LAN, ต้องยืนยันถ้า risk ≥ 1</p>
+          <div id="plugin-list" class="hint" data-i18n="plugins.status">ยังไม่มีปลั๊กอิน</div>
+          <textarea id="plugin-json" rows="10" spellcheck="false" placeholder='[{ "id": "catfact", "label": "เกร็ดแมว", "url": "https://catfact.ninja/fact", "risk": 0 }]'></textarea>
+          <div class="row">
+            <button id="plugin-example" data-i18n="plugins.example">ใส่ตัวอย่าง</button>
+            <button id="plugin-validate" data-i18n="plugins.validate">ตรวจสอบ</button>
+            <button id="plugin-save" data-i18n="plugins.save">บันทึกและใช้</button>
+          </div>
+          <p id="plugin-status" class="hint"></p>
         </section>
 
         <section id="view-memory" class="view">
@@ -137,6 +149,11 @@
 
           <h3 data-i18n="tasks.title">✅ งานที่ต้องทำ</h3>
           <p class="hint">มีเวลาเตือน + ซิงก์ข้ามเครื่องผ่าน <code>/api/sync</code> (last-write-wins)</p>
+          <div class="row">
+            <button id="digest-btn" data-i18n="digest.button">🌅 สรุปวันนี้</button>
+            <label class="inline"><input type="checkbox" id="set-digest-auto" /> สรุปอัตโนมัติทุกเช้า</label>
+          </div>
+          <div id="digest-card" hidden></div>
           <div id="task-stats" class="hint"></div>
           <div id="task-server-status" class="hint"></div>
           <div class="row">

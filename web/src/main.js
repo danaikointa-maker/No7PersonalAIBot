@@ -11,7 +11,7 @@ import { detectCapabilities, summarizeCapabilities, requestMicrophone, requestNo
 import { usageBreakdown, formatBytes, estimateQuota, isPersisted, requestPersistentStorage, clearGroup } from './core/storage.js';
 import { MemoryStore } from './core/memory.js';
 import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatWithFallbackStream } from './core/ai-providers.js';
-import { getTool, TOOL_IDS, runTool, toolMeta, restoreReminders, registerDynamicTools } from './core/tools.js';
+import { getTool, TOOL_IDS, allToolIds, runTool, toolMeta, restoreReminders, registerDynamicTools } from './core/tools.js';
 import { McpRegistry } from './core/mcp.js';
 import {
   createPkcePair, randomState, buildAuthorizeUrl, parseCallback,
@@ -42,6 +42,11 @@ import { renderCard, renderError } from './ui/cards.js';
 import { loadSettings, saveSettings, resetSettings, hasProviderConfigured, loadPermissions } from './core/settings.js';
 import { detectPlatform, platformLabel, isDesktopHost } from './core/platform.js';
 import { applyI18n, langOf, viewTitle, t as tr } from './core/i18n.js';
+import { AgentTimeline, statusIcon } from './core/timeline.js';
+import { buildDigest, digestTool, shouldAutoDigest } from './core/digest.js';
+import {
+  customToolDefs, validateCustomTools, PLUGIN_EXAMPLE, PLUGIN_LIMITS,
+} from './core/custom-tools.js';
 import {
   LOCAL_PRESETS, probeLocal, warmModel, pickBestModel, normalizeOfflineBrain,
   offlineChainSettings, describeLocalBrain, LocalModelCache,
@@ -58,10 +63,18 @@ const mcp = new McpRegistry({
   serverUrl: () => settings.serverUrl || 'http://localhost:8787',
 });
 
-function applyMcpTools() {
-  const defs = mcp.toolDefs();
+/** เครื่องมือ dynamic ทั้งหมด: MCP + ปลั๊กอิน HTTP + digest (ลงทะเบียนที่เดียว) */
+let pluginToolDefs = {};
+let digestToolDef = null;
+
+function refreshDynamicTools() {
+  const defs = { ...mcp.toolDefs(), ...pluginToolDefs, digest: digestToolDef };
   registerDynamicTools(defs);
   return Object.keys(defs).length;
+}
+
+function applyMcpTools() {
+  return refreshDynamicTools();
 }
 
 function renderMcp() {
@@ -281,6 +294,25 @@ async function speak(text) {
 }
 
 /** Add one visible agent step (tool call / denial / error) into the chat. */
+/** แผง timeline ระหว่างทำงาน — แสดงทุกขั้นพร้อมสถานะ */
+function renderTimeline(timeline) {
+  const box = $('#run-timeline');
+  if (!box) return;
+  if (!timeline || !timeline.steps.length) {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+  const headIcon = timeline.cancelled ? statusIcon('cancelled') : timeline.active ? statusIcon('running') : statusIcon('ok');
+  box.hidden = false;
+  box.innerHTML = `<div class="tl-head">${headIcon} <span>${esc(timeline.headline())}</span></div>`
+    + timeline.toRows().map((r) => `<div class="tl-row ${esc(r.status)}">`
+      + `<span class="tl-icon">${r.icon}</span>`
+      + `<span class="tl-label">${esc(r.label)}${r.title ? ` — <em>${esc(r.title)}</em>` : ''}</span>`
+      + (r.ms ? `<span class="tl-ms">${Math.round(r.ms)} ms</span>` : '')
+      + '</div>').join('');
+}
+
 function addStep(text, kind = '') {
   const el = document.createElement('div');
   el.className = `step ${kind}`;
@@ -355,6 +387,14 @@ async function respond(userText) {
   if (speakLive) bargeIn.start();
   $('#stop-btn').hidden = false;
 
+  const timeline = new AgentTimeline({
+    maxSteps: Number(settings.maxSteps) || 4,
+    lang: langOf(settings.uiLang),
+  });
+  timeline.start();
+  currentTimeline = timeline;
+  renderTimeline(timeline);
+
   const agent = new Agent({
     chat: (messages, { onToken } = {}) => {
       let emitted = false;
@@ -381,6 +421,8 @@ async function respond(userText) {
     maxSteps: Number(settings.maxSteps) || 4,
     onToolTiming: ({ tool, ms, ok }) => metrics.record({ kind: 'tool', label: tool, totalMs: ms, ok }),
     onEvent: (e) => {
+      timeline.push(e);
+      renderTimeline(timeline);
       if (e.type === 'thinking') {
         sm.set({ requestInFlight: true, toolRunning: false });
         if (e.step > 1 && !streamBuf) botEl.textContent = 'กำลังคิดต่อ…';
@@ -418,6 +460,8 @@ async function respond(userText) {
     },
   });
 
+  currentAgent = agent;
+
   try {
     const result = await agent.run(userText, {
       history: history.slice(-20),
@@ -426,6 +470,8 @@ async function respond(userText) {
       modeId: settings.mode,
     });
     botText = result.text || '(ไม่มีคำตอบ)';
+    timeline.finish();
+    renderTimeline(timeline);
 
     if (speakLive) {
       queue.resume();
@@ -445,6 +491,8 @@ async function respond(userText) {
     if (!speakLive) await speak(botText);
   } catch (err) {
     chatOk = false;
+    timeline.finish();
+    renderTimeline(timeline);
     noteError(err, retriedOnce ? 'chat(retry)' : 'chat');
     queue.stop();
     botEl.textContent = `⚠️ ${err.message}`;
@@ -453,6 +501,7 @@ async function respond(userText) {
     setTimeout(() => sm.set({ error: null }), 4000);
   } finally {
     busy = false;
+    currentAgent = null;
     bargeIn.stop();
     $('#stop-btn').hidden = true;
     wakeWordResume();
@@ -615,7 +664,23 @@ const speechVoice = {
   stopSpeaking: () => tts.stop(),
 };
 
-/* ---------------------------------------------------------- stop speaking */
+/* ---------------------------------------------- stop speaking / stop agent */
+let currentAgent = null;
+let currentTimeline = null;
+
+/** ปุ่ม ⏹ / Esc: หยุดทั้งงานที่กำลังทำและเสียง */
+function stopAll(reason = 'ผู้ใช้กดหยุด') {
+  const stoppedWork = !!(busy && currentAgent);
+  if (stoppedWork) {
+    currentAgent.cancel(reason);
+    currentTimeline?.cancel(reason);
+    if (currentTimeline) renderTimeline(currentTimeline);
+    setSubtitle(tr('agent.cancelled', { lang: settings.uiLang }));
+  }
+  stopSpeaking();
+  return stoppedWork;
+}
+
 function stopSpeaking() {
   activeQueue?.stop();
   activeQueue = null;
@@ -625,7 +690,7 @@ function stopSpeaking() {
   $('#stop-btn').hidden = true;
   setSubtitle('หยุดแล้ว');
 }
-$('#stop-btn').addEventListener('click', stopSpeaking);
+$('#stop-btn').addEventListener('click', () => stopAll());
 
 function updateMicUi() {
   $('#mic-btn').classList.toggle('listening', sm.current === STATES.LISTENING);
@@ -681,7 +746,7 @@ function renderToolsGrid(force = false) {
 
   const note = $('#tools-note');
   if (note) {
-    note.textContent = `${mode.emoji} โหมด ${mode.label}: แสดง ${ids.length}/${TOOL_IDS.length} เครื่องมือ`
+    note.textContent = `${mode.emoji} โหมด ${mode.label}: แสดง ${ids.length}/${allToolIds().length} เครื่องมือ`
       + (modeId === 'auto' ? ' — สลับโหมดเพื่อดูชุดอื่น' : '');
   }
 }
@@ -852,6 +917,123 @@ function downloadJson(data, filename) {
   URL.revokeObjectURL(a.href);
 }
 
+/* ------------------------------------------------------- HTTP tool plugins */
+/** โหลดปลั๊กอินที่บันทึกไว้ → dynamic tool defs (คีย์ plugin__<id>) */
+function loadPlugins({ apply = true } = {}) {
+  const res = customToolDefs(settings.customPlugins || []);
+  pluginToolDefs = res.defs;
+  if (apply) refreshDynamicTools();
+  return res;
+}
+
+function renderPlugins() {
+  const list = $('#plugin-list');
+  if (!list) return;
+  const { tools, errors } = validateCustomTools(settings.customPlugins || []);
+  const names = tools.map((t) => `${t.emoji} ${t.label} <small>(${t.method} ${new URL(t.url).host} · risk ${t.risk})</small>`);
+  list.innerHTML = names.length
+    ? names.map((n) => `<div>• ${n}</div>`).join('')
+    : `<span>${tr('plugins.status', { lang: settings.uiLang })}</span>`;
+  if (errors.length) list.innerHTML += `<div class="hint">⚠️ ${esc(errors.join(' · '))}</div>`;
+  const box = $('#plugin-json');
+  if (box && !box.value) box.value = (settings.customPlugins || []).length ? JSON.stringify(settings.customPlugins, null, 2) : '';
+}
+
+function setPluginStatus(text) {
+  const el = $('#plugin-status');
+  if (el) el.textContent = text;
+}
+
+$('#plugin-example')?.addEventListener('click', () => {
+  const box = $('#plugin-json');
+  if (box) box.value = JSON.stringify(PLUGIN_EXAMPLE, null, 2);
+  setPluginStatus('ใส่ตัวอย่างแล้ว — กด “ตรวจสอบ” เพื่อเช็กก่อนบันทึก');
+});
+
+$('#plugin-validate')?.addEventListener('click', () => {
+  const { ok, tools, errors } = validateCustomTools($('#plugin-json')?.value || '');
+  setPluginStatus(ok
+    ? `✅ ผ่านทั้งหมด ${tools.length}/${PLUGIN_LIMITS.maxTools} เครื่องมือ`
+    : `❌ ${errors.slice(0, 3).join(' · ')}`);
+  return ok;
+});
+
+$('#plugin-save')?.addEventListener('click', () => {
+  const { ok, tools, errors } = validateCustomTools($('#plugin-json')?.value || '');
+  if (!ok) {
+    setPluginStatus(`❌ บันทึกไม่ได้: ${errors.slice(0, 2).join(' · ')}`);
+    return;
+  }
+  Object.assign(settings, saveSettings({ customPlugins: tools }));
+  pluginToolDefs = Object.fromEntries(Object.entries(customToolDefs(tools).defs));
+  refreshDynamicTools();
+  renderPlugins();
+  renderToolsGrid(true);
+  setPluginStatus(`✅ ใช้ ${tools.length} ปลั๊กอินแล้ว (เรียกได้ทั้ง AI และกดทดลองในหน้าเครื่องมือ)`);
+});
+
+/* ------------------------------------------------------------------ digest */
+const DIGEST_KEY = 'no7.digest.last';
+
+// ใช้ closure (ไม่ใช่ getter) เพื่อไม่ให้แตะ `tasks`/`calendar` ก่อนถูกประกาศ (TDZ)
+digestToolDef = digestTool({
+  tasks: { list: (opts = {}) => tasks.list(opts) },
+  calendar: { list: () => calendar.all() },
+  memory: { recent: () => memory.listFacts({ sort: 'recent' }) },
+  lang: () => langOf(settings.uiLang),
+});
+
+function renderDigestCard(digest, target = null) {
+  const box = $('#digest-card');
+  const html = `<div class="digest-card">
+    <strong>${esc(digest.headline)}</strong>
+    ${digest.sections.map((sec) => `<div class="digest-sec">
+      <div class="digest-sec-head">${sec.emoji} ${esc(sec.title)} <small>(${sec.items.length}${sec.more ? `+${sec.more}` : ''})</small></div>
+      ${sec.items.map((it) => `<div class="digest-item">· ${esc(it.label)}${it.meta ? ` <small>${esc(it.meta)}</small>` : ''}</div>`).join('')}
+      ${sec.more ? `<div class="digest-item">· …อีก ${sec.more}</div>` : ''}
+    </div>`).join('') || `<p class="hint">${settings.uiLang === 'en' ? 'Nothing pending today.' : 'วันนี้ไม่มีอะไรค้าง 🎉'}</p>`}
+  </div>`;
+  if (box) {
+    box.innerHTML = html;
+    box.hidden = false;
+  }
+  if (target) {
+    const plain = [digest.headline]
+      .concat(digest.sections.flatMap((sec) => [
+        `${sec.emoji} ${sec.title}`,
+        ...sec.items.map((it) => `  · ${it.label}${it.meta ? ` (${it.meta})` : ''}`),
+      ]))
+      .join('\n');
+    const el = addMessage('bot', plain);
+    el.classList.add('digest');
+  }
+  return html;
+}
+
+/** สร้างสรุปวันนี้และแสดง (ปุ่ม / อัตโนมัติ / tool) */
+function showDigest({ inChat = true } = {}) {
+  const digest = buildDigest({
+    tasks: tasks.list({ done: null }),
+    events: calendar.all(),
+    memories: memory.listFacts({ sort: 'recent' }),
+    now: Date.now(),
+    lang: langOf(settings.uiLang),
+  });
+  renderDigestCard(digest, inChat ? {} : null);
+  setSubtitle(digest.headline);
+  return digest;
+}
+
+function maybeAutoDigest() {
+  if (!settings.digestAuto) return null;
+  let last = null;
+  try { last = Number(localStorage.getItem(DIGEST_KEY)) || null; } catch { last = null; }
+  if (!shouldAutoDigest({ lastDate: last, now: Date.now(), hour: 7 })) return null;
+  const digest = showDigest({ inChat: true });
+  try { localStorage.setItem(DIGEST_KEY, String(digest.date)); } catch { /* พื้นที่เต็ม */ }
+  return digest;
+}
+
 /* ---------------------------------------------------------------- calendar */
 const calendar = getCalendar();
 
@@ -909,6 +1091,17 @@ $('#cal-export-btn').addEventListener('click', () => {
   a.click();
   URL.revokeObjectURL(a.href);
   $('#cal-status').textContent = 'ส่งออกแล้ว';
+});
+
+$('#digest-btn')?.addEventListener('click', () => {
+  const digest = showDigest({ inChat: true });
+  try { localStorage.setItem(DIGEST_KEY, String(digest.date)); } catch { /* noop */ }
+});
+$('#set-digest-auto')?.addEventListener('change', (e) => {
+  Object.assign(settings, saveSettings({ digestAuto: e.target.checked }));
+  $('#settings-status').textContent = e.target.checked
+    ? (settings.uiLang === 'en' ? 'Morning digest: on' : 'สรุปอัตโนมัติทุกเช้า: เปิด')
+    : (settings.uiLang === 'en' ? 'Morning digest: off' : 'สรุปอัตโนมัติทุกเช้า: ปิด');
 });
 
 $('#cal-today-btn').addEventListener('click', () => {
@@ -1139,6 +1332,7 @@ function renderSettingsForm() {
   renderStorage();
   $('#set-language').value = settings.language;
   $('#set-uilang').value = langOf(settings.uiLang);
+  if ($('#set-digest-auto')) $('#set-digest-auto').checked = !!settings.digestAuto;
   $('#set-polite').checked = settings.polite;
   $('#set-tts').checked = settings.tts;
   $('#set-stt').checked = settings.stt;
@@ -1437,7 +1631,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.0.0',
+      version: window.NO7_VERSION || '2.1.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -2610,7 +2804,7 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === 'Escape') {
     if (!$('#confirm-modal').hidden) { $('#confirm-no').click(); e.preventDefault(); return; }
-    if (!$('#stop-btn').hidden) { stopSpeaking(); e.preventDefault(); return; }
+    if (!$('#stop-btn').hidden) { stopAll('หยุดด้วยแป้น Esc'); e.preventDefault(); return; }
     $('#sidebar').classList.remove('open');
     return;
   }
