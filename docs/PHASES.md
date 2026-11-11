@@ -186,3 +186,59 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 15.1 version 1.5.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics) + CHANGELOG 1.5.0
 - [x] 15.2 README (v1.5 + ตัวเลขใหม่) + ROADMAP + PHASES ปิดครบทั้ง S1–S5
 - [x] 15.3 ตรวจรับรวม: `npm run check` 75 ไฟล์ · `npm test` 266/0 · `npm run test:browser` 82/82 · `npx vite build` ผ่าน · เปิด PR
+
+---
+
+# รอบที่ 5 (v2.0)
+
+เป้าหมาย: ยกระดับคุณภาพ (เสียงพรีเมียม, สมองในเครื่อง), ทำแอปเป็นสองภาษา, และเตรียมกระจายจริง
+(auto-update + CI 3 แพลตฟอร์ม) พร้อมด่านตรวจคุณภาพอัตโนมัติ (performance budget)
+
+| เฟส | ชื่อ | งานย่อย | สถานะ |
+|---|---|---|---|
+| T1 | TTS พรีเมียม + แคชเสียง | 16.1–16.4 | ✅ |
+| T2 | โมเดลในเครื่อง (Ollama / LM Studio) | 17.1–17.4 | ✅ |
+| T3 | สองภาษา ไทย/อังกฤษ | 18.1–18.4 | ✅ |
+| T4 | Performance budget + E2E | 19.1–19.4 | ✅ |
+| T5 | Auto-update + CI 3 แพลตฟอร์ม | 20.1–20.3 | ⬜ |
+| T6 | Release 2.0 | 21.1–21.3 | ⬜ |
+
+## T1 — TTS พรีเมียม + แคชเสียง
+
+- [x] 16.1 `core/tts.js`: provider `elevenlabs`, `TTS_VOICES` (เสียงแนะนำต่อเจ้า), `voicesFor`, `resolveTTSConfig` (เติม default + กัน voice ข้ามเจ้า)
+- [x] 16.2 server `/api/tts`: branch `provider: 'elevenlabs'` (`xi-api-key`, `ELEVENLABS_API_KEY`/`BASE_URL`, `output_format=mp3_44100_128`, voice encode) + health `aiKeys.elevenlabs`
+- [x] 16.3 `AudioCache` LRU (20 รายการ/5 MB) — key ตาม provider/voice/model/lang/text, `cached` ในผลลัพธ์, `cacheStats`/`clearCache`, ปิดได้ด้วย `ttsCache`
+- [x] 16.4 Tests (`tts` 12, `server.tts` 1 integration, smoke +2) + UI ใช้ช่องร่วม (`needsServer`) + datalist เสียง + `docs/VOICE.md`
+
+## T2 — โมเดลในเครื่อง
+
+- [x] 17.1 `core/local-models.js`: `probeLocal` (Ollama `/api/tags`, LM Studio `/v1/models`), `warmModel`, `parseModelList`, `matchModel`, `LocalModelCache` (60 วิ), `offlineChainSettings`
+- [x] 17.2 server proxy `/api/local-models` + `/api/local-models/warm` พร้อม SSRF guard (เฉพาะ loopback/RFC1918, `NO7_LOCAL_ALLOW_REMOTE=1` เพื่อเปิด)
+- [x] 17.3 UI: แผง 🧠 สมองในเครื่อง (ตรวจ/เลือก/อุ่นเครื่อง/สวิตช์ออฟไลน์) + `resolveProviderChain` ใช้โมเดลในเครื่องอัตโนมัติเมื่อออฟไลน์
+- [x] 17.4 Tests (`local-models` 10, `server.local-models` 1 integration, smoke +5) + `docs/LOCAL_MODELS.md`
+
+## T3 — สองภาษา ไทย/อังกฤษ
+
+- [x] 18.1 `core/i18n.js`: `LANGS`, `DICT` (th/en ครบเท่ากัน), `t()` (+vars/fallback), `applyI18n`, `langOf`, `detectLang`, `viewTitle` + `settings.uiLang`
+- [x] 18.2 `data-i18n`/`data-i18n-placeholder`/`data-i18n-title` ใน UI หลัก ~90 จุด + สลับทันที (ไม่รีโหลด) + `html.lang`
+- [x] 18.3 ข้อความระบบที่สำคัญ (offline banner, view title, แจ้งเตือนงาน) ใช้ `t()` ตามภาษา
+- [x] 18.4 Tests (`i18n` 6, smoke +5) + `docs/I18N.md`
+
+## T4 — Performance budget + E2E
+
+- [x] 19.1 `tools/perf.js`: `measureSource`/`measureDist` (gzip ระดับ 9), `checkBudget`, `formatReport` + CLI
+- [x] 19.2 `npm run perf` + `perf-budget.json` + `tests/perf.test.js` (6 tests) + ขั้น CI ใหม่
+- [x] 19.3 E2E journey: งานซ้ำเลื่อนรอบใน UI (+3 checks) — smoke รวม 97
+- [x] 19.4 `docs/QUALITY.md`
+
+## T5 — Auto-update + CI 3 แพลตฟอร์ม
+
+- 20.1 `desktop/main.js`: electron-updater แบบ opt-in (`NO7_AUTO_UPDATE=1`) + เมนูตรวจอัปเดต
+- 20.2 `.github/workflows/release.yml`: matrix win/mac/linux build artifacts + tag
+- 20.3 เอกสาร `docs/BUILD.md` (การออก release + code signing)
+
+## T6 — Release 2.0
+
+- 21.1 version 2.0.0 + CHANGELOG 2.0.0
+- 21.2 README + ROADMAP + PHASES ปิดครบ
+- 21.3 ตรวจรับรวม (check/test/browser/perf/build) + PR

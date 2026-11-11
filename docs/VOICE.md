@@ -60,19 +60,40 @@
 
 ## 5) TTS provider router
 
-`web/src/core/tts.js` — เลือกเอนจินเสียงได้ 3 แบบ (ตั้งค่า → เสียงและการตอบ)
+`web/src/core/tts.js` — เลือกเอนจินเสียงได้ 4 แบบ (ตั้งค่า → เสียงและการตอบ)
 
 | Provider | การทำงาน |
 |---|---|
 | `system` | Web Speech ของเครื่อง (ฟรี, ออฟไลน์ได้, คุณภาพตาม OS) |
 | `openai` | `POST /api/tts` → `${baseUrl}/audio/speech` คืน `audio/mpeg` แล้วเล่นผ่าน `<audio>` |
+| `elevenlabs` | `POST /api/tts` → `${baseUrl}/text-to-speech/{voice}?output_format=mp3_44100_128` (`xi-api-key`) |
 | `off` | ไม่มีเสียง |
 
-- ค่าที่ใช้: `ttsVoice` (เช่น `alloy`, `nova`), `ttsModel` (`tts-1`, `tts-1-hd`), `ttsBaseUrl`, `ttsApiKey`
-- ไม่ใส่ API key ในแอปก็ได้ — server ใช้ `OPENAI_API_KEY` ของตัวเอง (เบราว์เซอร์ฝาก key ไว้ใน localStorage เท่านั้น)
-- base URL เปลี่ยนได้ → ใช้ผู้ให้บริการที่เข้ากันได้กับ OpenAI (เช่น LocalAI, LM Studio, Groq TTS) โดยไม่ต้องแก้โค้ด
+- ค่าที่ใช้: `ttsVoice`, `ttsModel`, `ttsBaseUrl`, `ttsApiKey`, `ttsCache`
+- **ค่าเริ่มต้นต่อ provider** (`resolveTTSConfig`): `openai` → `tts-1`/`alloy`, `elevenlabs` → `eleven_multilingual_v2`/`Rachel`
+  (ถ้าใส่ voice ของอีกเจ้ามา จะถูกแทนด้วยค่าเริ่มต้นให้อัตโนมัติ)
+- ไม่ใส่ API key ในแอปก็ได้ — server ใช้ `OPENAI_API_KEY` / `ELEVENLABS_API_KEY` ของตัวเอง
+  (เบราว์เซอร์ฝาก key ไว้ใน localStorage เท่านั้น) · `ELEVENLABS_BASE_URL` ใช้ชี้ proxy ได้
+- base URL เปลี่ยนได้ → ใช้ผู้ให้บริการที่เข้ากันได้ (LocalAI, LM Studio, Groq TTS, proxy ภายใน) โดยไม่ต้องแก้โค้ด
+- รายชื่อเสียงแนะนำอยู่ใน `TTS_VOICES` และถูกเติมเป็น `datalist` ให้ช่อง "เสียง"
 - **fallback**: ถ้าเรียก API ไม่สำเร็จ (`onFallback`) จะกลับไปใช้เสียงเครื่องทันทีและแจ้งในซับไทเทิล ไม่ทำให้บทสนทนาขาด
 - `stop()` หยุดทั้ง `<audio>` และเสียงเครื่อง
+
+### แคชเสียง (`AudioCache`)
+
+```js
+const tts = new TTSRouter({ settings: () => settings, voice });
+await tts.speak('สวัสดีครับ');    // → { engine:'elevenlabs', cached:false }
+await tts.speak('สวัสดีครับ');    // → { engine:'elevenlabs', cached:true }  (ไม่ยิงเน็ตซ้ำ)
+tts.cacheStats();                 // { entries, bytes, hits, misses, maxEntries, maxBytes }
+tts.clearCache();
+```
+
+- LRU ในหน่วยความจำ: 20 รายการ / 5 MB (`maxEntries`, `maxBytes` ตั้งได้ผ่าน constructor)
+- key = `provider|voice|model|lang|text` — เปลี่ยนเสียง/โมเดล = ไม่ใช้ของเก่าปนกัน
+- เก็บเป็น `Blob` แล้วสร้าง object URL ใหม่ทุกครั้งที่เล่น → revoke ได้โดยไม่ทำให้แคชพัง
+- ปิดได้ด้วย `ttsCache: false` ในหน้าตั้งค่า
+- ข้อความใหญ่เกิน 5 MB จะไม่ถูกแคช (กันหน่วยความจำบวม)
 
 ## 6) การปรับเสียง
 
@@ -90,3 +111,5 @@
 - wake word ต้องเปิดแอปค้างไว้ (ไม่ใช่ background service) — เป็นข้อจำกัดของเบราว์เซอร์
 - barge-in ต้องใช้ `SpeechRecognition` — iOS Safari ยังไม่รองรับ (ใช้ปุ่ม ⏹ แทน)
 - TTS คุณภาพสูงต้องออนไลน์และมี API key; โหมดออฟไลน์ใช้เสียงเครื่องเท่านั้น
+- แคชเสียงอยู่ในหน่วยความจำ (หายเมื่อรีเฟรช) — ยังไม่ลง IndexedDB เพราะเสี่ยงกินพื้นที่ผู้ใช้โดยไม่ถาม
+- ElevenLabs คิดตามตัวอักษร → แคชช่วยลดค่าใช้จ่ายเมื่อพูดประโยคเดิมซ้ำ (เช่น ทักทาย/ยืนยัน)

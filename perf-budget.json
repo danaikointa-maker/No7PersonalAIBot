@@ -1,0 +1,14 @@
+{
+  "source": {
+    "maxFileKb": 140,
+    "maxTotalKb": 800,
+    "maxModules": 60,
+    "maxHtmlKb": 90
+  },
+  "dist": {
+    "maxMainGzipKb": 160,
+    "maxTotalGzipKb": 320,
+    "maxCssGzipKb": 45,
+    "maxFiles": 60
+  }
+}

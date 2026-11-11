@@ -21,13 +21,13 @@
           </div>
         </div>
         <nav id="nav" aria-label="เมนูหลัก">
-          <button data-view="chat" class="active">💬 แชท</button>
-          <button data-view="tools">🧰 เครื่องมือ</button>
-          <button data-view="memory">🧠 ความจำ</button>
-          <button data-view="calendar">📅 ตารางนัด</button>
-          <button data-view="devices">🔗 อุปกรณ์</button>
-          <button data-view="desktop">🖥️ เดสก์ท็อป</button>
-          <button data-view="settings">⚙️ ตั้งค่า</button>
+          <button data-view="chat" class="active" data-i18n="nav.chat">💬 แชท</button>
+          <button data-view="tools" data-i18n="nav.tools">🧰 เครื่องมือ</button>
+          <button data-view="memory" data-i18n="nav.memory">🧠 ความจำ</button>
+          <button data-view="calendar" data-i18n="nav.calendar">📅 ตารางนัด</button>
+          <button data-view="devices" data-i18n="nav.devices">🔗 อุปกรณ์</button>
+          <button data-view="desktop" data-i18n="nav.desktop">🖥️ เดสก์ท็อป</button>
+          <button data-view="settings" data-i18n="nav.settings">⚙️ ตั้งค่า</button>
         </nav>
         <div class="sidebar-foot">
           <div id="conn-badge" class="badge">● พร้อมใช้</div>
@@ -45,9 +45,9 @@
           </div>
           <div class="topbar-actions">
             <span id="wake-badge" class="wake-badge" hidden title="กำลังฟังคำว่า No7">🎙 No7</span>
-            <button id="stop-btn" title="หยุดพูด" hidden>⏹</button>
-            <button id="companion-btn" title="โหมดเพื่อนบนจอ (Desktop)">🖥️</button>
-            <button id="mic-btn" title="พูด (Push to talk)">🎤</button>
+            <button id="stop-btn" title="หยุดพูด" data-i18n-title="chat.stop" hidden>⏹</button>
+            <button id="companion-btn" title="โหมดเพื่อนบนจอ (Desktop)" data-i18n-title="chat.companion">🖥️</button>
+            <button id="mic-btn" title="พูด (Push to talk)" data-i18n-title="chat.mic">🎤</button>
           </div>
         </header>
 
@@ -71,13 +71,13 @@
           <div id="messages" aria-live="polite"></div>
           <span id="outbox-badge" class="pill" hidden></span>
           <form id="composer">
-            <input id="input" type="text" placeholder="พิมพ์หรือพูดกับ No7…" autocomplete="off" />
-            <button type="submit" id="send-btn">ส่ง</button>
+            <input id="input" type="text" placeholder="พิมพ์หรือพูดกับ No7…" autocomplete="off" data-i18n-placeholder="chat.placeholder" />
+            <button type="submit" id="send-btn" data-i18n="chat.send">ส่ง</button>
           </form>
         </section>
 
         <section id="view-tools" class="view">
-          <h2>🧰 เครื่องมือ (Tools)</h2>
+          <h2 data-i18n="title.tools">🧰 เครื่องมือ (Tools)</h2>
           <p class="hint">AI เรียกเครื่องมือเองได้ — หรือกดลองใช้ตรงนี้</p>
           <div id="tools-note"></div>
           <div id="tools-grid"></div>
@@ -85,22 +85,22 @@
         </section>
 
         <section id="view-memory" class="view">
-          <h2>🧠 ความจำระยะยาว</h2>
+          <h2 data-i18n="title.memory">🧠 ความจำระยะยาว</h2>
           <p class="hint">GraphRAG-lite (BM25) + บันทึกบทสนทนา — เก็บในเครื่องนี้เท่านั้น</p>
 
           <div id="mem-stats" class="stats"></div>
 
           <div class="row">
-            <input id="mem-query" placeholder="ค้นหาความจำ…" autocomplete="off" />
-            <button id="mem-search-btn">ค้นหา</button>
+            <input id="mem-query" placeholder="ค้นหาความจำ…" autocomplete="off" data-i18n-placeholder="memory.queryPlaceholder" />
+            <button id="mem-search-btn" data-i18n="memory.search">ค้นหา</button>
             <button id="mem-clear-search" hidden>ล้าง</button>
           </div>
 
           <div id="mem-filters" class="chips"></div>
 
           <div class="row">
-            <input id="mem-new" placeholder="สอนความจำใหม่ เช่น: ชื่อฉันคือ…" autocomplete="off" />
-            <button id="mem-add-btn">จำไว้</button>
+            <input id="mem-new" placeholder="สอนความจำใหม่ เช่น: ชื่อฉันคือ…" autocomplete="off" data-i18n-placeholder="memory.newPlaceholder" />
+            <button id="mem-add-btn" data-i18n="memory.save">จำไว้</button>
           </div>
 
           <div id="mem-results"></div>
@@ -119,12 +119,12 @@
         </section>
 
         <section id="view-calendar" class="view">
-          <h2>📅 ตารางนัด</h2>
+          <h2 data-i18n="title.calendar">📅 ตารางนัด</h2>
           <p class="hint">เก็บในเครื่อง · นำเข้า/ส่งออก .ics ได้ · No7 เพิ่มนัดให้ได้เอง</p>
           <div class="row">
-            <input id="cal-title" placeholder="หัวข้อ เช่น ประชุมทีม" />
+            <input id="cal-title" placeholder="หัวข้อ เช่น ประชุมทีม" data-i18n-placeholder="calendar.titlePlaceholder" />
             <input id="cal-when" type="datetime-local" />
-            <button id="cal-add-btn">เพิ่ม</button>
+            <button id="cal-add-btn" data-i18n="calendar.add">เพิ่ม</button>
           </div>
           <div class="row">
             <button id="cal-import-btn">⬆️ นำเข้า .ics</button>
@@ -135,14 +135,14 @@
           <p id="cal-status" class="hint"></p>
           <div id="cal-list"></div>
 
-          <h3>✅ งานที่ต้องทำ</h3>
+          <h3 data-i18n="tasks.title">✅ งานที่ต้องทำ</h3>
           <p class="hint">มีเวลาเตือน + ซิงก์ข้ามเครื่องผ่าน <code>/api/sync</code> (last-write-wins)</p>
           <div id="task-stats" class="hint"></div>
           <div id="task-server-status" class="hint"></div>
           <div class="row">
-            <input id="task-title" placeholder="งาน เช่น ส่งรายงาน" />
+            <input id="task-title" placeholder="งาน เช่น ส่งรายงาน" data-i18n-placeholder="tasks.titlePlaceholder" />
             <input id="task-when" type="datetime-local" />
-            <button id="task-add">＋ เพิ่มงาน</button>
+            <button id="task-add" data-i18n="tasks.add">＋ เพิ่มงาน</button>
           </div>
           <div class="row">
             <select id="task-priority">
@@ -166,14 +166,14 @@
               <option value="done">เสร็จแล้ว</option>
               <option value="all">ทั้งหมด</option>
             </select>
-            <button id="task-clear-done">ล้างงานที่เสร็จ</button>
+            <button id="task-clear-done" data-i18n="tasks.clearDone">ล้างงานที่เสร็จ</button>
           </div>
           <p id="task-status" class="hint"></p>
           <div id="task-list"></div>
         </section>
 
         <section id="view-devices" class="view">
-          <h2>🔗 อุปกรณ์ (Phone-Link)</h2>
+          <h2 data-i18n="title.devices">🔗 อุปกรณ์ (Phone-Link)</h2>
           <p class="hint">สั่งงาน PC / ESP32 ผ่าน companion server ด้วยลายเซ็น HMAC — ไม่มีคลาวด์</p>
 
           <div id="dev-list"></div>
@@ -188,8 +188,8 @@
             <input id="dev-secret" placeholder="secret (hex 64)" type="password" />
           </div>
           <div class="row">
-            <button id="dev-pair">🎲 ขอรหัสจาก server</button>
-            <button id="dev-add">＋ เพิ่มอุปกรณ์</button>
+            <button id="dev-pair" data-i18n="devices.pair">🎲 ขอรหัสจาก server</button>
+            <button id="dev-add" data-i18n="devices.add">＋ เพิ่มอุปกรณ์</button>
           </div>
           <p id="dev-status" class="hint"></p>
           <pre id="dev-log" class="code" hidden></pre>
@@ -213,21 +213,21 @@
         </section>
 
         <section id="view-desktop" class="view">
-          <h2>🖥️ เดสก์ท็อป</h2>
+          <h2 data-i18n="title.desktop">🖥️ เดสก์ท็อป</h2>
           <p class="hint">
             รู้ว่ามีหน้าต่างอะไรเปิดอยู่ และรัน "สูตร" หลายขั้นให้จบในครั้งเดียว —
             ทุกขั้นวิ่งผ่าน allowlist ในหน้าตั้งค่า และลองก่อน (dry-run) ได้เสมอ
           </p>
 
-          <h3>🪟 หน้าต่างที่เปิดอยู่</h3>
+          <h3 data-i18n="desktop.windows">🪟 หน้าต่างที่เปิดอยู่</h3>
           <div class="row">
             <input id="win-query" placeholder="ค้นหาชื่อหน้าต่าง เช่น Chrome" autocomplete="off" />
-            <button id="win-refresh">🔄 อ่านรายการ</button>
+            <button id="win-refresh" data-i18n="desktop.refresh">🔄 อ่านรายการ</button>
           </div>
           <p id="win-status" class="hint">กด "อ่านรายการ" เพื่อดูหน้าต่างบนจอ (เดสก์ท็อปแอปเท่านั้น)</p>
           <div id="win-list"></div>
 
-          <h3>🧩 สูตรอัตโนมัติ</h3>
+          <h3 data-i18n="desktop.recipes">🧩 สูตรอัตโนมัติ</h3>
           <p class="hint">
             หนึ่งบรรทัด = หนึ่งขั้น: <code>open_app notepad</code> · <code>open_url https://…</code> ·
             <code>focus_window Chrome</code> · <code>wait 800</code> · <code>notify เริ่มงาน</code>
@@ -235,27 +235,33 @@
           </p>
           <div class="row">
             <select id="recipe-select" title="สูตรที่บันทึกไว้"><option value="">— สูตรใหม่ —</option></select>
-            <input id="recipe-name" placeholder="ชื่อสูตร เช่น โหมดทำงานเช้า" maxlength="60" />
+            <input id="recipe-name" placeholder="ชื่อสูตร เช่น โหมดทำงานเช้า" maxlength="60" data-i18n-placeholder="desktop.recipeNamePlaceholder" />
           </div>
           <textarea id="recipe-steps" rows="5" placeholder="open_url https://calendar.google.com&#10;wait 800&#10;notify เริ่มงานได้เลย"></textarea>
           <div class="row">
-            <button id="recipe-save">💾 บันทึกสูตร</button>
-            <button id="recipe-try">🔍 ลองก่อน (dry-run)</button>
-            <button id="recipe-run">▶️ รันสูตร</button>
-            <button id="recipe-delete">🗑 ลบสูตร</button>
+            <button id="recipe-save" data-i18n="desktop.recipeSave">💾 บันทึกสูตร</button>
+            <button id="recipe-try" data-i18n="desktop.recipeTry">🔍 ลองก่อน (dry-run)</button>
+            <button id="recipe-run" data-i18n="desktop.recipeRun">▶️ รันสูตร</button>
+            <button id="recipe-delete" data-i18n="desktop.recipeDelete">🗑 ลบสูตร</button>
           </div>
           <p id="recipe-status" class="hint"></p>
           <pre id="recipe-log" class="code" hidden></pre>
         </section>
 
         <section id="view-settings" class="view">
-          <h2>⚙️ ตั้งค่า</h2>
+          <h2 data-i18n="title.settings">⚙️ ตั้งค่า</h2>
 
-          <h3>ผู้ช่วย (Persona)</h3>
+          <h3 data-i18n="settings.persona">ผู้ช่วย (Persona)</h3>
           <label>โปรไฟล์
             <select id="set-persona"></select>
           </label>
-          <label>ภาษาที่ AI พูด
+          <label><span data-i18n="settings.uiLang">ภาษาของหน้าจอ</span>
+            <select id="set-uilang">
+              <option value="th">ไทย</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <label><span data-i18n="settings.aiLang">ภาษาที่ AI พูด</span>
             <select id="set-language">
               <option value="th">ไทย (ล็อก)</option>
               <option value="en">English</option>
@@ -354,12 +360,31 @@
             <input id="set-baseurl" placeholder="http://localhost:11434" />
           </label>
           <div class="row">
-            <button id="save-settings-btn">บันทึก</button>
-            <button id="test-ai-btn">ทดสอบ AI</button>
+            <button id="save-settings-btn" data-i18n="settings.save">บันทึก</button>
+            <button id="test-ai-btn" data-i18n="settings.testAI">ทดสอบ AI</button>
           </div>
           <p id="settings-status" class="hint"></p>
 
-          <h3>เสียงและการตอบ</h3>
+          <h3 data-i18n="settings.brain">🧠 สมองในเครื่อง (Ollama / LM Studio)</h3>
+          <p class="hint">เมื่อไม่มีเน็ต No7 จะใช้โมเดลในเครื่องแทน — ตรวจก่อนแล้วเลือกโมเดลที่ต้องการ</p>
+          <div class="grid2">
+            <label>ชนิด
+              <select id="local-kind">
+                <option value="ollama">Ollama</option>
+                <option value="lmstudio">LM Studio</option>
+              </select>
+            </label>
+            <label>Base URL <input id="local-baseurl" placeholder="http://localhost:11434" /></label>
+          </div>
+          <div class="row">
+            <button id="local-scan" data-i18n="settings.localScan">🔍 ตรวจโมเดลในเครื่อง</button>
+            <button id="local-warm" data-i18n="settings.localWarm">🔥 อุ่นเครื่อง</button>
+            <label class="switch"><input type="checkbox" id="set-offlinebrain" /> <span data-i18n="settings.localOffline">ใช้เมื่อออฟไลน์</span></label>
+          </div>
+          <p id="local-status" class="hint">ยังไม่ได้ตรวจ</p>
+          <div id="local-models"></div>
+
+          <h3 data-i18n="settings.voice">เสียงและการตอบ</h3>
           <label><input type="checkbox" id="set-streaming" checked /> สตรีมคำตอบ (เห็นข้อความไหลทีละคำ)</label>
           <label><input type="checkbox" id="set-speakstream" checked /> เริ่มพูดก่อนคำตอบจบ (ไวขึ้น)</label>
           <label><input type="checkbox" id="set-wake" /> ปลุกด้วยคำว่า "No7" (ฟังเบื้องหลัง)</label>
@@ -377,23 +402,24 @@
           </label>
           <p class="hint" id="tts-provider-hint"></p>
           <div id="tts-openai-fields" hidden>
-            <label>Base URL ของผู้ให้บริการ (OpenAI-compatible)
+            <label>Base URL ของผู้ให้บริการ (เว้นว่าง = ค่าเริ่มต้นของผู้ให้บริการ)
               <input id="set-ttsbaseurl" placeholder="https://api.openai.com/v1" />
             </label>
-            <label>API key (เว้นว่าง = ใช้ OPENAI_API_KEY ที่ server)
+            <label>API key (เว้นว่าง = ใช้ key ที่ server)
               <input id="set-ttsapikey" type="password" placeholder="เก็บในเครื่องเท่านั้น" />
             </label>
             <div class="grid2">
-              <label>โมเดล <input id="set-ttsmodel" placeholder="tts-1" /></label>
-              <label>เสียง <input id="set-ttsvoice" placeholder="alloy" /></label>
+              <label>โมเดล <input id="set-ttsmodel" placeholder="tts-1 / eleven_multilingual_v2" /></label>
+              <label>เสียง <input id="set-ttsvoice" placeholder="alloy / voice id" list="tts-voice-list" /></label>
             </div>
+            <label><input type="checkbox" id="set-ttscache" checked /> แคชเสียงในเครื่อง (ข้อความเดิมเล่นซ้ำทันที)</label>
           </div>
           <label>พูดขัดจังหวะได้ (barge-in)
             <select id="set-bargein"></select>
           </label>
           <div class="row">
-            <button id="test-voice-btn">🔊 ทดสอบเสียง</button>
-            <button id="stop-voice-btn">⏹ หยุด</button>
+            <button id="test-voice-btn" data-i18n="settings.testVoice">🔊 ทดสอบเสียง</button>
+            <button id="stop-voice-btn" data-i18n="settings.stopVoice">⏹ หยุด</button>
           </div>
           <p id="voice-status" class="hint"></p>
 

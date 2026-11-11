@@ -91,6 +91,14 @@ window.fetch = async (url, opts = {}) => {
     return reply('สวัสดีครับ ผมชื่อ No7');
   }
   const linkReply = (obj) => ({ ok: true, json: async () => obj, text: async () => JSON.stringify(obj) });
+  if (u.includes('/api/local-models/warm')) {
+    return linkReply({ ok: true, ms: 1200, model: 'llama3.1', kind: 'ollama', baseUrl: 'http://localhost:11434' });
+  }
+  if (u.includes('/api/local-models')) {
+    const model = { id: 'llama3.1:latest', name: 'llama3.1', sizeBytes: 4_000_000_000, family: 'llama', kind: 'ollama', baseUrl: 'http://localhost:11434' };
+    const target = { kind: 'ollama', label: 'Ollama', baseUrl: 'http://localhost:11434', ok: true, latencyMs: 12, models: [model], error: '' };
+    return linkReply({ ok: true, models: [model], results: [target], best: target });
+  }
   if (u.includes('/api/oauth/device')) {
     return { ok: true, json: async () => ({ status: 200, body: JSON.stringify({ device_code: 'dc-1', user_code: 'ABCD-EFGH', verification_uri: 'https://id.example.com/device', expires_in: 600, interval: 1 }) }) };
   }
@@ -236,6 +244,22 @@ check('tasks: completed task shown in done filter', $('#task-list').textContent.
 $('#task-filter').value = 'open';
 $('#task-filter').dispatchEvent(new window.Event('change'));
 
+// E2E journey: recurring task advances instead of closing
+$('#nav button[data-view="calendar"]').click();
+$('#task-title').value = 'งานซ้ำทดสอบ';
+$('#task-when').value = '2026-12-02T08:00';
+$('#task-repeat').value = 'daily';
+$('#task-add').click();
+await wait(30);
+check('journey: recurring task shown with 🔁', $('#task-list').textContent.includes('งานซ้ำทดสอบ') && $('#task-list').textContent.includes('🔁'), $('#task-list').textContent.slice(0, 80));
+const recurringRow = [...$('#task-list').querySelectorAll('.fact')].find((r) => r.textContent.includes('งานซ้ำทดสอบ'));
+recurringRow?.querySelectorAll('button')[0]?.click();
+await wait(30);
+check('journey: completing recurring task advances it', /เลื่อนไปรอบถัดไป/.test($('#task-status').textContent), $('#task-status').textContent.slice(0, 60));
+const stillOpen = [...$('#task-list').querySelectorAll('.fact')].some((r) => r.textContent.includes('งานซ้ำทดสอบ'));
+check('journey: recurring task stays open', stillOpen, $('#task-list').textContent.slice(0, 60));
+$('#task-repeat').value = '';
+
 // memory 2.0: pin + consolidate run
 $('#nav button[data-view="memory"]').click();
 await wait(20);
@@ -359,7 +383,46 @@ $('#mcp-transport').dispatchEvent(new window.Event('change'));
 // voice & streaming settings
 $('#nav button[data-view="settings"]').click();
 check('voice: thai voice listed', $('#set-voice').options.length >= 2, `${$('#set-voice').options.length} options`);
-check('voice: 3 tts providers offered', $('#set-ttsprovider').options.length === 3, `${$('#set-ttsprovider').options.length} options`);
+check('voice: 4 tts providers offered', $('#set-ttsprovider').options.length === 4, `${$('#set-ttsprovider').options.length} options`);
+$('#set-ttsprovider').value = 'elevenlabs';
+$('#set-ttsprovider').dispatchEvent(new window.Event('change'));
+await wait(20);
+check('voice: elevenlabs reveals server fields', $('#tts-openai-fields').hidden === false && $('#set-ttsmodel').value === 'eleven_multilingual_v2', `${$('#set-ttsmodel').value} / hidden=${$('#tts-openai-fields').hidden}`);
+check('voice: elevenlabs voice suggestions', $('#set-ttsvoice').getAttribute('list') === 'tts-voice-list' && window.document.getElementById('tts-voice-list').children.length === 5, String(window.document.getElementById('tts-voice-list')?.children.length));
+$('#set-ttsprovider').value = 'system';
+$('#set-ttsprovider').dispatchEvent(new window.Event('change'));
+
+// i18n: switch the UI to English and back
+$('#set-uilang').value = 'en';
+$('#set-uilang').dispatchEvent(new window.Event('change'));
+await wait(30);
+check('i18n: nav switched to English', $('#nav button[data-view="chat"]').textContent === '💬 Chat', $('#nav button[data-view="chat"]').textContent);
+check('i18n: view title translated', $('#view-title').textContent === 'Settings', $('#view-title').textContent);
+check('i18n: html lang attribute', window.document.documentElement.getAttribute('lang') === 'en', window.document.documentElement.getAttribute('lang'));
+check('i18n: placeholder translated', $('#input').getAttribute('placeholder') === 'Type or talk to No7…', $('#input').getAttribute('placeholder'));
+$('#set-uilang').value = 'th';
+$('#set-uilang').dispatchEvent(new window.Event('change'));
+await wait(30);
+check('i18n: back to Thai', $('#nav button[data-view="chat"]').textContent === '💬 แชท' && $('#view-title').textContent === 'ตั้งค่า', $('#view-title').textContent);
+
+// local brain panel (stubbed server probe)
+$('#local-scan').click();
+await wait(120);
+check('local: models listed', /พบ 1 โมเดล/.test($('#local-status').textContent), $('#local-status').textContent.slice(0, 60));
+check('local: model row rendered', $('#local-models').textContent.includes('llama3.1'), $('#local-models').textContent.slice(0, 60));
+$('#local-models').querySelector('button')?.click();
+await wait(30);
+check('local: model chosen', /เลือก llama3.1/.test($('#local-status').textContent), $('#local-status').textContent.slice(0, 60));
+$('#set-offlinebrain').checked = true;
+$('#set-offlinebrain').dispatchEvent(new window.Event('change'));
+await wait(20);
+const offlineBrain = (() => {
+  try { return JSON.parse(window.localStorage.getItem('no7.settings.v1') || '{}').offlineBrain || {}; } catch { return {}; }
+})();
+check('local: offline brain saved', offlineBrain.enabled === true && offlineBrain.model === 'llama3.1:latest', JSON.stringify(offlineBrain).slice(0, 80));
+$('#local-warm').click();
+await wait(150);
+check('local: warm-up reported', /พร้อมใช้/.test($('#local-status').textContent), $('#local-status').textContent.slice(0, 60));
 check('voice: openai fields hidden by default', $('#tts-openai-fields').hidden === true);
 $('#set-ttsprovider').value = 'openai';
 $('#set-ttsprovider').dispatchEvent(new window.Event('change'));

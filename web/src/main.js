@@ -36,11 +36,16 @@ import { Voice } from './core/voice.js';
 import { SentenceSplitter, SpeechQueue, withCursor } from './core/stream.js';
 import { WakeWord } from './core/wake.js';
 import { BargeIn, BARGE_MODES } from './core/bargein.js';
-import { TTSRouter, TTS_PROVIDERS } from './core/tts.js';
+import { TTSRouter, TTS_PROVIDERS, resolveTTSConfig, voicesFor } from './core/tts.js';
 import { EyeAvatar } from './ui/avatar.js';
 import { renderCard, renderError } from './ui/cards.js';
 import { loadSettings, saveSettings, resetSettings, hasProviderConfigured, loadPermissions } from './core/settings.js';
 import { detectPlatform, platformLabel, isDesktopHost } from './core/platform.js';
+import { applyI18n, langOf, viewTitle, t as tr } from './core/i18n.js';
+import {
+  LOCAL_PRESETS, probeLocal, warmModel, pickBestModel, normalizeOfflineBrain,
+  offlineChainSettings, describeLocalBrain, LocalModelCache,
+} from './core/local-models.js';
 
 /** escape ค่าที่มาจากภายนอกก่อนใส่ innerHTML */
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({
@@ -175,10 +180,13 @@ $('#platform-badge').textContent = platformLabel(platform);
 $('#device-info').textContent = `${platformLabel(platform)} · จอ ${window.innerWidth}×${window.innerHeight} · STT ${voice.sttSupported ? '✅' : '❌'} · TTS ${voice.ttsSupported ? '✅' : '❌'}`;
 
 /* -------------------------------------------------------------- navigation */
+let currentView = 'chat';
+
 function showView(name) {
+  currentView = name;
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${name}`));
   document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
-  $('#view-title').textContent = { chat: 'แชทกับ No7', tools: 'เครื่องมือ', memory: 'ความจำ', calendar: 'ตารางนัด', devices: 'อุปกรณ์', desktop: 'เดสก์ท็อป', settings: 'ตั้งค่า' }[name] || name;
+  $('#view-title').textContent = viewTitle(name, settings.uiLang);
   $('#sidebar').classList.remove('open');
   if (name === 'tools') renderToolsGrid();
   if (name === 'calendar') renderCalendar();
@@ -323,7 +331,7 @@ async function respond(userText) {
   memory.logTurn('user', userText);
 
   const persona = getPersona(settings.persona);
-  const chain = resolveProviderChain(settings);
+  const chain = resolveProviderChain(offlineChainSettings(settings));
   const botEl = addMessage('bot', '…');
   const cards = [];
   const splitter = new SentenceSplitter();
@@ -564,6 +572,23 @@ function syncWake() {
   try { wakeWord.start(); } catch (e) { $('#voice-status').textContent = e.message; }
 }
 
+/** เติมรายชื่อเสียงแนะนำ (datalist) ตามผู้ให้บริการ TTS ที่เลือก */
+function renderTTSVoiceOptions(provider, current = '') {
+  const list = voicesFor(provider);
+  const el = $('#set-ttsvoice');
+  if (!el) return;
+  if (!list.length) { el.removeAttribute('list'); return; }
+  let dl = document.getElementById('tts-voice-list');
+  if (!dl) {
+    dl = document.createElement('datalist');
+    dl.id = 'tts-voice-list';
+    document.body.appendChild(dl);
+  }
+  dl.innerHTML = list.map((v) => `<option value="${esc(v.id)}">${esc(v.label)}</option>`).join('');
+  el.setAttribute('list', 'tts-voice-list');
+  if (current) el.value = current;
+}
+
 /* ---------------------------------------------------------- tts + barge-in */
 const tts = new TTSRouter({
   settings: () => settings,
@@ -673,7 +698,7 @@ const MEM_FILTERS = [
 ];
 
 function llmChat(messages) {
-  return chatWithFallback(messages, resolveProviderChain(settings), { fallback });
+  return chatWithFallback(messages, resolveProviderChain(offlineChainSettings(settings)), { fallback });
 }
 
 function renderMemStats() {
@@ -1082,11 +1107,14 @@ function renderSettingsForm() {
   ttsSel.innerHTML = Object.entries(TTS_PROVIDERS).map(([id, p]) => `<option value="${id}">${p.label}</option>`).join('');
   ttsSel.value = TTS_PROVIDERS[settings.ttsProvider] ? settings.ttsProvider : 'system';
   $('#tts-provider-hint').textContent = TTS_PROVIDERS[ttsSel.value].desc;
-  $('#tts-openai-fields').hidden = ttsSel.value !== 'openai';
+  $('#tts-openai-fields').hidden = !TTS_PROVIDERS[ttsSel.value].needsServer;
+  const resolved = resolveTTSConfig({ ...settings, ttsProvider: ttsSel.value });
   $('#set-ttsbaseurl').value = settings.ttsBaseUrl || '';
   $('#set-ttsapikey').value = settings.ttsApiKey || '';
-  $('#set-ttsmodel').value = settings.ttsModel || 'tts-1';
-  $('#set-ttsvoice').value = settings.ttsVoice || 'alloy';
+  $('#set-ttsmodel').value = resolved.model;
+  $('#set-ttsvoice').value = resolved.voice;
+  $('#set-ttscache').checked = settings.ttsCache !== false;
+  renderTTSVoiceOptions(ttsSel.value, resolved.voice);
 
   const bargeSel = $('#set-bargein');
   bargeSel.innerHTML = Object.entries(BARGE_MODES).map(([id, m]) => `<option value="${id}">${m.label}</option>`).join('');
@@ -1110,6 +1138,7 @@ function renderSettingsForm() {
   renderCapabilities();
   renderStorage();
   $('#set-language').value = settings.language;
+  $('#set-uilang').value = langOf(settings.uiLang);
   $('#set-polite').checked = settings.polite;
   $('#set-tts').checked = settings.tts;
   $('#set-stt').checked = settings.stt;
@@ -1141,6 +1170,7 @@ function collectSettings() {
   return {
     persona: $('#set-persona').value,
     language: $('#set-language').value,
+    uiLang: $('#set-uilang').value,
     polite: $('#set-polite').checked,
     tts: $('#set-tts').checked,
     stt: $('#set-stt').checked,
@@ -1160,6 +1190,7 @@ function collectSettings() {
     ttsApiKey: $('#set-ttsapikey').value.trim(),
     ttsModel: $('#set-ttsmodel').value.trim(),
     ttsVoice: $('#set-ttsvoice').value.trim(),
+    ttsCache: $('#set-ttscache').checked,
     bargeIn: $('#set-bargein').value,
     controlPolicy: readControlPolicy(),
     streaming: $('#set-streaming').checked,
@@ -1406,7 +1437,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '1.5.0',
+      version: window.NO7_VERSION || '2.0.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -1539,9 +1570,10 @@ const taskScheduler = new TaskScheduler({
   intervalMs: 30_000,
   onDue: (task) => {
     const text = `⏰ ถึงเวลา: ${task.title}`;
-    setSubtitle(text);
-    addMessage('bot', `${text}${task.notes ? `\n${task.notes}` : ''}${task.due ? `\n(${formatTaskTime(task.due)})` : ''}`);
-    try { new Notification('No7 — ถึงเวลางาน', { body: task.title }); } catch { /* ไม่ได้อนุญาตแจ้งเตือน */ }
+    const label = settings.uiLang === 'en' ? `${tr('notify.taskPrefix', { lang: 'en' })} ${task.title}` : text;
+    setSubtitle(label);
+    addMessage('bot', `${label}${task.notes ? `\n${task.notes}` : ''}${task.due ? `\n(${formatTaskTime(task.due)})` : ''}`);
+    try { new Notification(`No7 — ${tr('notify.task', { lang: settings.uiLang })}`, { body: task.title }); } catch { /* ไม่ได้อนุญาตแจ้งเตือน */ }
     renderTasks();
   },
 });
@@ -1822,6 +1854,170 @@ $('#link-voice-status')?.addEventListener('click', async () => {
   } catch (e) {
     setLinkStatus(`⛔ ${e.message}`);
   }
+});
+
+/* ------------------------------------------------------------------ i18n */
+function applyUiLang(lang) {
+  applyI18n(document, langOf(lang));
+  $('#view-title').textContent = viewTitle(currentView, settings.uiLang);
+  renderModeChips();
+  if (currentView === 'tools') renderToolsGrid(true);
+}
+
+$('#set-uilang')?.addEventListener('change', (e) => {
+  Object.assign(settings, saveSettings({ uiLang: langOf(e.target.value) }));
+  applyUiLang(settings.uiLang);
+  $('#settings-status').textContent = settings.uiLang === 'en' ? 'Interface language: English' : 'ภาษาหน้าจอ: ไทย';
+});
+
+/* --------------------------------------------------------- local models */
+const localCache = new LocalModelCache();
+let localModels = [];
+
+function localTarget() {
+  const kind = $('#local-kind').value || 'ollama';
+  const preset = LOCAL_PRESETS[kind];
+  return {
+    kind,
+    baseUrl: ($('#local-baseurl').value || preset.baseUrl).trim().replace(/\/$/, ''),
+  };
+}
+
+function renderLocalModels(probe = null) {
+  const box = $('#local-models');
+  if (!box) return;
+  box.innerHTML = '';
+  if (probe) {
+    for (const r of probe.results) {
+      const line = document.createElement('div');
+      line.className = 'fact';
+      line.innerHTML = `<span class="fact-text">${r.ok ? '✅' : '⛔'} ${esc(r.label)} · ${esc(r.baseUrl)}`
+        + `${r.ok ? ` · ${r.models.length} โมเดล · ${r.latencyMs} ms` : ` · ${esc(r.error)}`}</span>`;
+      box.appendChild(line);
+    }
+  }
+  if (!localModels.length) {
+    if (probe) {
+      const hint = document.createElement('p');
+      hint.className = 'hint';
+      hint.textContent = 'ไม่พบโมเดล — เปิด Ollama/LM Studio แล้วดาวน์โหลดโมเดลก่อน (เช่น `ollama pull llama3.1`)';
+      box.appendChild(hint);
+    }
+    return;
+  }
+  for (const m of localModels) {
+    const row = document.createElement('div');
+    row.className = 'fact';
+    const label = document.createElement('span');
+    label.className = 'fact-text';
+    label.textContent = `🧠 ${m.id}${m.family ? ` · ${m.family}` : ''}${m.sizeBytes ? ` · ${(m.sizeBytes / 1e9).toFixed(1)} GB` : ''}`;
+    const use = document.createElement('button');
+    use.textContent = 'ใช้โมเดลนี้';
+    use.addEventListener('click', () => {
+      $('#local-kind').value = m.kind;
+      $('#local-baseurl').value = m.baseUrl;
+      const next = saveSettings({
+        offlineBrain: { enabled: $('#set-offlinebrain').checked, kind: m.kind, baseUrl: m.baseUrl, model: m.id },
+      });
+      Object.assign(settings, next);
+      $('#local-status').textContent = `เลือก ${m.name} เป็นสมองในเครื่องแล้ว — ${describeLocalBrain(settings)}`;
+    });
+    row.append(label, use);
+    box.appendChild(row);
+  }
+}
+
+async function scanLocalModels({ force = false } = {}) {
+  const target = localTarget();
+  if (!force) {
+    const cached = localCache.get();
+    if (cached && cached.target?.baseUrl === target.baseUrl && cached.target?.kind === target.kind) {
+      localModels = cached.models;
+      renderLocalModels(cached.probe);
+      $('#local-status').textContent = `พบ ${localModels.length} โมเดล (แคช 60 วิ)`;
+      return cached;
+    }
+  }
+  $('#local-status').textContent = 'กำลังตรวจ…';
+  let result;
+  try {
+    const res = await fetch(`${String(settings.serverUrl || '').replace(/\/$/, '')}/api/local-models`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ targets: [target] }),
+    });
+    if (!res.ok) throw new Error(`server ${res.status}`);
+    result = await res.json();
+  } catch {
+    // ไม่มี server → ยิงตรง (อาจติด CORS แต่ Ollama มักอนุญาต localhost)
+    result = await probeLocal({ targets: [target] });
+  }
+  localModels = Array.isArray(result.models) ? result.models : [];
+  localCache.set({ target, probe: result, models: localModels });
+  renderLocalModels(result);
+  $('#local-status').textContent = localModels.length
+    ? `พบ ${localModels.length} โมเดล — เลือกได้เลย`
+    : `ไม่พบโมเดล${result.results?.[0]?.error ? ` (${result.results[0].error})` : ''}`;
+  return result;
+}
+
+function renderLocalBrain() {
+  const local = normalizeOfflineBrain(settings.offlineBrain);
+  $('#local-kind').value = local.kind;
+  $('#local-baseurl').value = local.baseUrl || LOCAL_PRESETS[local.kind].baseUrl;
+  $('#set-offlinebrain').checked = local.enabled;
+  $('#local-status').textContent = describeLocalBrain(settings) + (local.enabled && !local.model ? ' · ยังไม่ได้เลือกโมเดล' : '');
+}
+
+$('#local-scan')?.addEventListener('click', () => { scanLocalModels({ force: true }); });
+
+$('#local-warm')?.addEventListener('click', async () => {
+  const target = localTarget();
+  const preferred = normalizeOfflineBrain(settings.offlineBrain).model;
+  const model = pickBestModel(localModels.length ? localModels : [{ id: preferred }].filter((m) => m.id), preferred);
+  if (!model) { $('#local-status').textContent = 'ต้องเลือกโมเดลก่อน (กดตรวจโมเดล)'; return; }
+  $('#local-status').textContent = `กำลังอุ่นเครื่อง ${model}… (ครั้งแรกอาจใช้เวลา)`;
+  try {
+    let result;
+    try {
+      const res = await fetch(`${String(settings.serverUrl || '').replace(/\/$/, '')}/api/local-models/warm`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...target, model }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `server ${res.status}`);
+      result = data;
+    } catch {
+      result = await warmModel({ ...target, model });
+    }
+    $('#local-status').textContent = `🔥 ${model} พร้อมใช้ (${(result.ms / 1000).toFixed(1)} วิ)`;
+  } catch (e) {
+    $('#local-status').textContent = `อุ่นเครื่องไม่สำเร็จ: ${e.message}`;
+  }
+});
+
+$('#set-offlinebrain')?.addEventListener('change', (e) => {
+  const target = localTarget();
+  const next = saveSettings({
+    offlineBrain: {
+      enabled: e.target.checked,
+      kind: target.kind,
+      baseUrl: target.baseUrl,
+      model: normalizeOfflineBrain(settings.offlineBrain).model,
+    },
+  });
+  Object.assign(settings, next);
+  $('#local-status').textContent = describeLocalBrain(settings);
+});
+
+$('#local-kind')?.addEventListener('change', () => {
+  const preset = LOCAL_PRESETS[$('#local-kind').value] || LOCAL_PRESETS.ollama;
+  $('#local-baseurl').value = preset.baseUrl;
+  localCache.clear();
+  localModels = [];
+  renderLocalModels();
+  $('#local-status').textContent = 'เปลี่ยนชนิดแล้ว — กดตรวจโมเดล';
 });
 
 /* ------------------------------------------------------------- control UI */
@@ -2197,7 +2393,12 @@ $('#test-ai-btn').addEventListener('click', async () => {
 $('#set-ttsprovider').addEventListener('change', (e) => {
   const p = TTS_PROVIDERS[e.target.value];
   $('#tts-provider-hint').textContent = p.desc;
-  $('#tts-openai-fields').hidden = e.target.value !== 'openai';
+  $('#tts-openai-fields').hidden = !p.needsServer;
+  // เปลี่ยนผู้ให้บริการ = ใช้ค่าเริ่มต้นของเจ้านั้น (ไม่พาค่าเดิมข้ามเจ้ามาปน)
+  const cfg = resolveTTSConfig({ ttsProvider: e.target.value, ttsCache: settings.ttsCache });
+  $('#set-ttsmodel').value = cfg.model;
+  $('#set-ttsvoice').value = cfg.voice;
+  renderTTSVoiceOptions(e.target.value, cfg.voice);
 });
 
 $('#set-rate').addEventListener('input', (e) => { $('#out-rate').textContent = Number(e.target.value).toFixed(2); });
@@ -2439,7 +2640,7 @@ function syncOnlineState() {
   const banner = $('#offline-banner');
   if (offline) {
     banner.hidden = false;
-    banner.textContent = '⚠️ ออฟไลน์อยู่ — ความจำ/โน้ต/ปฏิทินยังใช้ได้ แต่การคุยกับ AI ต้องรอเน็ต';
+    banner.textContent = tr('status.offline', { lang: settings.uiLang });
   } else if (banner.textContent.startsWith('⚠️ ออฟไลน์')) {
     banner.hidden = true;
   }
@@ -2461,6 +2662,8 @@ mcp.hydrateFromCache();
 applyMcpTools();
 renderMcp();
 renderSettingsForm();
+applyUiLang(settings.uiLang);
+renderLocalBrain();
 renderModeChips();
 renderToolsGrid();
 if (Array.isArray(settings.mcpServers) && settings.mcpServers.length) refreshMcp({ quiet: true });

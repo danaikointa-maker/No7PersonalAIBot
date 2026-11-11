@@ -3,6 +3,7 @@
 import { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, globalShortcut, clipboard, Notification } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { updaterConfig, setupAutoUpdater, describeUpdateEvent } from './updater.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -12,6 +13,7 @@ const DEV_URL = process.env.NO7_DEV_URL || 'http://localhost:5173';
 let mainWindow = null;
 let overlayWindow = null;
 let tray = null;
+let updater = null;
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -67,15 +69,48 @@ function createTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'เปิดหน้าต่างหลัก', click: () => (mainWindow ? mainWindow.show() : createMainWindow()) },
     { label: 'เพื่อนบนจอ', click: () => createOverlay() },
+    { label: 'ตรวจอัปเดต', click: () => { if (updater?.enabled) updater.check(); else notifyUpdate({ title: 'auto-update ปิดอยู่', body: 'ต้องติดตั้งแอปและตั้ง NO7_AUTO_UPDATE=1' }); } },
     { type: 'separator' },
     { label: 'ออกจากโปรแกรม', click: () => app.quit() },
   ]));
   tray.on('click', () => (mainWindow ? mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show() : createMainWindow()));
 }
 
+/** แจ้งเตือนผ่าน OS notification (ใช้ทั้ง reminder และ updater) */
+function notifyUpdate(msg) {
+  try {
+    if (Notification.isSupported()) new Notification({ title: `No7 — ${msg.title}`, body: msg.body || '' }).show();
+  } catch { /* ไม่มีสิทธิ์แจ้งเตือน */ }
+}
+
+/** เปิด auto-update เฉพาะเมื่อเป็นแอปที่ติดตั้งแล้วและผู้ใช้เปิดเอง */
+async function initUpdater() {
+  const cfg = updaterConfig(process.env, { isPackaged: app.isPackaged });
+  if (!cfg.enabled) {
+    console.log(`[no7] auto-update: ปิด (${describeUpdateEvent('update-not-available', { currentVersion: app.getVersion() }).body})`);
+    return null;
+  }
+  try {
+    const mod = await import('electron-updater');
+    const autoUpdater = mod.autoUpdater || mod.default?.autoUpdater;
+    updater = setupAutoUpdater({ autoUpdater, config: cfg, notify: notifyUpdate, log: (m) => console.log(m) });
+    console.log(`[no7] auto-update: เปิด (channel=${cfg.channel}, delay=${cfg.checkDelayMs}ms)`);
+    if (updater.enabled) {
+      const quitInstall = () => { try { updater.install(); } catch { /* noop */ } };
+      app.on('before-quit', () => { /* electron-updater จัดการติดตั้งตอนปิดเอง */ });
+      process.once('SIGTERM', quitInstall);
+    }
+    return updater;
+  } catch (err) {
+    console.warn('[no7] auto-update ใช้งานไม่ได้:', err?.message || err);
+    return null;
+  }
+}
+
 app.whenReady().then(() => {
   createMainWindow();
   createTray();
+  initUpdater();
 
   // Push-to-talk anywhere on the desktop (mirrors ESP32 BOOT-button tap).
   globalShortcut.register('CommandOrControl+Shift+Space', () => {
