@@ -23,7 +23,7 @@ export function renderHealthHistory(history, { lang = 'th', copy = {} } = {}) {
     chart = `<svg class="health-history-chart" role="img" aria-label="${esc(copy.historyChart || 'Health score history')}" viewBox="0 0 360 100" preserveAspectRatio="none"><title>${esc(copy.historyChart || 'Health score history')}</title><desc>${esc(trend.label)}</desc><line x1="8" y1="16" x2="352" y2="16"/><line x1="8" y1="52" x2="352" y2="52"/><line x1="8" y1="88" x2="352" y2="88"/><polyline points="${polyline}"/>${circles}</svg>`;
   }
   return `<section class="health-history" aria-label="${esc(copy.history || 'Health history')}">
-    <div class="health-history-head"><strong>${esc(copy.history || 'Health history')}</strong>${snapshots.length ? `<button id="health-history-clear" type="button">${esc(copy.clearHistory || 'Clear history')}</button>` : ''}</div>
+    <div class="health-history-head"><strong>${esc(copy.history || 'Health history')}</strong>${snapshots.length ? `<div class="digest-actions"><button data-health-export="md" type="button">${esc(copy.exportMarkdown || '⬇️ Markdown')}</button><button data-health-export="csv" type="button">${esc(copy.exportCsv || '⬇️ CSV')}</button><button id="health-history-clear" type="button">${esc(copy.clearHistory || 'Clear history')}</button></div>` : ''}</div>
     <p class="hint health-history-privacy">${esc(copy.historyPrivacy || '')}</p>
     ${snapshots.length ? `<p class="health-trend ${trend.direction}">${esc(trend.label)}</p>${chart}<ol class="health-history-list">${rows}</ol>` : `<p class="hint">${esc(copy.noHistory || 'No history yet')}</p>`}
   </section>`;
