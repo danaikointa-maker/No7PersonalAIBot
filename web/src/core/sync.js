@@ -8,11 +8,10 @@ import { TaskStore } from './tasks.js';
 import { mergeSyncBundle } from './sync-merge.js';
 import { withBackupListsRestore } from './backup-restore.js';
 import { restoreReminders } from './tools.js';
+import { redactSettings } from './backup.js';
 
 export function collectBundle({ memory, personas = [], calendar = [], tasks = null, settings = {} }) {
-  const safeSettings = { ...settings };
-  delete safeSettings.apiKey;
-  delete safeSettings.syncToken;
+  const safeSettings = redactSettings(settings);
   return {
     version: SYNC_VERSION,
     updatedAt: new Date().toISOString(),
