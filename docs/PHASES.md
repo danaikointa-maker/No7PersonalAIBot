@@ -358,7 +358,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 | --- | --- | --- | --- |
 | X1 | ซิงก์แบบ conflict-aware | 32.1–32.4 | ✅ |
 | X2 | ส่งออกรายงาน (MD/CSV) | 33.1–33.4 | ✅ |
-| X3 | Release 2.4 | 34.1–34.3 | ⬜ |
+| X3 | Release 2.4 | 34.1–34.3 | ✅ |
 
 ## X1 — ซิงก์แบบ conflict-aware
 
@@ -376,6 +376,6 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## X3 — Release 2.4
 
-- 34.1 version 2.4.0 + CHANGELOG
-- 34.2 README + PHASES ปิดครบ
-- 34.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- 34.1 ✅ version 2.4.0 + CHANGELOG
+- 34.2 ✅ README + PHASES ปิดครบ
+- 34.3 ✅ ตรวจรับรวม (check/test/browser/perf/build) + PR
