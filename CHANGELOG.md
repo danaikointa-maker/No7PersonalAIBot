@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.30.0] — 2026-11-10
+
+- Health-history snapshots now use the device's local calendar day, matching 7/30-day filters and avoiding UTC-midnight off-by-one dates.
+
 ## [2.29.0] — 2026-11-10
 
 - Full-backup restore now applies notes/todos as a guarded transaction before health/memory commits. If a list write or later health/memory step fails, prior list values are restored and the UI reports failure.
