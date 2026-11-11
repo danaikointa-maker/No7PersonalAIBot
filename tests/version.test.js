@@ -38,6 +38,12 @@ test('CHANGELOG and README describe the current version', () => {
   assert.match(read('README.md'), new RegExp(`# No7 Personal AI Bot \`v${major}\\.${minor}\``));
 });
 
+test('package metadata has an author email for Debian package metadata', () => {
+  const author = JSON.parse(read('package.json')).author;
+  assert.equal(author.name, 'No7 Personal AI Bot');
+  assert.match(author.email, /^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+});
+
 test('release workflow triggers on version tags and builds all 3 platforms', () => {
   const rel = read('.github/workflows/release.yml');
   assert.match(rel, /tags: \['v\*'\]/);
