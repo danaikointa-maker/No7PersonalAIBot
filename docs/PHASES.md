@@ -328,7 +328,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 |---|---|---|---|
 | W1 | ผลเครื่องมือแบบ progressive | 29.1–29.4 | ✅ |
 | W2 | รายงานรายสัปดาห์ | 30.1–30.4 | ✅ |
-| W3 | Release 2.3 | 31.1–31.3 | ⬜ |
+| W3 | Release 2.3 | 31.1–31.3 | ✅ |
 
 ## W1 — ผลเครื่องมือแบบ progressive (partial UI)
 
@@ -346,6 +346,6 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## W3 — Release 2.3
 
-- 31.1 version 2.3.0 + CHANGELOG
-- 31.2 README + PHASES ปิดครบ
-- 31.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 31.1 version 2.3.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics) + CHANGELOG 2.3.0
+- [x] 31.2 README v2.3 (progressive cards, weekly review, 30 tools, 377 unit / 133 checks, 29 docs) + PHASES ปิดครบ
+- [x] 31.3 ตรวจรับรวม: check 98 ไฟล์ · unit 377 · browser 133 · build · perf → PR

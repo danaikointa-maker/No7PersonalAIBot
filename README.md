@@ -1,4 +1,4 @@
-# No7 Personal AI Bot `v2.2`
+# No7 Personal AI Bot `v2.3`
 
 > ผู้ช่วย AI ส่วนตัวที่ **โค้ดชุดเดียวกันรันได้ทั้งมือถือและ PC** — พูดไทยก่อน ฟังได้ด้วยเสียง มีความจำระยะยาว
 > เรียกเครื่องมือจริง ทำงานหลายก้าวได้ ซิงก์ข้ามเครื่อง และสั่งงานอุปกรณ์ผ่าน HMAC
@@ -22,15 +22,15 @@ npm run build         # dist/ ชุดเดียวสำหรับ PWA + E
 npm run server        # companion server: static + AI proxy + tools + sync + phone-link
 npm run desktop       # เปิดเป็นแอปเดสก์ท็อป (Electron)
 npm run mobile:sync   # ซิงก์ dist/ เข้าโปรเจค Android/iOS
-npm test              # 368 unit tests
-npm run test:browser  # 123 end-to-end checks (รันแอปจริงใน jsdom)
+npm test              # 377 unit tests
+npm run test:browser  # 133 end-to-end checks (รันแอปจริงใน jsdom)
 npm run check         # syntax + structure check
 npm run perf          # performance budget (ขนาด bundle/source)
 ```
 
 ---
 
-## ทำอะไรได้ (v2.2)
+## ทำอะไรได้ (v2.3)
 
 ### 🎭 เลือกได้ทั้งหมด — 5 บทบาทในที่เดียว
 `✨ ทั้งหมด` (สลับบทบาทเองตามคำขอ) · `💛 เพื่อนคุย` · `💼 งาน` · `📅 ชีวิตประจำวัน` · `🏠 อุปกรณ์`
@@ -76,6 +76,14 @@ npm run perf          # performance budget (ขนาด bundle/source)
 - เพิ่มงานด้วยเสียง/ข้อความ ("เตือนส่งรายงานพรุ่งนี้ 9 โมง"), priority 0–3, เตือนตามเวลา
 - ซิงก์ข้ามเครื่องแบบ last-write-wins + tombstone (การลบตามไปทุกเครื่อง)
 - `parseDue` เข้าใจ ISO, `+30m`, `+2h`, `วันนี้ 18:00`, `พรุ่งนี้ 09:30`
+
+### 🧩 ผลลัพธ์ทยอยขึ้นระหว่างทำงาน
+- ทำงานหลายเครื่องมือในคำสั่งเดียว: การ์ดของแต่ละเครื่องมือขึ้นทันทีที่ได้ผล (ไม่ต้องรอคำตอบจบ)
+- ระหว่างลูปบอก `กำลังสรุป…` แล้วคำตอบสุดท้ายมาเติมโดยไม่ทิ้งการ์ดที่วาดแล้ว
+
+### 📆 รายงานรายสัปดาห์
+- ปิดงานได้กี่อย่าง · เพิ่มใหม่เท่าไร · นัดหมาย · ความจำใหม่ · เครื่องมือที่ใช้บ่อย + failure rate
+- เทียบกับสัปดาห์ก่อน และมีข้อเสนอโฟกัสสัปดาห์หน้า (tool `weekly` ให้ AI เรียกเองได้)
 
 ### 🔎 ค้นทุกอย่างด้วย ⌘K
 - command palette เดียวค้น ความจำ · โน้ต · รายการ · งาน · นัดหมาย · เครื่องมือ · เมนู · คำสั่ง
@@ -125,7 +133,7 @@ npm run perf          # performance budget (ขนาด bundle/source)
 - จัดการพื้นที่เก็บข้อมูล + ขอ persistent storage + ล้างข้อมูลเป็นกลุ่ม
 - เมนู/ปุ่มใหญ่/ปุ่มลัดคีย์บอร์ด (`Ctrl/Cmd+K`, `Ctrl/Cmd+M`, `Esc`, `Ctrl/Cmd+Enter`)
 
-### 🧰 29 tools (28 เดิม + `digest`) — ไม่ต้องใช้คีย์
+### 🧰 30 tools (28 เดิม + `digest` + `weekly`) — ไม่ต้องใช้คีย์
 | หมวด | tools |
 |---|---|
 | 📖 อ่าน | `weather` `air` `crypto` `fx` `gold` `wiki` `news` `calc` `rss_read` `summarize_url` |
@@ -134,7 +142,7 @@ npm run perf          # performance budget (ขนาด bundle/source)
 | ⚡ ทำงานในเครื่อง | `timer` `reminder` `clipboard_copy` `open_url` `task` |
 | ✉️ ร่างข้อความ | `compose_message` (อีเมล/SMS/LINE — คุณกดส่งเอง) |
 | 🎛️ ควบคุม | `open_app` `control_run` `desktop` `run_recipe` `device_command` `system_info` |
-| 🌅 สรุป | `digest` (dynamic) — ปลั๊กอินผู้ใช้กลายเป็น `plugin__<id>` เพิ่มได้เอง |
+| 🌅 สรุป | `digest` `weekly` (dynamic) — ปลั๊กอินผู้ใช้กลายเป็น `plugin__<id>` เพิ่มได้เอง |
 
 ### 🎭 Persona Studio
 สร้าง/แก้/ทำสำเนา/ลบ persona เอง — ตัวตน, คำทักทาย, หัวข้อต้องห้าม, คำลงท้าย, สไตล์เสียง
@@ -159,7 +167,7 @@ web/                 ชุด UI + core ที่ทุกแพลตฟอร
   src/core/          state · memory · consolidate · tools · agent · permissions · modes
                      · ai-providers (stream/fallback) · voice · stream · wake · bargein · tts
                      · local-models · i18n · oauth · desktop · tasks
-                     · timeline · digest · custom-tools · search · backup
+                     · timeline · digest · weekly · custom-tools · search · backup
                      · mcp · retry · metrics · diagnostics · capabilities · storage
                      · calendar · net · sync · link · prompt · settings · platform
   src/ui/            avatar (14 emotions) · cards
@@ -169,7 +177,7 @@ mobile/              ที่สำหรับ native project (Capacitor)
 server/              companion server (zero deps): static · AI proxy · tools · sync · phone-link
 devices/esp32/       reference client (no7_link.h) + คู่มือ
 tests/               unit tests + jsdom end-to-end
-docs/                เอกสาร 28 ไฟล์
+docs/                เอกสาร 29 ไฟล์
 ```
 
 ## เอกสาร
@@ -195,6 +203,7 @@ docs/                เอกสาร 28 ไฟล์
 | [docs/I18N.md](docs/I18N.md) | สองภาษา ไทย/อังกฤษ (สลับหน้าจอได้ทันที) |
 | [docs/DEVICES.md](docs/DEVICES.md) | Phone-Link protocol + ESP32 |
 | [docs/PHONE_LINK.md](docs/PHONE_LINK.md) | HMAC canonical signing + ตัวอย่าง curl |
+| [docs/WEEKLY.md](docs/WEEKLY.md) | รายงานรายสัปดาห์ + ข้อเสนอโฟกัส |
 | [docs/SEARCH.md](docs/SEARCH.md) | command palette ⌘K + การให้คะแนน/ไฮไลต์ |
 | [docs/BACKUP.md](docs/BACKUP.md) | สำรอง/กู้คืน schema 2 (dry-run, merge/replace) |
 | [docs/AGENT.md](docs/AGENT.md) | agent loop, event, timeline, การหยุดกลางทาง |
