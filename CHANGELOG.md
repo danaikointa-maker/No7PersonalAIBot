@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.39.0] — 2026-11-10
+
+- Sync downloads now persist notes and todos before applying other collections, roll both list keys back if a store write fails, and surface apply errors instead of claiming success. Task sync uses the live store cache and retains deletion tombstones; partial applies identify committed collections and can be safely retried.
+
 ## [2.38.0] — 2026-11-10
 
 - Offline messages now persist transactionally; storage errors keep the draft in the composer. The outbox no longer silently evicts messages at capacity, expires old messages, or removes items after retry exhaustion. Users can review/remove queued messages, manually retry, and see whether send or queue persistence failed.

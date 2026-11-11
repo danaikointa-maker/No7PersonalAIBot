@@ -6,6 +6,7 @@ export const SYNC_VERSION = 1;
 /** เก็บเฉพาะข้อมูลที่ย้ายข้ามเครื่องได้ (ตัด API key ออกเสมอ) */
 import { TaskStore } from './tasks.js';
 import { mergeSyncBundle } from './sync-merge.js';
+import { withBackupListsRestore } from './backup-restore.js';
 
 export function collectBundle({ memory, personas = [], calendar = [], tasks = null, settings = {} }) {
   const safeSettings = { ...settings };
@@ -53,20 +54,32 @@ export async function pullBundle(serverUrl, token) {
   return res.json();
 }
 
+export class SyncApplyError extends Error {
+  constructor(message, { cause, applied = [], report = null } = {}) {
+    super(message, { cause });
+    this.name = 'SyncApplyError';
+    this.applied = [...applied];
+    this.report = report;
+  }
+}
+
 /**
- * รวมข้อมูลจากอีกเครื่องเข้ามาแบบ additive
- * @returns {{facts:number, personas:number, events:number, tasks:number}}
+ * Apply a merged bundle. Notes/todos are persisted first; later store failures
+ * carry an applied-collection list so the UI can explain partial success.
  */
-export function mergeBundle(bundle, { memory, createPersona, getPersona, listPersonas, calendar, strategy = 'newest' }) {
+export function mergeBundle(bundle, {
+  memory, createPersona, getPersona, listPersonas, calendar, tasks = null, strategy = 'newest',
+} = {}) {
   const out = { facts: 0, personas: 0, events: 0, tasks: 0, conflicts: [], report: null };
   if (!bundle) return out;
 
-  const taskStore = new TaskStore();
+  const taskStore = tasks && typeof tasks.merge === 'function' ? tasks : new TaskStore();
   const local = {
     facts: memory?.listFacts?.() || [],
     notes: safeJson('no7.notes.v1', []),
     todos: safeJson('no7.todos.v1', []),
-    tasks: taskStore.list({ done: null }),
+    // Include deleted records: their tombstones prevent deleted tasks reappearing.
+    tasks: taskStore.exportData?.().tasks || taskStore.list?.({ done: null }) || [],
     events: calendar?.all?.() || [],
   };
   const remote = {
@@ -76,43 +89,47 @@ export function mergeBundle(bundle, { memory, createPersona, getPersona, listPer
     tasks: bundle.tasks || [],
     events: bundle.calendar || [],
   };
-
   const merged = mergeSyncBundle(local, remote, { strategy });
   out.report = merged;
   out.conflicts = merged.conflicts;
+  const applied = [];
+  const markApplied = (name) => { if (!applied.includes(name)) applied.push(name); };
 
-  // facts: เขียนกลับผ่าน memory (merge ตามข้อความ — ไม่สร้างซ้ำ)
-  if (merged.data.facts.length && memory?.importData) {
-    memory.importData({ facts: merged.data.facts }, { merge: true });
-    out.facts = merged.collections.facts.added + merged.collections.facts.updated;
-  }
+  const applyOtherStores = () => {
+    if ((merged.collections.facts.added || merged.collections.facts.updated) && memory?.importData) {
+      const result = memory.importData({ facts: merged.data.facts }, { merge: true });
+      out.facts = result?.added ?? (merged.collections.facts.added + merged.collections.facts.updated);
+      markApplied('ความจำ');
+    }
+    if ((merged.collections.tasks.added || merged.collections.tasks.updated) && taskStore.merge) {
+      out.tasks = taskStore.merge(merged.data.tasks).changed;
+      if (out.tasks) markApplied('งาน');
+    }
+    if ((merged.collections.events.added || merged.collections.events.updated) && calendar?.replaceAll) {
+      calendar.replaceAll(merged.data.events);
+      out.events = merged.collections.events.added + merged.collections.events.updated;
+      if (out.events) markApplied('นัดหมาย');
+    }
+    const known = (listPersonas?.() || (getPersona ? [getPersona('no7')] : [])) || [];
+    for (const persona of bundle.personas || []) {
+      if (!persona?.system || !persona?.name) continue;
+      if (known.some((item) => item && (item.id === persona.id || (item.name === persona.name && item.system === persona.system)))) continue;
+      const created = createPersona?.({ ...persona, name: `${persona.name}`.slice(0, 24) });
+      if (created) {
+        out.personas++;
+        known.push(created);
+        markApplied('persona');
+      }
+    }
+    return out;
+  };
 
-  // notes/todos: เขียนชุดที่รวมแล้วทับ (คีย์มี ts → เป็นการต่อท้าย)
   try {
-    if (merged.data.notes.length) globalThis.localStorage?.setItem('no7.notes.v1', JSON.stringify(merged.data.notes));
-    if (merged.data.todos.length) globalThis.localStorage?.setItem('no7.todos.v1', JSON.stringify(merged.data.todos));
-  } catch { /* พื้นที่เต็ม */ }
-
-  // tasks: ใช้ TaskStore.merge (จัดการ tombstone ให้แล้ว)
-  if (merged.data.tasks.length) {
-    out.tasks = taskStore.merge(merged.data.tasks).changed;
+    return withBackupListsRestore({ notes: merged.data.notes, todos: merged.data.todos }, applyOtherStores);
+  } catch (cause) {
+    const message = applied.length
+      ? `ซิงก์หยุดกลางทาง — ผสานแล้วบางส่วน (${applied.join(', ')}) โน้ต/รายการถูกย้อนกลับแล้ว; กดดาวน์โหลดซ้ำเพื่อลองต่อได้`
+      : `บันทึกข้อมูลซิงก์ไม่สำเร็จ — โน้ต/รายการเดิมยังคงอยู่: ${cause?.message || cause}`;
+    throw new SyncApplyError(message, { cause, applied, report: merged });
   }
-
-  // events: เขียนชุดที่รวมแล้ว
-  if (calendar?.replaceAll && merged.data.events.length) {
-    calendar.replaceAll(merged.data.events);
-    out.events = merged.collections.events.added + merged.collections.events.updated;
-  }
-
-  // personas: additive เดิม
-  const known = (listPersonas?.() || (getPersona ? [getPersona('no7')] : [])) || [];
-  for (const p of bundle.personas || []) {
-    if (!p?.system || !p?.name) continue;
-    const exists = known.some((k) => k && (k.id === p.id || (k.name === p.name && k.system === p.system)));
-    if (exists) continue;
-    const created = createPersona({ ...p, name: `${p.name}`.slice(0, 24) });
-    if (created) { out.personas++; known.push(created); }
-  }
-
-  return out;
 }

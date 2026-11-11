@@ -1974,7 +1974,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.38.0',
+      version: window.NO7_VERSION || '2.39.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -3034,6 +3034,7 @@ $('#sync-pull-btn').addEventListener('click', async () => {
       getPersona,
       listPersonas: allPersonas,
       calendar,
+      tasks,
       strategy: settings.syncStrategy || 'newest',
     });
     renderMemory(); renderCalendar(); renderPersonaList(); renderSettingsForm();
@@ -3046,7 +3047,15 @@ $('#sync-pull-btn').addEventListener('click', async () => {
     }
     renderTasks();
     pushRemindersToServer();
-  } catch (e) { $('#sync-status').textContent = `❌ ${e.message}`; }
+  } catch (e) {
+    if (e.applied?.length) {
+      renderMemory(); renderCalendar(); renderPersonaList(); renderTasks();
+      if (e.report) renderSyncReport(e.report);
+      $('#sync-status').textContent = `⚠️ ${e.message}`;
+    } else {
+      $('#sync-status').textContent = `❌ ${e.message}`;
+    }
+  }
 });
 
 $('#test-voice-btn').addEventListener('click', async () => {
