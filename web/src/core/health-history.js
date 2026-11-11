@@ -71,6 +71,35 @@ export function clearHealthHistory(storage = globalThis.localStorage) {
   catch { return false; }
 }
 
+export function filterHealthHistory(history, { days = 30, now = Date.now() } = {}) {
+  const range = days === 7 ? 7 : 30;
+  const end = new Date(now);
+  end.setHours(0, 0, 0, 0);
+  const endKey = dateKey(end);
+  end.setDate(end.getDate() - (range - 1));
+  const startKey = dateKey(end);
+  const snapshots = normalizeHealthHistory(history).snapshots.filter((item) => item.date >= startKey && item.date <= endKey);
+  return { schema: HEALTH_HISTORY_SCHEMA, snapshots, range, start: startKey, end: endKey };
+}
+
+export function healthWindowSummary(history, { days = 30, now = Date.now(), lang = 'th' } = {}) {
+  const filtered = filterHealthHistory(history, { days, now });
+  const snapshots = filtered.snapshots;
+  const scores = snapshots.map((item) => item.score);
+  const count = scores.length;
+  const delta = count > 1 ? scores.at(-1) - scores[0] : null;
+  const direction = delta == null ? 'new' : delta > 0 ? 'up' : delta < 0 ? 'down' : 'same';
+  const summary = {
+    days: filtered.range, count, average: count ? Math.round(scores.reduce((sum, score) => sum + score, 0) / count * 10) / 10 : null,
+    min: count ? Math.min(...scores) : null, max: count ? Math.max(...scores) : null,
+    delta, direction, start: snapshots[0]?.date || null, end: snapshots.at(-1)?.date || null,
+  };
+  summary.label = delta == null
+    ? (lang === 'en' ? 'Need at least two scans to compare this range' : 'ต้องมีการตรวจอย่างน้อย 2 ครั้งเพื่อเทียบช่วงนี้')
+    : (lang === 'en' ? `Change from first to latest: ${delta > 0 ? '+' : ''}${delta} points` : `เปลี่ยนจากครั้งแรกถึงล่าสุด: ${delta > 0 ? '+' : ''}${delta} คะแนน`);
+  return summary;
+}
+
 export function healthTrend(history, lang = 'th') {
   const snapshots = normalizeHealthHistory(history).snapshots;
   if (!snapshots.length) return { latest: null, previous: null, delta: null, direction: 'empty', label: lang === 'en' ? 'No history yet' : 'ยังไม่มีประวัติ' };

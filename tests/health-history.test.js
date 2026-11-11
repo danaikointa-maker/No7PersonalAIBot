@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   HEALTH_HISTORY_KEY, HEALTH_HISTORY_LIMIT, normalizeHealthHistory, recordHealthSnapshot,
   readHealthHistory, writeHealthHistory, clearHealthHistory, healthTrend,
+  filterHealthHistory, healthWindowSummary,
 } from '../web/src/core/health-history.js';
 
 const nowFor = (day) => Date.parse(`2026-11-${String(day).padStart(2, '0')}T12:00:00Z`);
@@ -69,4 +70,29 @@ test('trend reports first scan and score delta in both languages', () => {
     direction: 'up', label: 'Change since previous scan: +16 points',
   });
   assert.equal(healthTrend(history, 'th').label, 'เปลี่ยนจากการตรวจก่อนหน้า: +16 คะแนน');
+});
+
+test('filterHealthHistory uses inclusive local calendar ranges and ignores future dates', () => {
+  const history = { schema: 1, snapshots: [
+    { date: '2026-11-03', score: 40, grade: 'D', issues: {} },
+    { date: '2026-11-04', score: 60, grade: 'C', issues: {} },
+    { date: '2026-11-10', score: 100, grade: 'A', issues: {} },
+    { date: '2026-11-11', score: 95, grade: 'A', issues: {} },
+  ] };
+  const short = filterHealthHistory(history, { days: 7, now: nowFor(10) });
+  assert.deepEqual(short.snapshots.map((item) => item.date), ['2026-11-04', '2026-11-10']);
+  assert.equal(filterHealthHistory(history, { days: 30, now: nowFor(10) }).snapshots.length, 3);
+  assert.equal(filterHealthHistory(history, { days: 1, now: nowFor(10) }).range, 30, 'only supported presets are accepted');
+});
+
+test('healthWindowSummary describes sparse ranges with average, extrema and delta', () => {
+  const history = { schema: 1, snapshots: [
+    { date: '2026-11-05', score: 60, grade: 'C', issues: {} },
+    { date: '2026-11-09', score: 81, grade: 'B', issues: {} },
+  ] };
+  assert.deepEqual(healthWindowSummary(history, { days: 7, now: nowFor(10), lang: 'en' }), {
+    days: 7, count: 2, average: 70.5, min: 60, max: 81, delta: 21, direction: 'up',
+    start: '2026-11-05', end: '2026-11-09', label: 'Change from first to latest: +21 points',
+  });
+  assert.equal(healthWindowSummary({ schema: 1, snapshots: [] }, { days: 7, now: nowFor(10) }).count, 0);
 });

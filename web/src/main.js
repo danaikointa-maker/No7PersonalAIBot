@@ -1256,6 +1256,7 @@ $('#digest-btn')?.addEventListener('click', () => {
 $('#weekly-btn')?.addEventListener('click', () => showWeekly({ inChat: true }));
 
 let lastHealth = null;
+let healthHistoryRange = 30;
 let healthUndo = null;
 let healthUndoTimer = null;
 const HEALTH_UNDO_MS = 30_000;
@@ -1284,9 +1285,15 @@ function renderHealthCard(report) {
     ${report.suggestions.length ? `<div><strong>${copy.suggestions}</strong>${report.suggestions.map((text) => `<div class="digest-item">· ${esc(healthSuggestion(text, langOf(settings.uiLang)))}</div>`).join('')}</div>` : ''}
     ${cleanupRows ? `<div class="health-cleanup"><strong>${copy.cleanable}</strong>${cleanupRows}</div>` : ''}
     <div class="digest-actions">${undo}<button id="health-clean-btn" ${fixableCount ? '' : 'disabled'}>${copy.clean}</button></div>
-    ${renderHealthHistory(readHealthHistory(), { lang: langOf(settings.uiLang), copy })}
+    ${renderHealthHistory(readHealthHistory(), { lang: langOf(settings.uiLang), copy, range: healthHistoryRange })}
   </div>`;
   card.hidden = false;
+  card.querySelectorAll('[data-health-range]').forEach((button) => {
+    button.addEventListener('click', () => {
+      healthHistoryRange = Number(button.dataset.healthRange) === 7 ? 7 : 30;
+      renderHealthCard(lastHealth);
+    });
+  });
   card.querySelector('#health-history-clear')?.addEventListener('click', () => {
     if (!window.confirm(copy.confirmClearHistory)) return;
     if (!clearHealthHistory()) {
@@ -1931,7 +1938,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.8.0',
+      version: window.NO7_VERSION || '2.9.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
