@@ -1359,3 +1359,18 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] CA1: ใช้ when+label เป็น identity; เก็บ malformed rows; persist กับ notes/todos และ rollback พร้อมกัน
 - [x] CA2: รายงานจำนวนที่เพิ่ม; retry idempotent; re-arm timers โดยไม่ตั้งซ้ำ
 - [x] CA3: อัปเดต metadata/docs และผ่าน test/browser/check/build/perf ก่อน PR
+
+# รอบที่ 46 (v2.41.0) — ปกป้องข้อมูลบน companion server
+
+เป้าหมาย: ไฟล์ sync/reminders ถูกเขียนทับตรง ๆ และ sync PUT รับ JSON รูปแบบใดก็ได้; ความล้มเหลวกลางเขียนเสี่ยงทำไฟล์เก่าพัง และคำตอบ persisted=false ไม่มี fallback ใน memory สำหรับ sync
+
+| # | งาน | สถานะ |
+|---|---|---|
+| CB1 | เขียน JSON state แบบ atomic และคง memory fallback ของ sync | ✅ |
+| CB2 | ตรวจรูปแบบ payload sync ก่อนบันทึกและทดสอบเส้นทาง server | ✅ |
+| CB3 | Release 2.41 + ตรวจรับ + PR | ✅ |
+
+- [x] CB1: sync/reminders เขียน temp file ใน directory เดียวกันแล้ว rename; failed write ไม่ทำลายไฟล์เดิม
+- [x] CB1: sync GET คืนค่าล่าสุดจาก process memory เมื่อ persistence ล้มเหลว และ startup โหลดจาก disk
+- [x] CB2: ปฏิเสธ payload ที่ไม่ใช่ object/collection ที่ผิดรูปแบบด้วย 400 โดยไม่เขียนทับ bundle เดิม
+- [x] CB3: tests, browser, check, build, perf ผ่าน และเปิด PR
