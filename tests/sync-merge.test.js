@@ -105,6 +105,23 @@ test('events compare on start time', () => {
   assert.equal(res.stats.conflicts, 1);
 });
 
+test('reminders merge by due time and label without duplicating across devices', () => {
+  const res = mergeSyncBundle(
+    { reminders: [{ label: 'กินยา', when: 10_000 }] },
+    { reminders: [{ label: 'กินยา', when: 10_000 }, { label: 'โทรกลับ', when: 20_000 }] },
+  );
+  assert.equal(res.data.reminders.length, 2);
+  assert.deepEqual(res.data.reminders.map((item) => item.label), ['กินยา', 'โทรกลับ']);
+  assert.equal(res.collections.reminders.added, 1);
+  assert.equal(res.totals.added, 1);
+});
+
+test('malformed local reminders are retained rather than silently discarded', () => {
+  const malformed = { label: '', when: null, legacyField: 'keep me' };
+  const res = mergeSyncBundle({ reminders: [malformed] }, {});
+  assert.deepEqual(res.data.reminders, [malformed]);
+});
+
 test('mergeSyncBundle merges every collection and totals the report', () => {
   const local = {
     facts: [{ ...fact('f1', 'ความจำเดิม', 1000), importance: 1 }],

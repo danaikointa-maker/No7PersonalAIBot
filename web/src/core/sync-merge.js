@@ -143,6 +143,15 @@ export const COLLECTION_META = {
   todos: { label: 'รายการ', key: (t) => `${t.ts ?? t.createdAt ?? ''}|${t.text ?? t.title ?? ''}` },
   tasks: { label: 'งาน', key: (t) => t.id ?? t.title ?? null },
   events: { label: 'นัดหมาย', key: (e) => e.uid ?? `${e.start ?? ''}|${e.title ?? ''}`, time: (e) => toMs(e.start) || recordTime(e) },
+  reminders: {
+    label: 'เตือนความจำ',
+    key: (r) => {
+      const when = toMs(r?.when);
+      const label = String(r?.label ?? '');
+      return when > 0 && label.trim() ? `${when}|${label}` : `invalid|${JSON.stringify(r ?? null)}`;
+    },
+    time: (r) => toMs(r?.when) || recordTime(r),
+  },
 };
 
 /**

@@ -4,7 +4,7 @@ import { allPersonas, customPersonas, restoreCustomPersonas, getPersona, createP
 import { mountConversationArchive } from './ui/conversation-archive.js';
 import { bindMemoryImport } from './ui/memory-import.js';
 import { getCalendar, formatWhen } from './core/calendar.js';
-import { collectBundle, pushBundle, pullBundle, mergeBundle } from './core/sync.js';
+import { collectBundle, pushBundle, pullBundle, mergeBundle, formatSyncResult } from './core/sync.js';
 import { withBackupListsRestore } from './core/backup-restore.js';
 import { SYNC_STRATEGIES, summarizeSync, describeConflicts } from './core/sync-merge.js';
 import {
@@ -1974,7 +1974,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.39.0',
+      version: window.NO7_VERSION || '2.40.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -3039,7 +3039,7 @@ $('#sync-pull-btn').addEventListener('click', async () => {
     });
     renderMemory(); renderCalendar(); renderPersonaList(); renderSettingsForm();
     const conflicts = res.conflicts?.length || 0;
-    $('#sync-status').textContent = `✅ ผสานแล้ว: ความจำ +${res.facts} · persona +${res.personas} · นัด +${res.events} · งาน ${res.tasks || 0}`
+    $('#sync-status').textContent = formatSyncResult(res)
       + (conflicts ? ` · ชนกัน ${conflicts} รายการ (ดูรายละเอียดด้านล่าง)` : '');
     renderSyncReport(res.report);
     if (conflicts) {
