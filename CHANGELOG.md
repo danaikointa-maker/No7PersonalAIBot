@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.23.0] — 2026-11-10
+
+- Memory import plans are now opaque, bound to their originating store, and single-use. A changed in-memory snapshot or concurrent localStorage update invalidates the preview before any import write, preserving concurrent data.
+
 ## [2.22.0] — 2026-11-10
 
 - Memory JSON import now previews the actual fact merge and chat-log counts before confirmation. Cancelling the prompt makes no storage changes; explicit confirmation applies the previewed plan.

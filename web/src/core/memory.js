@@ -71,6 +71,7 @@ const id = () => `f${Date.now().toString(36)}-${Math.random().toString(36).slice
 
 export class MemoryStore {
   constructor() {
+    this._importPlans = new WeakMap();
     const state = loadRaw(KEY, null);
     if (state) {
       this.facts = state.facts || [];
@@ -281,6 +282,12 @@ export class MemoryStore {
 
   /** Build a read-only import preview. Nothing is persisted until applyImportPlan(). */
   planImport(payload, { merge = true } = {}) {
+    let snapshot;
+    let storageSnapshot;
+    try {
+      snapshot = JSON.stringify([this.facts, this.log, this.meta]);
+      storageSnapshot = localStorage.getItem(KEY);
+    } catch { return null; }
     const facts = (merge ? this.facts : []).map((fact) => ({
       ...fact,
       tokens: Array.isArray(fact.tokens) ? [...fact.tokens] : tokenize(fact.text),
@@ -337,21 +344,34 @@ export class MemoryStore {
       result.logAdded++;
     }
     log.sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0));
-    return { merge, facts, log, result, applied: false };
+    const plan = Object.freeze({ result: Object.freeze({ ...result }) });
+    this._importPlans.set(plan, { merge, facts, log, result: { ...result }, snapshot, storageSnapshot, applied: false });
+    return plan;
   }
 
   applyImportPlan(plan) {
-    if (!plan || plan.applied || !Array.isArray(plan.facts) || !Array.isArray(plan.log) || !plan.result) return null;
-    this.facts = plan.facts;
-    this.log = plan.log;
-    if (!plan.merge) {
+    const state = plan && typeof plan === 'object' ? this._importPlans.get(plan) : null;
+    if (!state || state.applied) return null;
+    let currentSnapshot;
+    let currentStorageSnapshot;
+    try {
+      currentSnapshot = JSON.stringify([this.facts, this.log, this.meta]);
+      currentStorageSnapshot = localStorage.getItem(KEY);
+    } catch { return null; }
+    if (currentSnapshot !== state.snapshot || currentStorageSnapshot !== state.storageSnapshot) {
+      this._importPlans.delete(plan);
+      return null;
+    }
+    this.facts = state.facts;
+    this.log = state.log;
+    if (!state.merge) {
       this.meta = {};
       try { localStorage.removeItem(LEGACY_FACTS); localStorage.removeItem(LEGACY_LOG); } catch {}
     }
     this._buildIndex();
     this._persist();
-    plan.applied = true;
-    return { ...plan.result };
+    state.applied = true;
+    return { ...state.result };
   }
 
   /** importData(payload, {merge}) → {added, merged, skipped}; immediate API for already-confirmed callers. */
