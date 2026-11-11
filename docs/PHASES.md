@@ -1345,3 +1345,17 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] เพิ่ม tests สำหรับ quota failure, rollback, live cache/tombstones และ partial failure/retry report
 - [x] Release metadata, README และ CHANGELOG เป็น v2.39.0
 - [x] ตรวจรับ: unit, browser smoke, check, build, perf budget และ `git diff --check`
+
+# รอบที่ 45 (v2.40.0) — ซิงก์เตือนความจำข้ามเครื่อง
+
+เป้าหมาย: collectBundle ส่งเตือนความจำอยู่แล้ว แต่ merge ละทิ้งข้อมูลดังกล่าว จึงต้องเพิ่ม conflict-aware merge โดยไม่ทิ้ง malformed legacy rows, บันทึก transaction ร่วมกับ notes/todos และตั้งเวลาเตือนใหม่ทันทีอย่างไม่สร้าง timer ซ้ำ
+
+| # | งาน | สถานะ |
+|---|---|---|
+| CA1 | เพิ่ม merge/persist เตือนความจำแบบ transaction | ⬜ |
+| CA2 | แสดงจำนวนเตือนและครอบคลุม dedupe, rollback, scheduling | ⬜ |
+| CA3 | Release 2.40 + ตรวจรับ + PR | ⬜ |
+
+- [ ] CA1: ใช้ when+label เป็น identity; เก็บ malformed rows; persist กับ notes/todos และ rollback พร้อมกัน
+- [ ] CA2: รายงานจำนวนที่เพิ่ม; retry idempotent; re-arm timers โดยไม่ตั้งซ้ำ
+- [ ] CA3: อัปเดต metadata/docs และผ่าน test/browser/check/build/perf ก่อน PR
