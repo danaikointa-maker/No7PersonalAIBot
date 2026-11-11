@@ -15,7 +15,7 @@ const state = {
   todos: [{ text: 'ส่งเมล', ts: 3000 }],
   tasks: [{ id: 't1', title: 'งาน', due: '2026-12-01T09:00:00', updatedAt: '2026-11-01T00:00:00' }],
   events: [{ uid: 'e1', title: 'นัด', start: 5000 }],
-  personas: [{ id: 'p1', name: 'ของฉัน' }],
+  personas: [{ id: 'p-custom1', name: 'ของฉัน', system: 'ผู้ช่วยส่วนตัว', createdAt: 1000, updatedAt: 1000 }],
 };
 
 test('redactSettings removes every secret and keeps the rest', () => {

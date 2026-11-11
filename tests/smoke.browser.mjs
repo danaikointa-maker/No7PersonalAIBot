@@ -294,6 +294,7 @@ const backupPayload = {
     facts: [{ id: 'imp-1', text: 'ความจำจากการนำเข้า', ts: Date.now(), importance: 2 }],
     log: [], notes: [{ text: 'โน้ตจากไฟล์สำรอง', ts: Date.now() }], todos: [], tasks: [], events: [],
     healthHistory: [{ date: new Date().toISOString().slice(0, 10), score: 41, grade: 'D', issues: { high: 1, medium: 2, low: 3 }, privateText: 'must stay private' }],
+    personas: [{ id: 'p-smoketest1', name: 'จากไฟล์สำรอง', system: 'ตัวตนที่นำเข้ามา', desc: 'persona custom', gender: 'neutral', createdAt: Date.now(), updatedAt: Date.now(), extra: 'strip' }],
   },
 };
 const backupFile = new window.File([JSON.stringify(backupPayload)], 'no7-backup.json', { type: 'application/json' });
@@ -303,6 +304,8 @@ await wait(120);
 check('backup: import succeeded', $('#backup-status').textContent.includes('นำเข้าแล้ว'), $('#backup-status').textContent.slice(0, 80));
 const restoredBackupHealth = JSON.parse(window.localStorage.getItem('no7.health.history.v1') || '{}').snapshots || [];
 check('backup: health summary restored without private fields', restoredBackupHealth.length === 1 && restoredBackupHealth[0].score === 41 && !JSON.stringify(restoredBackupHealth).includes('must stay private'));
+const restoredCustomPersonas = JSON.parse(window.localStorage.getItem('no7.personas.v1') || '[]');
+check('backup: custom persona restored and unknown fields stripped', restoredCustomPersonas.some((p) => p.id === 'p-smoketest1' && p.name === 'จากไฟล์สำรอง') && !JSON.stringify(restoredCustomPersonas).includes('strip'));
 $('#nav button[data-view="memory"]').click();
 $('#mem-query').value = 'นำเข้า';
 $('#mem-search-btn').click();
@@ -499,7 +502,7 @@ check('sync: controls present', !!$('#sync-push-btn') && !!$('#set-serverurl'));
 check('sync: strategy select has 4 options', $('#set-syncstrategy') && $('#set-syncstrategy').options.length === 4, String($('#set-syncstrategy')?.options.length));
 check('sync: strategy defaults to newest', $('#set-syncstrategy').value === 'newest', $('#set-syncstrategy').value);
 check('sync: conflict report hidden by default', $('#sync-report').hidden === true);
-check('persona: list rendered', $('#persona-list').children.length === 8, String($('#persona-list').children.length));
+check('persona: list rendered', $('#persona-list').children.length === 9, String($('#persona-list').children.length));
 $('#persona-new').click();
 $('#pf-name').value = 'น้องสโมค';
 $('#pf-emoji').value = '🍊';
@@ -507,7 +510,7 @@ $('#pf-system').value = 'คุณคือน้องสโมค พูดจ
 $('#pf-greeting').value = 'สวัสดีค่ะ น้องสโมคมาแล้ว';
 $('#pf-save').click();
 await wait(20);
-check('persona: custom created', $('#persona-list').children.length === 9, String($('#persona-list').children.length));
+check('persona: custom created', $('#persona-list').children.length === 10, String($('#persona-list').children.length));
 check('persona: selected header updated', $('#persona-name').textContent.includes('น้องสโมค'), $('#persona-name').textContent);
 check('persona: appears in dropdown', [...$('#set-persona').options].some((o) => o.textContent.includes('น้องสโมค')));
 

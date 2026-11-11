@@ -2,6 +2,20 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.13.0] — 2026-11-10
+
+รอบที่สิบแปด: รวม custom personas ในไฟล์สำรอง/กู้คืนข้อมูลทั้งแอปอย่างปลอดภัย
+
+### เพิ่ม
+- สำรองเฉพาะ Persona Studio ที่ผู้ใช้สร้าง; ไม่รวม/ไม่เขียนทับ persona built-in
+- normalize ด้วย whitelist; จำกัด 100 custom personas, ความยาวข้อความ, banned topics และ voiceName
+- merge ด้วย ID และ `updatedAt` (เพิ่ม timestamp ตอนแก้ persona); replace แทนที่เฉพาะ custom personas
+- หลัง restore ตรวจ persona ที่เลือกและกลับไป built-in `no7` หากไม่มี; refresh UI หลังยืนยัน
+
+### ตรวจรับ
+- 446 unit tests · 164 browser checks · `npm run check` 116 JS files
+- Performance/build ผ่าน; source ใหญ่สุด 150.0 KB; main gzip 105.7 KB
+
 ## [2.12.0] — 2026-11-10
 
 รอบที่สิบเจ็ด: รวมประวัติสุขภาพแบบสรุปในไฟล์สำรอง/กู้คืนข้อมูลทั้งแอป

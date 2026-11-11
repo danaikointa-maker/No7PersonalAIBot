@@ -11,17 +11,51 @@ function read() {
   } catch { return []; }
 }
 function write(list) {
-  try { localStorage.setItem(KEY, JSON.stringify(list)); } catch {}
+  try { localStorage.setItem(KEY, JSON.stringify(list)); return true; } catch { return false; }
 }
 
-export const PERSONA_LIMITS = { name: 24, desc: 90, system: 1500, greeting: 200, banned: 12 };
+export const PERSONA_LIMITS = { name: 24, desc: 90, system: 1500, greeting: 200, banned: 12, count: 100 };
 
 export function builtinPersonas() {
   return PERSONAS.map((p) => ({ ...p, builtin: true, emoji: p.emoji || '🤖' }));
 }
 
+export function normalizeImportedPersonas(input) {
+  if (!Array.isArray(input)) return [];
+  const builtins = new Set(PERSONAS.map((p) => p.id));
+  const byId = new Map();
+  for (const raw of input.slice(0, PERSONA_LIMITS.count)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const id = String(raw.id || '');
+    if (!/^p-[a-z0-9-]{2,80}$/i.test(id) || builtins.has(id)) continue;
+    const name = String(raw.name || '').trim().slice(0, PERSONA_LIMITS.name);
+    const system = String(raw.system || '').slice(0, PERSONA_LIMITS.system);
+    if (!name || !system) continue;
+    const createdAt = Number.isFinite(Number(raw.createdAt)) && Number(raw.createdAt) > 0 ? Math.trunc(Number(raw.createdAt)) : 0;
+    const updatedAt = Number.isFinite(Number(raw.updatedAt)) && Number(raw.updatedAt) > 0 ? Math.trunc(Number(raw.updatedAt)) : createdAt;
+    const clean = {
+      id, createdAt, updatedAt,
+      ...normalize({
+        name, system, emoji: raw.emoji, desc: raw.desc, gender: raw.gender, greeting: raw.greeting,
+        banned: Array.isArray(raw.banned) ? raw.banned.slice(0, PERSONA_LIMITS.banned).map((item) => String(item).slice(0, 80)) : [],
+        style: { ...raw.style, voiceName: String(raw.style?.voiceName || '').slice(0, 80) },
+      }),
+      builtin: false,
+    };
+    const previous = byId.get(id);
+    if (!previous || clean.updatedAt >= previous.updatedAt) byId.set(id, clean);
+  }
+  return [...byId.values()].slice(0, PERSONA_LIMITS.count);
+}
+
 export function customPersonas() {
-  return read().map((p) => ({ ...p, builtin: false }));
+  return normalizeImportedPersonas(read());
+}
+
+export function restoreCustomPersonas(input, selectedId = 'no7') {
+  const clean = normalizeImportedPersonas(input);
+  if (!write(clean)) return 'no7';
+  return [...builtinPersonas(), ...clean].some((persona) => persona.id === selectedId) ? selectedId : 'no7';
 }
 
 export function allPersonas() {
@@ -59,10 +93,13 @@ function clampNum(v, min, max) {
 }
 
 export function createPersona(data = {}) {
-  const list = read();
+  const list = customPersonas();
+  if (list.length >= PERSONA_LIMITS.count) return null;
+  const now = Date.now();
   const persona = {
-    id: `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
-    createdAt: Date.now(),
+    id: `p-${now.toString(36)}-${Math.random().toString(36).slice(2, 5)}`,
+    createdAt: now,
+    updatedAt: now,
     ...normalize(data, { name: 'No7 ใหม่', desc: ' persona ที่ฉันสร้างเอง' }),
   };
   list.push(persona);
@@ -71,10 +108,10 @@ export function createPersona(data = {}) {
 }
 
 export function updatePersona(id, patch = {}) {
-  const list = read();
+  const list = customPersonas();
   const idx = list.findIndex((p) => p.id === id);
   if (idx < 0) return null;
-  list[idx] = { ...list[idx], ...normalize({ ...list[idx], ...patch }, list[idx]), id, builtin: false };
+  list[idx] = { ...list[idx], ...normalize({ ...list[idx], ...patch }, list[idx]), id, updatedAt: Date.now(), builtin: false };
   write(list);
   return list[idx];
 }

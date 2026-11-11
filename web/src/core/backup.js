@@ -7,6 +7,7 @@
 //   • ไฟล์ export รุ่นเก่า (ก่อนมี schema) ยังนำเข้าได้ (migrate ให้)
 import { fnvHash } from './memory.js';
 import { HEALTH_HISTORY_SCHEMA, normalizeHealthHistory } from './health-history.js';
+import { normalizeImportedPersonas } from './persona-store.js';
 
 export const BACKUP_APP = 'no7-personal-ai';
 export const BACKUP_SCHEMA = 2;
@@ -62,7 +63,7 @@ export function createBackup(state = {}, { now = Date.now(), includeSecrets = fa
     todos: state.todos || [],
     tasks: state.tasks || [],
     events: state.events || [],
-    personas: state.personas || [],
+    personas: normalizeImportedPersonas(state.personas || []),
     healthHistory: normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: state.healthHistory || [] }).snapshots,
   };
   const counts = Object.fromEntries(Object.keys(COLLECTIONS).map((k) => [k, Array.isArray(data[k]) ? data[k].length : 0]));
@@ -213,21 +214,18 @@ export function planRestore(backup = {}, local = {}, { mode = 'merge' } = {}) {
   for (const [key, meta] of Object.entries(COLLECTIONS)) {
     const rawIncoming = Array.isArray(data[key]) ? data[key] : [];
     const rawExisting = Array.isArray(local[key]) ? local[key] : [];
-    const incoming = key === 'healthHistory'
-      ? normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: rawIncoming }).snapshots
-      : rawIncoming;
-    const existing = key === 'healthHistory'
-      ? normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: rawExisting }).snapshots
-      : rawExisting;
+    const sanitize = (items) => key === 'healthHistory'
+      ? normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: items }).snapshots
+      : key === 'personas' ? normalizeImportedPersonas(items) : items;
+    const incoming = sanitize(rawIncoming);
+    const existing = sanitize(rawExisting);
     if (mode === 'replace') {
       values[key] = incoming;
       actions.push({ key, label: meta.label, mode, incoming: incoming.length, existing: existing.length, added: incoming.length, updated: 0, removed: existing.length, total: incoming.length });
       continue;
     }
     const merged = mergeRecords(existing, incoming, meta);
-    values[key] = key === 'healthHistory'
-      ? normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: merged.list }).snapshots
-      : merged.list;
+    values[key] = sanitize(merged.list);
     actions.push({
       key, label: meta.label, mode,
       incoming: incoming.length,
