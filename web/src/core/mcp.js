@@ -11,7 +11,7 @@
 import { TokenStore, OAuthSession } from './oauth.js';
 
 export const MCP_PROTOCOL_VERSION = '2024-11-05';
-export const MCP_CLIENT_INFO = { name: 'no7-personal-ai', version: '2.30.0' };
+export const MCP_CLIENT_INFO = { name: 'no7-personal-ai', version: '2.31.0' };
 export const MCP_CACHE_KEY = 'no7.mcp.tools.v1';
 
 export class McpError extends Error {

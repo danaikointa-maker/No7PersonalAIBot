@@ -231,8 +231,21 @@ export class TaskStore {
     } catch { return []; }
   }
 
-  _save() {
-    try { this.storage?.setItem(this.key, JSON.stringify(this.tasks)); } catch { /* quota */ }
+  _save(candidate = this.tasks) {
+    try {
+      this.storage?.setItem(this.key, JSON.stringify(candidate));
+      return true;
+    } catch (cause) {
+      const error = new Error('บันทึกงานไม่สำเร็จ พื้นที่จัดเก็บอาจเต็ม — งานเดิมยังคงอยู่', { cause });
+      error.name = 'TaskStorageError';
+      throw error;
+    }
+  }
+
+  _commit(candidate) {
+    this._save(candidate);
+    this.tasks = candidate;
+    return true;
   }
 
   add({ title, notes = '', due = null, priority = 0, tags = [], device = '', recurrence = null } = {}) {
@@ -245,8 +258,7 @@ export class TaskStore {
       createdAt: now, updatedAt: now,
     }, now);
     if (!task) throw new Error('ต้องมีชื่องาน');
-    this.tasks.push(task);
-    this._save();
+    this._commit([...this.tasks, task]);
     return task;
   }
 
@@ -255,8 +267,9 @@ export class TaskStore {
   }
 
   update(id, patch = {}) {
-    const task = this.get(id);
-    if (!task) return null;
+    const current = this.get(id);
+    if (!current) return null;
+    const task = { ...current, tags: [...current.tags] };
     if (patch.title != null) task.title = String(patch.title).trim().slice(0, 200) || task.title;
     if (patch.notes != null) task.notes = String(patch.notes).slice(0, 1000);
     if (patch.due !== undefined) {
@@ -270,7 +283,7 @@ export class TaskStore {
     }
     if (Array.isArray(patch.tags)) task.tags = patch.tags.map((t) => String(t).slice(0, 24)).slice(0, 8);
     task.updatedAt = this.now();
-    this._save();
+    this._commit(this.tasks.map((item) => item.id === id ? task : item));
     return task;
   }
 
@@ -284,32 +297,54 @@ export class TaskStore {
     if (!done) { this.update(id, { done: false }); return { task: this.get(id), advanced: false }; }
     const rec = normalizeRecurrence(task.recurrence);
     if (!rec) {
-      this.update(id, { done: true });
-      return { task: this.get(id), advanced: false };
+      const updated = this.update(id, { done: true });
+      return { task: updated, advanced: false };
     }
-    const next = nextOccurrence(task.due || this.now(), rec, this.now());
-    task.done = false;
-    task.doneAt = this.now();
-    task.due = next;
-    task.notifiedAt = null;
-    task.repeatCount = (task.repeatCount || 0) + 1;
-    task.updatedAt = this.now();
-    this._save();
-    return { task, advanced: true };
+    const now = this.now();
+    const updated = {
+      ...task,
+      done: false,
+      doneAt: now,
+      due: nextOccurrence(task.due || now, rec, now),
+      notifiedAt: null,
+      repeatCount: (task.repeatCount || 0) + 1,
+      updatedAt: now,
+    };
+    this._commit(this.tasks.map((item) => item.id === id ? updated : item));
+    return { task: updated, advanced: true };
   }
 
   remove(id) {
     const task = this.get(id);
     if (!task) return false;
-    task.deleted = true;
-    task.updatedAt = this.now();
-    this._save();
+    const now = this.now();
+    const deleted = { ...task, deleted: true, updatedAt: now };
+    this._commit(this.tasks.map((item) => item.id === id ? deleted : item));
     return true;
   }
 
+  removeMany(ids = []) {
+    const selected = new Set(ids);
+    const now = this.now();
+    let removed = 0;
+    const candidate = this.tasks.map((task) => {
+      if (!selected.has(task.id) || task.deleted) return task;
+      removed += 1;
+      return { ...task, deleted: true, updatedAt: now };
+    });
+    if (removed) this._commit(candidate);
+    return removed;
+  }
+
   clear() {
-    this.tasks = [];
-    this._save();
+    this._commit([]);
+    return true;
+  }
+
+  replaceAll(tasks = []) {
+    const candidate = tasks.map((task) => normalizeTask(task, this.now())).filter(Boolean);
+    this._commit(candidate);
+    return candidate.length;
   }
 
   /** @param {{done?: boolean|null, dueWithinMs?: number, sort?: 'due'|'priority'|'created'}} opts */
@@ -339,9 +374,9 @@ export class TaskStore {
   markNotified(id, now = this.now()) {
     const task = this.get(id);
     if (!task) return null;
-    task.notifiedAt = now;
-    this._save();
-    return task;
+    const updated = { ...task, notifiedAt: now };
+    this._commit(this.tasks.map((item) => item.id === id ? updated : item));
+    return updated;
   }
 
   stats(now = this.now()) {
@@ -363,8 +398,7 @@ export class TaskStore {
 
   merge(remoteTasks = []) {
     const res = mergeTaskLists(this.tasks, remoteTasks);
-    this.tasks = res.tasks;
-    this._save();
+    this._commit(res.tasks);
     return { ...res, changed: res.added + res.updated + res.removed };
   }
 }
@@ -404,7 +438,8 @@ export class TaskScheduler {
     if (!this.store) return [];
     const due = this.store.dueNow(this.now());
     for (const task of due) {
-      this.store.markNotified(task.id, this.now());
+      try { this.store.markNotified(task.id, this.now()); }
+      catch { continue; } // ยังไม่เตือนจนกว่าจะบันทึกสถานะได้ เพื่อไม่ให้แจ้งซ้ำทุก tick
       try { this.onDue(task); } catch { /* อย่าให้ callback พังทั้งตัวตั้งเวลา */ }
     }
     return due;

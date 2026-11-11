@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.31.0] — 2026-11-11
+
+- Task mutations now persist candidates before swapping live state; quota failures preserve existing tasks and surface clear errors. Bulk completion cleanup uses one atomic tombstone write, restore replacement commits once, and scheduler reminders wait until notification state can be saved.
+
 ## [2.30.0] — 2026-11-10
 
 - Health-history snapshots now use the device's local calendar day, matching 7/30-day filters and avoiding UTC-midnight off-by-one dates.

@@ -82,6 +82,55 @@ test('TaskStore add/list/update/complete/remove', () => {
   assert.equal(store.exportData().tasks.find((t) => t.id === a.id).deleted, true, 'ต้องส่ง tombstone ไปซิงก์');
 });
 
+test('TaskStore mutations roll back in-memory state when storage writes fail', () => {
+  const storage = {
+    value: null,
+    fail: false,
+    getItem() { return this.value; },
+    setItem(_key, value) { if (this.fail) throw new Error('quota exceeded'); this.value = value; },
+  };
+  const store = new TaskStore({ storage, now: () => NOW });
+  const task = store.add({ title: 'งานที่ต้องรักษา' });
+  const priorTasks = store.tasks;
+  const priorStored = storage.value;
+  storage.fail = true;
+  const assertRollback = (operation) => {
+    assert.throws(operation, { name: 'TaskStorageError' });
+    assert.equal(store.tasks, priorTasks, 'state array must remain untouched');
+    assert.equal(storage.value, priorStored, 'persisted state must remain untouched');
+    assert.equal(store.get(task.id).title, 'งานที่ต้องรักษา');
+  };
+  assertRollback(() => store.add({ title: 'งานใหม่' }));
+  assertRollback(() => store.update(task.id, { title: 'แก้ไข' }));
+  assertRollback(() => store.complete(task.id));
+  assertRollback(() => store.markNotified(task.id));
+  assertRollback(() => store.remove(task.id));
+  assertRollback(() => store.removeMany([task.id]));
+  assertRollback(() => store.clear());
+  assertRollback(() => store.merge([{ id: 'remote', title: 'งานจากเครื่องอื่น', updatedAt: NOW + 1 }]));
+  assertRollback(() => store.replaceAll([{ id: 'replacement', title: 'แทนที่', updatedAt: NOW + 1 }]));
+});
+
+test('TaskStore removeMany persists tombstones once and replaceAll commits atomically', () => {
+  let writes = 0;
+  const storage = {
+    value: null,
+    getItem() { return this.value; },
+    setItem(_key, value) { writes += 1; this.value = value; },
+  };
+  const store = new TaskStore({ storage, now: () => NOW });
+  const a = store.add({ title: 'เสร็จแล้ว' });
+  const b = store.add({ title: 'งานเปิด' });
+  store.complete(a.id);
+  writes = 0;
+  assert.equal(store.removeMany([a.id]), 1);
+  assert.equal(writes, 1, 'bulk deletion writes only once');
+  assert.equal(store.exportData().tasks.find((item) => item.id === a.id).deleted, true);
+  assert.equal(store.list().some((item) => item.id === b.id), true);
+  assert.equal(store.replaceAll([{ id: 'restored', title: 'กู้คืน', updatedAt: NOW }]), 1);
+  assert.deepEqual(store.list().map((item) => item.id), ['restored']);
+});
+
 test('TaskStore dueNow + markNotified fires once', () => {
   localStorage.clear();
   let now = NOW;
@@ -94,6 +143,22 @@ test('TaskStore dueNow + markNotified fires once', () => {
   assert.deepEqual(due.map((t) => t.id), [soon.id]);
   store.markNotified(soon.id, now);
   assert.deepEqual(store.dueNow(now), []);
+});
+
+test('TaskScheduler skips reminder delivery when notified state cannot be persisted', () => {
+  const storage = {
+    value: null,
+    fail: false,
+    getItem() { return this.value; },
+    setItem(_key, value) { if (this.fail) throw new Error('quota'); this.value = value; },
+  };
+  const store = new TaskStore({ storage, now: () => NOW });
+  store.add({ title: 'เตือนภายหลัง', due: new Date(NOW - 60_000).toISOString() });
+  storage.fail = true;
+  let delivered = 0;
+  const scheduler = new TaskScheduler({ store, now: () => NOW, onDue: () => { delivered += 1; } });
+  assert.doesNotThrow(() => scheduler.tick());
+  assert.equal(delivered, 0);
 });
 
 test('isOverdue and formatTaskTime read naturally', () => {

@@ -1117,24 +1117,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AY1 | ทำ TaskStore mutations แบบ persist-before-swap | 113.1–113.3 | ⬜ |
-| AY2 | ทำ bulk delete/restore งานแบบ atomic พร้อม UI feedback | 114.1–114.3 | ⬜ |
-| AY3 | Release 2.31 | 115.1–115.3 | ⬜ |
+| AY1 | ทำ TaskStore mutations แบบ persist-before-swap | 113.1–113.3 | ✅ |
+| AY2 | ทำ bulk delete/restore งานแบบ atomic พร้อม UI feedback | 114.1–114.3 | ✅ |
+| AY3 | Release 2.31 | 115.1–115.3 | ✅ |
 
 ## AY1 — ทำ TaskStore mutations แบบ persist-before-swap
 
-- [ ] 113.1 `_save(candidate)` คืนผลและแจ้ง storage error; failed write คง tasks เดิม
-- [ ] 113.2 ครอบคลุม add/update/complete/remove/clear/markNotified/merge
-- [ ] 113.3 Unit tests จำลอง quota failure และยืนยัน unfinished tasks ยังอยู่
+- [x] 113.1 `_save(candidate)` คืนผลและแจ้ง storage error; failed write คง tasks เดิม
+- [x] 113.2 ครอบคลุม add/update/complete/remove/clear/markNotified/merge
+- [x] 113.3 Unit tests จำลอง quota failure และยืนยัน unfinished tasks ยังอยู่
 
 ## AY2 — ทำ bulk delete/restore งานแบบ atomic พร้อม UI feedback
 
-- [ ] 114.1 เพิ่ม removeMany/restore แบบ candidate commit ครั้งเดียว
-- [ ] 114.2 ปุ่มล้างงานที่เสร็จและเพิ่มงานไม่รายงาน success เมื่อ persist ล้มเหลว
-- [ ] 114.3 Browser smoke ตรวจ add/clear failure แล้วยังเก็บงานเดิมและ input
+- [x] 114.1 เพิ่ม removeMany/replaceAll แบบ candidate commit ครั้งเดียว
+- [x] 114.2 ปุ่มล้างงานที่เสร็จและเพิ่มงานไม่รายงาน success เมื่อ persist ล้มเหลว
+- [x] 114.3 Browser smoke ตรวจ add/clear failure แล้วยังเก็บงานเดิมและ input
 
 ## AY3 — Release 2.31
 
-- [ ] 115.1 version 2.31.0 + CHANGELOG
-- [ ] 115.2 README + PHASES ปิดครบ
-- [ ] 115.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 115.1 version 2.31.0 + CHANGELOG
+- [x] 115.2 README + PHASES ปิดครบ
+- [x] 115.3 ตรวจรับรวม (check/test/browser/perf/build) + PR

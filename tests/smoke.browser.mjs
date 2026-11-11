@@ -299,6 +299,25 @@ const stillOpen = [...$('#task-list').querySelectorAll('.fact')].some((r) => r.t
 check('journey: recurring task stays open', stillOpen, $('#task-list').textContent.slice(0, 60));
 $('#task-repeat').value = '';
 
+// task storage failures must preserve both the stored tasks and unfinished input
+const tasksBeforeQuotaFailure = window.localStorage.getItem('no7.tasks.v1');
+const tasksStoragePrototype = Object.getPrototypeOf(window.localStorage);
+const originalTasksSetItem = tasksStoragePrototype.setItem;
+tasksStoragePrototype.setItem = function (key, value) {
+  if (key === 'no7.tasks.v1') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalTasksSetItem.call(this, key, value);
+};
+$('#task-title').value = 'งานใหม่ที่ยังไม่ได้บันทึก';
+$('#task-add').click();
+check('tasks: failed add shows error and keeps input and stored tasks', $('#task-title').value === 'งานใหม่ที่ยังไม่ได้บันทึก' && $('#task-status').textContent.includes('บันทึกงานไม่สำเร็จ') && window.localStorage.getItem('no7.tasks.v1') === tasksBeforeQuotaFailure);
+$('#task-clear-done').click();
+check('tasks: failed bulk clear keeps completed task and stored data', JSON.parse(window.localStorage.getItem('no7.tasks.v1') || '[]').some((task) => task.title === 'ทดสอบงาน' && !task.deleted) && window.localStorage.getItem('no7.tasks.v1') === tasksBeforeQuotaFailure);
+tasksStoragePrototype.setItem = originalTasksSetItem;
+
 // backup / restore (schema 2)
 window.confirm = () => true;
 $('#nav button[data-view="settings"]').click();
