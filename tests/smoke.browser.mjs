@@ -354,6 +354,22 @@ $('#import-file').dispatchEvent(new window.Event('change'));
 await wait(120);
 backupStoragePrototype.setItem = originalBackupSetItem;
 check('backup: health summary rolls back when memory commit fails', $('#backup-status').textContent.includes('Memory storage write failed') && window.localStorage.getItem('no7.memory.v2') === memoryBeforeBackupMemoryFailure && window.localStorage.getItem('no7.health.history.v1') === healthBeforeBackupMemoryFailure);
+const notesBeforeBackupFailure = window.localStorage.getItem('no7.notes.v1');
+const todosBeforeBackupFailure = window.localStorage.getItem('no7.todos.v1');
+const memoryBeforeListFailure = window.localStorage.getItem('no7.memory.v2');
+const healthBeforeListFailure = window.localStorage.getItem('no7.health.history.v1');
+backupStoragePrototype.setItem = function (key, value) {
+  if (key === 'no7.todos.v1') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalBackupSetItem.call(this, key, value);
+};
+$('#import-file').dispatchEvent(new window.Event('change'));
+await wait(120);
+backupStoragePrototype.setItem = originalBackupSetItem;
+check('backup: failed todo write rolls back lists before memory/health changes', $('#backup-status').textContent.includes('QuotaExceededError') && window.localStorage.getItem('no7.notes.v1') === notesBeforeBackupFailure && window.localStorage.getItem('no7.todos.v1') === todosBeforeBackupFailure && window.localStorage.getItem('no7.memory.v2') === memoryBeforeListFailure && window.localStorage.getItem('no7.health.history.v1') === healthBeforeListFailure);
 $('#import-file').dispatchEvent(new window.Event('change'));
 await wait(120);
 check('backup: import succeeded', $('#backup-status').textContent.includes('นำเข้าแล้ว'), $('#backup-status').textContent.slice(0, 80));
