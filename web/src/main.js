@@ -575,7 +575,6 @@ function learnFrom(text) {
   if (like && like[1].length > 2) memory.addFact(`ผู้ใช้ชอบ ${like[1].trim()}`, 1);
 }
 
-/* -------------------------------------------------------- composer + mic */
 $('#composer').addEventListener('submit', (e) => {
   e.preventDefault();
   const text = $('#input').value.trim();
@@ -636,7 +635,6 @@ async function triggerListen() {
 
 $('#mic-btn').addEventListener('click', triggerListen);
 
-/* ------------------------------------------------------------- wake word */
 const wakeWord = new WakeWord({
   lang: settings.language === 'en' ? 'en-US' : 'th-TH',
   onWake: () => { setSubtitle('ได้ยินชื่อแล้ว กำลังฟัง…'); triggerListen(); },
@@ -683,7 +681,6 @@ function renderTTSVoiceOptions(provider, current = '') {
   if (current) el.value = current;
 }
 
-/* ---------------------------------------------------------- tts + barge-in */
 const tts = new TTSRouter({
   settings: () => settings,
   voice,
@@ -940,7 +937,7 @@ $('#mem-import-file').addEventListener('change', async (e) => {
   try {
     const payload = JSON.parse(await file.text());
     const res = memory.importData(payload, { merge: true });
-    $('#mem-status').textContent = `นำเข้าแล้ว: เพิ่ม ${res.added} · รวม ${res.merged} · ข้าม ${res.skipped}`;
+    $('#mem-status').textContent = `นำเข้าแล้ว: เพิ่ม ${res.added} · รวม ${res.merged} · ข้าม ${res.skipped} · บทสนทนา +${res.logAdded || 0}`;
     renderMemory();
   } catch (err) {
     $('#mem-status').textContent = `ไฟล์ไม่ถูกต้อง: ${err.message}`;
@@ -1944,7 +1941,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.13.0',
+      version: window.NO7_VERSION || '2.14.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -3077,7 +3074,7 @@ $('#export-btn').addEventListener('click', () => {
 function applyRestore(plan) {
   const replace = plan.mode === 'replace';
   if (replace) memory.clearAll();
-  memory.importData({ facts: plan.values.facts }, { merge: !replace });
+  memory.importData({ facts: plan.values.facts, log: plan.values.log }, { merge: !replace });
   try {
     localStorage.setItem('no7.notes.v1', JSON.stringify(plan.values.notes || []));
     localStorage.setItem('no7.todos.v1', JSON.stringify(plan.values.todos || []));
@@ -3114,6 +3111,7 @@ function restoreFromText(text) {
     todos: readList('no7.todos.v1'),
     tasks: tasks.list({ done: null }),
     events: calendar.all(),
+    log: memory.log,
     personas: customPersonas(),
     healthHistory: readHealthHistory().snapshots,
   }, { mode: 'merge' });
@@ -3130,7 +3128,7 @@ function restoreFromText(text) {
     return null;
   }
   const totals = applyRestore(plan);
-  setBackupStatus(`✅ นำเข้าแล้ว: +${totals.added} ใหม่ · ${totals.updated} อัปเดต${check.warnings.length ? ' (มีคำเตือน)' : ''}`);
+  setBackupStatus(`✅ นำเข้าแล้ว: +${totals.added} ใหม่ · ${totals.updated} อัปเดต · บทสนทนา ${plan.values.log.length} ข้อความ${check.warnings.length ? ' (มีคำเตือน)' : ''}`);
   return { check, plan, totals };
 }
 

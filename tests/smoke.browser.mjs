@@ -293,6 +293,7 @@ const backupPayload = {
     settings: { language: 'th', uiLang: 'th' },
     facts: [{ id: 'imp-1', text: 'ความจำจากการนำเข้า', ts: Date.now(), importance: 2 }],
     log: [], notes: [{ text: 'โน้ตจากไฟล์สำรอง', ts: Date.now() }], todos: [], tasks: [], events: [],
+    log: [{ role: 'user', text: 'ข้อความสำรองทดสอบ', ts: 5000, extra: 'strip' }, { role: 'assistant', text: 'คำตอบสำรองทดสอบ', ts: 6000 }, { role: 'tool', text: 'invalid role', ts: 7000 }],
     healthHistory: [{ date: new Date().toISOString().slice(0, 10), score: 41, grade: 'D', issues: { high: 1, medium: 2, low: 3 }, privateText: 'must stay private' }],
     personas: [{ id: 'p-smoketest1', name: 'จากไฟล์สำรอง', system: 'ตัวตนที่นำเข้ามา', desc: 'persona custom', gender: 'neutral', createdAt: Date.now(), updatedAt: Date.now(), extra: 'strip' }],
   },
@@ -304,6 +305,8 @@ await wait(120);
 check('backup: import succeeded', $('#backup-status').textContent.includes('นำเข้าแล้ว'), $('#backup-status').textContent.slice(0, 80));
 const restoredBackupHealth = JSON.parse(window.localStorage.getItem('no7.health.history.v1') || '{}').snapshots || [];
 check('backup: health summary restored without private fields', restoredBackupHealth.length === 1 && restoredBackupHealth[0].score === 41 && !JSON.stringify(restoredBackupHealth).includes('must stay private'));
+const restoredChatLog = JSON.parse(window.localStorage.getItem('no7.memory.v2') || '{}').log || [];
+check('backup: chat log restored with safe roles and fields', restoredChatLog.some((entry) => entry.text === 'ข้อความสำรองทดสอบ') && !restoredChatLog.some((entry) => entry.role === 'tool') && !JSON.stringify(restoredChatLog).includes('extra'));
 const restoredCustomPersonas = JSON.parse(window.localStorage.getItem('no7.personas.v1') || '[]');
 check('backup: custom persona restored and unknown fields stripped', restoredCustomPersonas.some((p) => p.id === 'p-smoketest1' && p.name === 'จากไฟล์สำรอง') && !JSON.stringify(restoredCustomPersonas).includes('strip'));
 $('#nav button[data-view="memory"]').click();

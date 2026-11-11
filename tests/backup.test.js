@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 
 import {
   BACKUP_APP, BACKUP_SCHEMA, COLLECTIONS, redactSettings, hasSecrets, createBackup,
-  migrateBackup, validateBackup, summarizeBackup, mergeRecords, planRestore, describePlan,
+  migrateBackup, validateBackup, summarizeBackup, mergeRecords, planRestore, describePlan, normalizeBackupLog,
 } from '../web/src/core/backup.js';
 
 const state = {
@@ -40,6 +40,35 @@ test('createBackup produces a checksummed schema-2 payload without secrets', () 
   assert.equal(b.data.settings.apiKey, '');
   assert.ok(b.checksum);
   assert.deepEqual(b.counts, { facts: 1, log: 1, notes: 1, todos: 1, tasks: 1, events: 1, personas: 1, healthHistory: 0 });
+});
+
+test('backup log keeps only valid message fields and the newest 500 entries', () => {
+  const log = Array.from({ length: 505 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', text: `message ${i}`, ts: i + 1, privateMeta: 'strip' }));
+  log.push({ role: 'tool', text: 'not a chat role', ts: 9999 }, { role: 'user', text: 'missing timestamp' });
+  const b = createBackup({ log });
+  assert.equal(b.data.log.length, 500);
+  assert.equal(b.data.log[0].text, 'message 5');
+  assert.equal(JSON.stringify(b.data.log).includes('privateMeta'), false);
+  assert.equal(normalizeBackupLog([{ role: 'system', text: 'bad', ts: 1 }]).length, 0);
+});
+
+test('planRestore merges chat log by full message identity and sorts by timestamp', () => {
+  const backup = createBackup({ log: [
+    { role: 'assistant', text: 'incoming', ts: 3000, privateField: 'strip' },
+    { role: 'user', text: 'duplicate prefix abc', ts: 2000 },
+  ] });
+  const plan = planRestore(backup, { log: [
+    { role: 'user', text: 'duplicate prefix xyz', ts: 2000 },
+    { role: 'user', text: 'local only', ts: 1000, secret: true },
+  ] });
+  assert.deepEqual(plan.values.log.map(({ role, text, ts }) => [role, text, ts]), [
+    ['user', 'local only', 1000],
+    ['user', 'duplicate prefix xyz', 2000],
+    ['user', 'duplicate prefix abc', 2000],
+    ['assistant', 'incoming', 3000],
+  ]);
+  assert.equal(JSON.stringify(plan.values.log).includes('privateField'), false);
+  assert.equal(plan.actions.find((item) => item.key === 'log').total, 4);
 });
 
 test('full backups include only normalized health-history summaries and cap at 30', () => {

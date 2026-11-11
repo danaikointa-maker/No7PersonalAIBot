@@ -641,24 +641,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AH1 | validate/merge log records | 62.1–62.3 | ⬜ |
-| AH2 | เชื่อม restore ทั้งแอปและ memory import | 63.1–63.3 | ⬜ |
-| AH3 | Release 2.14 | 64.1–64.3 | ⬜ |
+| AH1 | validate/merge log records | 62.1–62.3 | ✅ |
+| AH2 | เชื่อม restore ทั้งแอปและ memory import | 63.1–63.3 | ✅ |
+| AH3 | Release 2.14 | 64.1–64.3 | ✅ |
 
 ## AH1 — validate/merge log records
 
-- [ ] 62.1 export/restore เก็บเฉพาะ role, text, timestamp; จำกัดความยาวและจำนวน
-- [ ] 62.2 merge ตาม identity ของข้อความ, เรียงตามเวลา, เก็บได้ไม่เกินเพดาน memory store
-- [ ] 62.3 Tests สำหรับ roles/metadata/duplicate/limit และข้อมูล malformed
+- [x] 62.1 export/restore เก็บเฉพาะ role, text, timestamp; จำกัดความยาวและจำนวน
+- [x] 62.2 merge ตาม identity ของข้อความ, เรียงตามเวลา, เก็บได้ไม่เกินเพดาน memory store
+- [x] 62.3 Tests สำหรับ roles/metadata/duplicate/limit และข้อมูล malformed
 
 ## AH2 — เชื่อม restore ทั้งแอปและ memory import
 
-- [ ] 63.1 Full restore รวม chat log ใน dry-run ที่ยืนยันก่อนเขียน
-- [ ] 63.2 Memory JSON import ยังคง compatible และกู้คืน log แบบ merge
-- [ ] 63.3 Browser smoke + อัปเดต `docs/BACKUP.md`
+- [x] 63.1 Full restore รวม chat log ใน dry-run ที่ยืนยันก่อนเขียน
+- [x] 63.2 Memory JSON import ยังคง compatible และกู้คืน log แบบ merge
+- [x] 63.3 Browser smoke + อัปเดต `docs/BACKUP.md`
 
 ## AH3 — Release 2.14
 
-- [ ] 64.1 version 2.14.0 + CHANGELOG
-- [ ] 64.2 README + PHASES ปิดครบ
-- [ ] 64.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 64.1 version 2.14.0 + CHANGELOG
+- [x] 64.2 README (32 docs, 449 unit / 165 checks) + PHASES ปิดครบ
+- [x] 64.3 ตรวจรับรวม: check 116 files · unit 449 · browser 165 · perf · build → PR
