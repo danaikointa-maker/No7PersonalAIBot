@@ -718,3 +718,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 70.1 version 2.16.0 + CHANGELOG
 - [x] 70.2 README (32 docs, 452 unit / 167 checks) + PHASES ปิดครบ
 - [x] 70.3 ตรวจรับรวม: check 116 files · unit 452 · browser 167 · perf · build → PR
+
+# รอบที่ 22 (v2.17)
+
+เป้าหมาย: ให้ผู้ใช้เปิดดูและค้นหาบทสนทนาที่เก็บใน memory log ได้จากหน้า memory รวมถึง log ที่ restore มา โดยไม่ส่งหรือแก้ไขข้อความ
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AK1 | ตัวกรอง local chat archive | 71.1–71.3 | ⬜ |
+| AK2 | เชื่อมหน้า memory และ UX เข้าถึงได้ | 72.1–72.3 | ⬜ |
+| AK3 | Release 2.17 | 73.1–73.3 | ⬜ |
+
+## AK1 — ตัวกรอง local chat archive
+
+- [ ] 71.1 ค้นหาข้อความและกรอง user/assistant จาก local memory log เท่านั้น
+- [ ] 71.2 เรียงล่าสุดก่อน, แสดงทีละ 50 พร้อม load-more และข้าม records ผิดรูป
+- [ ] 71.3 Unit tests สำหรับ search, role, ordering, malformed entries และ limits
+
+## AK2 — เชื่อมหน้า memory และ UX เข้าถึงได้
+
+- [ ] 72.1 เพิ่มส่วนอ่านประวัติในหน้า memory; ข้อความใช้ textContent และไม่มีปุ่มลบ/แก้
+- [ ] 72.2 แสดงผลหลัง restore/import โดยไม่เพิ่มข้อมูลเข้า prompt หรือส่งออก network
+- [ ] 72.3 Browser smoke + อัปเดต `docs/MEMORY.md`
+
+## AK3 — Release 2.17
+
+- [ ] 73.1 version 2.17.0 + CHANGELOG
+- [ ] 73.2 README + PHASES ปิดครบ
+- [ ] 73.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
