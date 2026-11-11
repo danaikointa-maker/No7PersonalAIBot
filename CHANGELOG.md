@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.28.0] — 2026-11-10
+
+- Full-backup restore now commits health summaries before memory, aborts if that write fails, and rolls the summary back if the subsequent memory commit fails; restore errors are reported instead of appearing successful.
+
 ## [2.27.0] — 2026-11-10
 
 - Memory writes now persist candidate facts/log/meta before changing live state. Failed add/edit/pin/delete/restore/log/clear operations keep prior memory intact; the UI preserves unsaved input and aborts reset if memory cannot be cleared safely.

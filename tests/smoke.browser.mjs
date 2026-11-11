@@ -323,6 +323,37 @@ const backupPayload = {
 };
 const backupFile = new window.File([JSON.stringify(backupPayload)], 'no7-backup.json', { type: 'application/json' });
 Object.defineProperty($('#import-file'), 'files', { value: [backupFile], configurable: true });
+const memoryBeforeFailedBackupRestore = window.localStorage.getItem('no7.memory.v2');
+const healthBeforeFailedBackupRestore = window.localStorage.getItem('no7.health.history.v1');
+const backupStoragePrototype = Object.getPrototypeOf(window.localStorage);
+const originalBackupSetItem = backupStoragePrototype.setItem;
+backupStoragePrototype.setItem = function (key, value) {
+  if (key === 'no7.health.history.v1') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalBackupSetItem.call(this, key, value);
+};
+window.confirm = () => true;
+$('#import-file').dispatchEvent(new window.Event('change'));
+await wait(120);
+backupStoragePrototype.setItem = originalBackupSetItem;
+check('backup: failed health-summary write aborts restore before memory changes', $('#backup-status').textContent.includes('Health summary restore could not be saved') && window.localStorage.getItem('no7.memory.v2') === memoryBeforeFailedBackupRestore && window.localStorage.getItem('no7.health.history.v1') === healthBeforeFailedBackupRestore);
+const memoryBeforeBackupMemoryFailure = window.localStorage.getItem('no7.memory.v2');
+const healthBeforeBackupMemoryFailure = window.localStorage.getItem('no7.health.history.v1');
+backupStoragePrototype.setItem = function (key, value) {
+  if (key === 'no7.memory.v2') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalBackupSetItem.call(this, key, value);
+};
+$('#import-file').dispatchEvent(new window.Event('change'));
+await wait(120);
+backupStoragePrototype.setItem = originalBackupSetItem;
+check('backup: health summary rolls back when memory commit fails', $('#backup-status').textContent.includes('Memory storage write failed') && window.localStorage.getItem('no7.memory.v2') === memoryBeforeBackupMemoryFailure && window.localStorage.getItem('no7.health.history.v1') === healthBeforeBackupMemoryFailure);
 $('#import-file').dispatchEvent(new window.Event('change'));
 await wait(120);
 check('backup: import succeeded', $('#backup-status').textContent.includes('นำเข้าแล้ว'), $('#backup-status').textContent.slice(0, 80));

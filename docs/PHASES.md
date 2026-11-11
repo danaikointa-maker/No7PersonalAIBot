@@ -1026,3 +1026,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 103.1 version 2.27.0 + CHANGELOG
 - [x] 103.2 README + PHASES ปิดครบ
 - [x] 103.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 33 (v2.28)
+
+เป้าหมาย: ให้ full-backup restore ตรวจผลการเขียน health summary อย่างชัดเจนและหยุดก่อนเปลี่ยน memory/ข้อมูลส่วนอื่น หาก storage ปฏิเสธการบันทึก
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AV1 | ตรวจ health-history write ก่อน commit ส่วนอื่น | 104.1–104.3 | ✅ |
+| AV2 | rollback health summary หาก memory commit ล้มเหลว | 105.1–105.3 | ✅ |
+| AV3 | Release 2.28 | 106.1–106.3 | ✅ |
+
+## AV1 — ตรวจ health-history write ก่อน commit ส่วนอื่น
+
+- [x] 104.1 restore ต้องหยุดและ throw เมื่อ health summary เขียนไม่ได้
+- [x] 104.2 เขียน health summary ก่อนเปลี่ยน memory/collections อื่น
+- [x] 104.3 Unit tests สำหรับ failed write และ old summary คงอยู่
+
+## AV2 — rollback health summary หาก memory commit ล้มเหลว
+
+- [x] 105.1 หาก memory import หลัง health-history commit ล้มเหลว ให้คืน health key เดิม
+- [x] 105.2 UI แสดง restore failure ไม่แสดง success
+- [x] 105.3 Browser smoke ยืนยัน failed health write ไม่เปลี่ยน memory/health history
+
+## AV3 — Release 2.28
+
+- [x] 106.1 version 2.28.0 + CHANGELOG
+- [x] 106.2 README + PHASES ปิดครบ
+- [x] 106.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
