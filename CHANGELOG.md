@@ -2,6 +2,20 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.12.0] — 2026-11-10
+
+รอบที่สิบเจ็ด: รวมประวัติสุขภาพแบบสรุปในไฟล์สำรอง/กู้คืนข้อมูลทั้งแอป
+
+### เพิ่ม
+- app backup เก็บ `healthHistory` เฉพาะ `{ date, score, grade, issues }` ที่ normalize แล้ว ไม่เกิน 30 วัน
+- restore แสดงจำนวนในแผน dry-run; merge ตามวันที่และให้ข้อมูลจากไฟล์ชนะเมื่อวันซ้ำ; replace ตามโหมดเดิม
+- เขียนประวัติลง localStorage หลังยืนยันกู้คืน; ไฟล์ backup รุ่นเก่าที่ยังไม่มี healthHistory ใช้ได้เหมือนเดิม
+- แสดงจำนวนประวัติสุขภาพในสถานะหลังส่งออก และอัปเดตเอกสาร/ทดสอบ privacy
+
+### ตรวจรับ
+- 442 unit tests · 163 browser checks · `npm run check` 115 JS files
+- Performance/build ผ่าน; source ใหญ่สุด 149.8 KB; main gzip 105.3 KB
+
 ## [2.11.0] — 2026-11-11
 
 รอบที่สิบหก: นำเข้าประวัติสุขภาพ JSON แบบตรวจสอบและ preview ก่อน merge

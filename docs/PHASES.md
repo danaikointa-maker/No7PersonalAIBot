@@ -585,24 +585,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AF1 | รวมประวัติสุขภาพใน backup core | 56.1–56.3 | ⬜ |
-| AF2 | เชื่อม UI สำรอง/กู้คืน | 57.1–57.3 | ⬜ |
-| AF3 | Release 2.12 | 58.1–58.3 | ⬜ |
+| AF1 | รวมประวัติสุขภาพใน backup core | 56.1–56.3 | ✅ |
+| AF2 | เชื่อม UI สำรอง/กู้คืน | 57.1–57.3 | ✅ |
+| AF3 | Release 2.12 | 58.1–58.3 | ✅ |
 
 ## AF1 — รวมประวัติสุขภาพใน backup core
 
-- [ ] 56.1 เพิ่ม `healthHistory` เป็นคอลเลกชัน summary-only ในไฟล์สำรอง; จำกัด 30 วันและ whitelist fields
-- [ ] 56.2 restore แบบ merge ตามวันที่ และ replace ตามโหมดเดิม; ไฟล์เก่าไม่มีคอลเลกชันนี้ต้องทำงานได้
-- [ ] 56.3 Unit tests ครอบคลุม export privacy, merge/replace, retention, backward compatibility
+- [x] 56.1 เพิ่ม `healthHistory` เป็นคอลเลกชัน summary-only ในไฟล์สำรอง; จำกัด 30 วันและ whitelist fields
+- [x] 56.2 restore แบบ merge ตามวันที่ และ replace ตามโหมดเดิม; ไฟล์เก่าไม่มีคอลเลกชันนี้ต้องทำงานได้
+- [x] 56.3 Unit tests ครอบคลุม export privacy, merge/replace, retention, backward compatibility
 
 ## AF2 — เชื่อม UI สำรอง/กู้คืน
 
-- [ ] 57.1 Export app backup รวมประวัติจาก local storage โดยผู้ใช้กดเองเท่านั้น
-- [ ] 57.2 Restore แสดงจำนวนประวัติใน dry-run; เขียนหลังการยืนยันเดียวกับข้อมูลอื่น
-- [ ] 57.3 Browser smoke + `docs/BACKUP.md`/`docs/HEALTH.md`
+- [x] 57.1 Export app backup รวมประวัติจาก local storage โดยผู้ใช้กดเองเท่านั้น
+- [x] 57.2 Restore แสดงจำนวนประวัติใน dry-run; เขียนหลังการยืนยันเดียวกับข้อมูลอื่น
+- [x] 57.3 Browser smoke + `docs/BACKUP.md`/`docs/HEALTH.md`
 
 ## AF3 — Release 2.12
 
-- [ ] 58.1 version 2.12.0 + CHANGELOG
-- [ ] 58.2 README + PHASES ปิดครบ
-- [ ] 58.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 58.1 version 2.12.0 + CHANGELOG
+- [x] 58.2 README (32 docs, 442 unit / 163 checks) + PHASES ปิดครบ
+- [x] 58.3 ตรวจรับรวม: check 115 files · unit 442 · browser 163 · perf · build → PR

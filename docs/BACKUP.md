@@ -21,8 +21,8 @@
   "version": "2.2.0",
   "createdAt": "2026-11-10T04:00:00.000Z",
   "includeSecrets": false,
-  "counts": { "facts": 12, "log": 40, "notes": 3, "todos": 0, "tasks": 5, "events": 2, "personas": 0 },
-  "data": { "settings": {}, "facts": [], "log": [], "notes": [], "todos": [], "tasks": [], "events": [], "personas": [] },
+  "counts": { "facts": 12, "log": 40, "notes": 3, "todos": 0, "tasks": 5, "events": 2, "personas": 0, "healthHistory": 30 },
+  "data": { "settings": {}, "facts": [], "log": [], "notes": [], "todos": [], "tasks": [], "events": [], "personas": [], "healthHistory": [] },
   "checksum": 1234567890
 }
 ```
@@ -49,6 +49,9 @@
 | `tasks` | `id` | `updatedAt` → `createdAt` |
 | `events` | `uid` → start+title | `start` |
 | `personas` | `id` | `updatedAt` |
+| `healthHistory` | `date` | วันตามปฏิทิน |
+
+`healthHistory` เก็บเฉพาะ snapshot summary ที่ whitelist แล้ว (`date`, `score`, `grade`, `issues`) ไม่เก็บข้อความส่วนตัว และจำกัด 30 วันล่าสุด; restore แบบ merge ใช้วันที่เป็นคีย์ (ค่าจากไฟล์ชนะเมื่อวันตรงกัน) แล้วคงขีดจำกัด 30 วัน
 
 ## 4) API (`core/backup.js`)
 
@@ -68,4 +71,5 @@
 - `personas` ยังไม่ถูกกู้คืนผ่าน UI (โครงสร้างไฟล์รองรับแล้ว)
 - `log` (ประวัติแชท) ถูกเขียนลงไฟล์ แต่การนำเข้าใช้เฉพาะ `facts` — ประวัติแชทไม่ถูกกู้
 - ไฟล์สำรองไม่รวม: ปลั๊กอินที่ผู้ใช้เพิ่ม (อยู่ใน settings → รวมแล้ว), persona ที่สร้างเอง (ยังไม่ apply), ข้อมูลใน server/Telegram
+- `healthHistory` เป็นข้อมูลสรุปในเครื่องเท่านั้น; ไม่มีการอัปโหลดอัตโนมัติและรวมในไฟล์เฉพาะเมื่อผู้ใช้กดส่งออกข้อมูล
 - ไม่มีการเข้ารหัสไฟล์ — ถ้าใส่ `includeSecrets` ควรเก็บไฟล์ให้ปลอดภัย

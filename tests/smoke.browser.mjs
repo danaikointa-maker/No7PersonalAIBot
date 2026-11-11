@@ -286,12 +286,14 @@ window.confirm = () => true;
 $('#nav button[data-view="settings"]').click();
 $('#export-btn').click();
 check('backup: export reports a schema-2 file', $('#backup-status').textContent.includes('schema 2'), $('#backup-status').textContent.slice(0, 80));
+check('backup: export summary includes health history count', $('#backup-status').textContent.includes('ประวัติสุขภาพ'));
 const backupPayload = {
   app: 'no7-personal-ai', schema: 2, version: '2.2.0', createdAt: new Date().toISOString(), includeSecrets: false,
   data: {
     settings: { language: 'th', uiLang: 'th' },
     facts: [{ id: 'imp-1', text: 'ความจำจากการนำเข้า', ts: Date.now(), importance: 2 }],
     log: [], notes: [{ text: 'โน้ตจากไฟล์สำรอง', ts: Date.now() }], todos: [], tasks: [], events: [],
+    healthHistory: [{ date: new Date().toISOString().slice(0, 10), score: 41, grade: 'D', issues: { high: 1, medium: 2, low: 3 }, privateText: 'must stay private' }],
   },
 };
 const backupFile = new window.File([JSON.stringify(backupPayload)], 'no7-backup.json', { type: 'application/json' });
@@ -299,6 +301,8 @@ Object.defineProperty($('#import-file'), 'files', { value: [backupFile], configu
 $('#import-file').dispatchEvent(new window.Event('change'));
 await wait(120);
 check('backup: import succeeded', $('#backup-status').textContent.includes('นำเข้าแล้ว'), $('#backup-status').textContent.slice(0, 80));
+const restoredBackupHealth = JSON.parse(window.localStorage.getItem('no7.health.history.v1') || '{}').snapshots || [];
+check('backup: health summary restored without private fields', restoredBackupHealth.length === 1 && restoredBackupHealth[0].score === 41 && !JSON.stringify(restoredBackupHealth).includes('must stay private'));
 $('#nav button[data-view="memory"]').click();
 $('#mem-query').value = 'นำเข้า';
 $('#mem-search-btn').click();
