@@ -78,8 +78,10 @@ jobs:
           import sys
           from pathlib import Path
 
-          lines = Path(sys.argv[1]).read_text(errors='replace').splitlines()[-40:]
-          for line in lines:
+          lines = Path(sys.argv[1]).read_text(errors='replace').splitlines()
+          matcher = re.compile(r'(?i)(error|fail|exception|unresolved|missing|not found|doesn.t exist|cannot|exited command|exit code|ERR_)')
+          selected = [line for line in lines if matcher.search(line)][-8:] or lines[-8:]
+          for line in selected:
               line = re.sub(r"https?://[^\s\"']+", '[URL redacted]', line)
               line = re.sub(r'(?i)(api[_-]?key|token|secret|password|authorization)(\s*[:=]\s*)[^,\s]+', r'\1\2[REDACTED]', line)
               line = line[:500]
