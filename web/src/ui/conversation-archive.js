@@ -1,3 +1,18 @@
+function localDateKey(date) {
+  return `${String(date.getFullYear()).padStart(4, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+export function conversationDatePresetRange(preset, now = new Date()) {
+  if (preset === 'all' || preset === 'custom') return { dateFrom: '', dateTo: '' };
+  const daysBack = preset === 'today' ? 0 : preset === '7days' ? 6 : preset === '30days' ? 29 : null;
+  const current = now instanceof Date ? new Date(now.getTime()) : new Date(now);
+  if (daysBack === null || !Number.isFinite(current.getTime())) return { dateFrom: '', dateTo: '' };
+  const end = new Date(current.getFullYear(), current.getMonth(), current.getDate());
+  const start = new Date(end);
+  start.setDate(start.getDate() - daysBack);
+  return { dateFrom: localDateKey(start), dateTo: localDateKey(end) };
+}
+
 function localDateBoundary(value, inclusiveEnd = false) {
   if (value === '' || value === undefined || value === null) return undefined;
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
@@ -35,7 +50,9 @@ export function mountConversationArchive(root, getLog, getLang = () => 'th') {
   root.innerHTML = '<h3 data-archive-title></h3><p class="hint" data-archive-privacy></p>'
     + '<div class="row"><input type="search" data-archive-query autocomplete="off" />'
     + '<select data-archive-role><option value="all"></option><option value="user"></option><option value="assistant"></option></select></div>'
-    + '<div class="row archive-date-filter"><label data-archive-from-label><span></span><input type="date" data-archive-from /></label>'
+    + '<div class="row archive-date-filter"><label data-archive-preset-label><span></span><select data-archive-preset>'
+    + '<option value="all"></option><option value="today"></option><option value="7days"></option><option value="30days"></option><option value="custom"></option></select></label>'
+    + '<label data-archive-from-label><span></span><input type="date" data-archive-from /></label>'
     + '<label data-archive-to-label><span></span><input type="date" data-archive-to /></label></div>'
     + '<p class="hint" data-archive-status role="status"></p><div data-archive-list></div>'
     + '<button type="button" data-archive-more hidden></button>';
@@ -43,6 +60,7 @@ export function mountConversationArchive(root, getLog, getLang = () => 'th') {
   const role = root.querySelector('[data-archive-role]');
   const dateFrom = root.querySelector('[data-archive-from]');
   const dateTo = root.querySelector('[data-archive-to]');
+  const preset = root.querySelector('[data-archive-preset]');
   const status = root.querySelector('[data-archive-status]');
   const list = root.querySelector('[data-archive-list]');
   const more = root.querySelector('[data-archive-more]');
@@ -51,8 +69,8 @@ export function mountConversationArchive(root, getLog, getLang = () => 'th') {
   function render() {
     const english = String(getLang()).toLowerCase().startsWith('en');
     const text = english
-      ? { title: '💬 Conversation archive', privacy: 'Stored on this device only. Search does not send messages to AI or the network.', search: 'Search saved messages…', from: 'From date', to: 'Through date', all: 'All speakers', user: 'You', assistant: 'No7', empty: 'No matching saved messages.', shown: (count, total) => `Showing ${count} of ${total}`, capped: (count, total) => `Showing latest ${count} of ${total}; memory stores up to 800 messages.`, more: 'Load 50 more' }
-      : { title: '💬 ประวัติบทสนทนา', privacy: 'เก็บในเครื่องนี้เท่านั้น การค้นหาไม่ส่งข้อความให้ AI หรือเครือข่าย', search: 'ค้นหาข้อความที่บันทึก…', from: 'ตั้งแต่วันที่', to: 'ถึงวันที่', all: 'ทุกคน', user: 'ผู้ใช้', assistant: 'No7', empty: 'ไม่พบข้อความที่ตรงกัน', shown: (count, total) => `แสดง ${count} จาก ${total} ข้อความ`, capped: (count, total) => `แสดง ${count} จาก ${total} ข้อความ (ความจำเก็บได้สูงสุด 800 ข้อความ)`, more: 'โหลดเพิ่ม 50 ข้อความ' };
+      ? { title: '💬 Conversation archive', privacy: 'Stored on this device only. Search does not send messages to AI or the network.', search: 'Search saved messages…', from: 'From date', to: 'Through date', preset: 'Quick date range', presets: ['Any date', 'Today', 'Last 7 days', 'Last 30 days', 'Custom range'], all: 'All speakers', user: 'You', assistant: 'No7', empty: 'No matching saved messages.', shown: (count, total) => `Showing ${count} of ${total}`, capped: (count, total) => `Showing latest ${count} of ${total}; memory stores up to 800 messages.`, more: 'Load 50 more' }
+      : { title: '💬 ประวัติบทสนทนา', privacy: 'เก็บในเครื่องนี้เท่านั้น การค้นหาไม่ส่งข้อความให้ AI หรือเครือข่าย', search: 'ค้นหาข้อความที่บันทึก…', from: 'ตั้งแต่วันที่', to: 'ถึงวันที่', preset: 'ช่วงวันที่ด่วน', presets: ['ทุกช่วง', 'วันนี้', '7 วันล่าสุด', '30 วันล่าสุด', 'กำหนดเอง'], all: 'ทุกคน', user: 'ผู้ใช้', assistant: 'No7', empty: 'ไม่พบข้อความที่ตรงกัน', shown: (count, total) => `แสดง ${count} จาก ${total} ข้อความ`, capped: (count, total) => `แสดง ${count} จาก ${total} ข้อความ (ความจำเก็บได้สูงสุด 800 ข้อความ)`, more: 'โหลดเพิ่ม 50 ข้อความ' };
     root.setAttribute('aria-label', text.title);
     root.querySelector('[data-archive-title]').textContent = text.title;
     root.querySelector('[data-archive-privacy]').textContent = text.privacy;
@@ -64,6 +82,9 @@ export function mountConversationArchive(root, getLog, getLang = () => 'th') {
     role.options[2].textContent = text.assistant;
     root.querySelector('[data-archive-from-label] span').textContent = text.from;
     root.querySelector('[data-archive-to-label] span').textContent = text.to;
+    root.querySelector('[data-archive-preset-label] span').textContent = text.preset;
+    preset.setAttribute('aria-label', text.preset);
+    [...preset.options].forEach((option, index) => { option.textContent = text.presets[index]; });
     dateFrom.setAttribute('aria-label', text.from);
     dateTo.setAttribute('aria-label', text.to);
     const result = filterConversationLog(getLog(), { query: query.value, role: role.value, dateFrom: dateFrom.value, dateTo: dateTo.value, limit });
@@ -92,8 +113,17 @@ export function mountConversationArchive(root, getLog, getLang = () => 'th') {
   }
   query.addEventListener('input', () => { limit = 50; render(); });
   role.addEventListener('change', () => { limit = 50; render(); });
-  dateFrom.addEventListener('change', () => { limit = 50; render(); });
-  dateTo.addEventListener('change', () => { limit = 50; render(); });
+  dateFrom.addEventListener('change', () => { preset.value = 'custom'; limit = 50; render(); });
+  dateTo.addEventListener('change', () => { preset.value = 'custom'; limit = 50; render(); });
+  preset.addEventListener('change', () => {
+    const range = conversationDatePresetRange(preset.value);
+    if (preset.value !== 'custom') {
+      dateFrom.value = range.dateFrom;
+      dateTo.value = range.dateTo;
+    }
+    limit = 50;
+    render();
+  });
   more.addEventListener('click', () => { limit = Math.min(800, limit + 50); render(); });
   render();
   return render;

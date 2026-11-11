@@ -2,6 +2,19 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.20.0] — 2026-11-10
+
+รอบที่ยี่สิบห้า: เพิ่มช่วงวันที่ด่วนในประวัติบทสนทนา
+
+### เพิ่ม
+- quick presets ทุกช่วง / วันนี้ / 7 วันล่าสุด / 30 วันล่าสุด คำนวณจากวันท้องถิ่นแบบรวมวันนี้
+- เลือก preset แล้ว sync date inputs; แก้วันที่เองเปลี่ยนสถานะเป็นกำหนดเอง; ทุกช่วงล้าง date range
+- tests ครอบคลุม leap day, ข้ามเดือน/ปี และ browser smoke ยืนยัน Today filter เป็น local-only
+
+### ตรวจรับ
+- 459 unit tests · 173 browser checks · `npm run check` 118 JS files
+- Performance/build ผ่าน; source ใหญ่สุด 149.9 KB; main gzip 108.9 KB
+
 ## [2.19.0] — 2026-11-10
 
 รอบที่ยี่สิบสี่: กรองประวัติบทสนทนาในเครื่องตามช่วงวันที่
