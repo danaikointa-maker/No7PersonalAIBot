@@ -43,6 +43,7 @@ test('updatePersona edits only custom personas', () => {
   const p = createPersona({ name: 'A', system: 'sys' });
   const updated = updatePersona(p.id, { name: 'B' });
   assert.equal(updated.name, 'B');
+  assert.ok(updated.updatedAt >= updated.createdAt);
   assert.equal(updatePersona('no7', { name: 'hack' }), null);
 });
 
