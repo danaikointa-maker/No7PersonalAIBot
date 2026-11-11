@@ -49,12 +49,12 @@
 - [x] Computer control (Electron) พร้อม allowlist 3 ชั้น + audit
 - [x] งาน + แจ้งเตือนข้ามอุปกรณ์ (self-host sync, LWW + tombstone)
 
-## v1.5 — ลงลึกที่อุปกรณ์และออฟไลน์
+## v1.5 — ลงลึกที่อุปกรณ์และออฟไลน์ ✅
 
-- [ ] UI automation (Electron accessibility) ต่อจาก `control_run`
-- [ ] ESP32 Phone-Link ครบวงจร (เสียงขึ้น-ลง, eyes บนจอ)
-- [ ] MCP OAuth: dynamic client registration + device code flow
-- [ ] recurring tasks + แจ้งเตือนข้ามเครื่องอัตโนมัติ (push)
+- [x] งานซ้ำ (recurrence) + เตือนผ่าน server/Telegram แม้ปิดแอป (push)
+- [x] Desktop awareness: รายชื่อหน้าต่าง + โฟกัส + สูตรอัตโนมัติ (dry-run ได้)
+- [x] ESP32 Phone-Link ครบวงจร (hello/capabilities, eyes บนจอ, เสียงขึ้น–ลง)
+- [x] MCP OAuth: dynamic client registration + device code flow
 
 ## v2.0 — คุณภาพและการกระจาย
 

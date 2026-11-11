@@ -2,6 +2,50 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [1.5.0] — 2026-11-10
+
+รอบที่สี่: ลงลึกที่อุปกรณ์และความต่อเนื่อง — งานซ้ำที่เตือนได้แม้ปิดแอป, รู้จักหน้าต่างบนจอ
+พร้อมสูตรอัตโนมัติ, Phone-Link ครบวงจร (hello/eyes/voice) และ MCP OAuth ที่ไม่ต้องมี redirect
+
+### เพิ่ม
+**S1 — งานซ้ำ + เตือนผ่าน server**
+- `core/tasks.js`: `normalizeRecurrence` (daily/weekdays/weekly/monthly/hourly + interval/weekday/at),
+  `nextOccurrence`, `describeRecurrence`; `complete()` บนงานซ้ำเลื่อนรอบถัดไปแทนการปิด (`repeatCount`)
+- tool `task` รับ `repeat` · UI เลือกความถี่ + แสดง 🔁 + รอบถัดไป
+- server: `PUT /api/reminders`, `GET /api/reminders/due|upcoming|status`, `POST /api/reminders/ack`,
+  tick `NO7_REMINDER_TICK_MS`, ส่ง Telegram (`TELEGRAM_REMINDER_CHAT_ID`) และเลื่อนงานซ้ำเอง
+- แอป push งานขึ้น server + poll due ทุก 60 วิ/ตอนกลับมาโฟกัส + แสดงสถานะ server
+- `NO7_DATA_DIR` สำหรับแยกข้อมูล (ใช้ในเทสต์) · `docs/TASKS.md`
+
+**S2 — Desktop awareness + automation**
+- `core/desktop.js`: อ่าน/จับคู่/โฟกัสหน้าต่าง (powershell/osascript/wmctrl), recipes 5 ขั้น
+  (open_app/open_url/focus_window/wait/notify) ≤8 ขั้น, dry-run, `RecipeStore` (localStorage)
+- Electron IPC `no7:list-windows` / `no7:focus-window` (คำสั่งคงที่ ไม่มี shell)
+- tool ใหม่ `desktop` + `run_recipe` — **28 tools** · หน้า 🖥️ เดสก์ท็อป · `docs/DESKTOP.md`
+
+**S3 — Phone-Link ครบวงจร**
+- `POST/GET /api/link/hello` (capabilities + `.no7/devices.json`),
+  `POST/GET /api/link/eyes` (อารมณ์ + ttl → stale), `POST /api/link/voice`,
+  `GET /api/link/voice?since`, `/voice/status`, `POST /voice/ack` (คิว ≤2 MB)
+- client: `helloDevice`, `sendEyes`, `getEyes`, `sendVoiceChunk`, `pullVoice`, `voiceStatus`, `ackVoice`
+- ESP32 header: `hello` / `onEyes`+`pollEyes` / `sendEyes` / `sendVoice` · แผงในหน้า 🔗 อุปกรณ์
+- `docs/DEVICES.md`, `docs/PHONE_LINK.md`
+
+**S4 — MCP OAuth: device flow + DCR**
+- `core/oauth.js`: `requestDeviceCode`, `requestDeviceToken`, `pollDeviceToken`
+  (pending/slow_down/expired_token/access_denied/timeout), `registerClient` (RFC 7591), `oauthMethodFor`
+- server proxies `/api/oauth/device` และ `/api/oauth/register`; `/api/oauth/token` ส่ง `device_code`
+- UI: ช่อง Device/Registration URL + ปุ่ม 🔢 ล็อกอินด้วยรหัส (แสดงรหัส/ลิงก์) + 🆕 ขอ client id
+- `docs/OAUTH.md`
+
+### เปลี่ยน
+- `MCP_CLIENT_INFO.version` = 1.5.0, diagnostics ใช้ 1.5.0
+- tool ทั้งหมด **28 ตัว** (auto 28, hub 21) — อัปเดตเทสต์/smoke ตามจำนวนจริง
+- `/api/link/status` รายงาน device/eyes/voice เพิ่ม
+
+### ตัวเลข
+- 266 unit tests · 82 end-to-end checks · 75 JS files · 28 tools + MCP tools แบบ dynamic · 20 docs
+
 ## [1.4.0] — 2026-11-10
 
 รอบที่สาม: ให้ No7 ออกไปทำงานนอกแอป — MCP แบบ local process + OAuth, บอท Telegram/LINE,

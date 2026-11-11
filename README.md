@@ -1,4 +1,4 @@
-# No7 Personal AI Bot `v1.4`
+# No7 Personal AI Bot `v1.5`
 
 > ผู้ช่วย AI ส่วนตัวที่ **โค้ดชุดเดียวกันรันได้ทั้งมือถือและ PC** — พูดไทยก่อน ฟังได้ด้วยเสียง มีความจำระยะยาว
 > เรียกเครื่องมือจริง ทำงานหลายก้าวได้ ซิงก์ข้ามเครื่อง และสั่งงานอุปกรณ์ผ่าน HMAC
@@ -22,14 +22,14 @@ npm run build         # dist/ ชุดเดียวสำหรับ PWA + E
 npm run server        # companion server: static + AI proxy + tools + sync + phone-link
 npm run desktop       # เปิดเป็นแอปเดสก์ท็อป (Electron)
 npm run mobile:sync   # ซิงก์ dist/ เข้าโปรเจค Android/iOS
-npm test              # 232 unit tests
-npm run test:browser  # 72 end-to-end checks (รันแอปจริงใน jsdom)
+npm test              # 266 unit tests
+npm run test:browser  # 82 end-to-end checks (รันแอปจริงใน jsdom)
 npm run check         # syntax + structure check
 ```
 
 ---
 
-## ทำอะไรได้ (v1.4)
+## ทำอะไรได้ (v1.5)
 
 ### 🎭 เลือกได้ทั้งหมด — 5 บทบาทในที่เดียว
 `✨ ทั้งหมด` (สลับบทบาทเองตามคำขอ) · `💛 เพื่อนคุย` · `💼 งาน` · `📅 ชีวิตประจำวัน` · `🏠 อุปกรณ์`
@@ -86,7 +86,7 @@ npm run check         # syntax + structure check
 - จัดการพื้นที่เก็บข้อมูล + ขอ persistent storage + ล้างข้อมูลเป็นกลุ่ม
 - เมนู/ปุ่มใหญ่/ปุ่มลัดคีย์บอร์ด (`Ctrl/Cmd+K`, `Ctrl/Cmd+M`, `Esc`, `Ctrl/Cmd+Enter`)
 
-### 🧰 26 tools (ไม่ต้องใช้คีย์)
+### 🧰 28 tools (ไม่ต้องใช้คีย์)
 | หมวด | tools |
 |---|---|
 | 📖 อ่าน | `weather` `air` `crypto` `fx` `gold` `wiki` `news` `calc` `rss_read` `summarize_url` |
@@ -94,7 +94,7 @@ npm run check         # syntax + structure check
 | 📅 ตาราง | `calendar_list` `calendar_add` (+ นำเข้า/ส่งออก `.ics`) |
 | ⚡ ทำงานในเครื่อง | `timer` `reminder` `clipboard_copy` `open_url` `task` |
 | ✉️ ร่างข้อความ | `compose_message` (อีเมล/SMS/LINE — คุณกดส่งเอง) |
-| 🎛️ ควบคุม | `open_app` `control_run` `device_command` `system_info` |
+| 🎛️ ควบคุม | `open_app` `control_run` `desktop` `run_recipe` `device_command` `system_info` |
 
 ### 🎭 Persona Studio
 สร้าง/แก้/ทำสำเนา/ลบ persona เอง — ตัวตน, คำทักทาย, หัวข้อต้องห้าม, คำลงท้าย, สไตล์เสียง
@@ -103,9 +103,12 @@ npm run check         # syntax + structure check
 - Phone-Link: สั่งงาน PC/ESP32 ผ่าน HMAC-SHA256 (`/api/link/*`), มี ESP32 reference client ให้
 - ซิงก์มือถือ ↔ PC ผ่าน server ของคุณเอง (`/api/sync`, token) — ไม่มีคลาวด์ ไม่มีบัญชี
 - **งาน + เตือนข้ามเครื่อง**: เพิ่มงานด้วยเสียง/ข้อความ, เตือนตามเวลา, ซิงก์แบบ last-write-wins (tombstone สำหรับการลบ)
+- **งานซ้ำ + เตือนแม้ปิดแอป**: `daily/weekdays/weekly/monthly/hourly`, server tick ส่ง Telegram, ปิดงานแล้วเลื่อนรอบถัดไปเอง
 
 ### 🖥️ เดสก์ท็อป
 tray · hotkey ระดับระบบ (`Ctrl/Cmd+Shift+Space`) · overlay always-on-top · clipboard/open-app/notify bridge
+- **รู้จักหน้าต่างบนจอ**: อ่านรายชื่อหน้าต่าง (powershell / osascript / wmctrl) + ค้นหา + โฟกัส
+- **สูตรอัตโนมัติ (recipes)**: ลำดับขั้น `open_app` / `open_url` / `focus_window` / `wait` / `notify` สูงสุด 8 ขั้น, dry-run ได้, วิ่งผ่าน allowlist เดิม
 
 ---
 
@@ -144,7 +147,8 @@ docs/                เอกสาร 19 ไฟล์
 | [docs/RELIABILITY.md](docs/RELIABILITY.md) | retry/backoff, offline queue, metrics, diagnostics |
 | [docs/BOTS.md](docs/BOTS.md) | Telegram / LINE bot ผ่าน server |
 | [docs/CONTROL.md](docs/CONTROL.md) | computer control + allowlist + audit |
-| [docs/TASKS.md](docs/TASKS.md) | งาน, เตือนตามเวลา, ซิงก์ข้ามเครื่อง |
+| [docs/TASKS.md](docs/TASKS.md) | งาน, งานซ้ำ, เตือนตามเวลา + เตือนผ่าน server/Telegram |
+| [docs/DESKTOP.md](docs/DESKTOP.md) | หน้าต่างบนจอ + สูตรอัตโนมัติ (recipes) |
 | [docs/DEVICES.md](docs/DEVICES.md) | Phone-Link protocol + ESP32 |
 | [docs/PHONE_LINK.md](docs/PHONE_LINK.md) | HMAC canonical signing + ตัวอย่าง curl |
 | [docs/BUILD.md](docs/BUILD.md) | build ทั้ง 3 แพลตฟอร์ม |

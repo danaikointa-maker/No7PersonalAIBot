@@ -6,6 +6,8 @@ import {
   base64UrlEncode, randomVerifier, createPkcePair, randomState, buildAuthorizeUrl, parseCallback,
   isExpired, normalizeTokenResponse, TokenStore, requestToken, exchangeCode, refreshAccessToken,
   OAuthSession, OAUTH_KEY,
+  normalizeDeviceCode, requestDeviceCode, requestDeviceToken, pollDeviceToken, registerClient,
+  oauthMethodFor, DEVICE_GRANT,
 } from '../web/src/core/oauth.js';
 
 function fakeStorage() {
@@ -194,4 +196,139 @@ test('OAuthSession without tokens returns null and exchange stores them', async 
   const sent = JSON.parse(fetchImpl.calls[0].body);
   assert.equal(sent.grant_type, 'authorization_code');
   assert.equal(sent.redirect_uri, 'https://no7.local/cb');
+});
+
+/* ------------------------- device flow + DCR (v1.5) ------------------------- */
+
+test('normalizeDeviceCode clamps interval and computes expiry', () => {
+  const d = normalizeDeviceCode({
+    device_code: 'dc', user_code: 'ABCD-EFGH', verification_uri: 'https://x/device',
+    verification_uri_complete: 'https://x/device?c=ABCD-EFGH', expires_in: 900, interval: 0,
+  }, 1000);
+  assert.equal(d.deviceCode, 'dc');
+  assert.equal(d.userCode, 'ABCD-EFGH');
+  assert.equal(d.interval, 5, 'interval 0 → 5');
+  assert.equal(d.expiresAt, 1000 + 900_000);
+  assert.equal(normalizeDeviceCode({ interval: 999 }, 0).interval, 60);
+
+  const bare = normalizeDeviceCode({}, 0);
+  assert.equal(bare.expiresIn, 600);
+  assert.equal(bare.userCode, '');
+});
+
+test('requestDeviceCode goes through /api/oauth/device proxy', async () => {
+  const fetchImpl = jsonFetch(() => ({
+    envelope: {
+      status: 200,
+      body: JSON.stringify({ device_code: 'dc-1', user_code: 'WXYZ-1234', verification_uri: 'https://id/device', expires_in: 300, interval: 7 }),
+    },
+  }));
+  const code = await requestDeviceCode({
+    deviceAuthorizationUrl: 'https://id/device_authorization',
+    clientId: 'client-9', scope: 'read mail', serverUrl: 'http://srv:8787',
+    fetchImpl, now: () => 10_000,
+  });
+  assert.equal(fetchImpl.calls[0].url, 'http://srv:8787/api/oauth/device');
+  const sent = JSON.parse(fetchImpl.calls[0].body);
+  assert.equal(sent.deviceAuthorizationUrl, 'https://id/device_authorization');
+  assert.equal(sent.client_id, 'client-9');
+  assert.equal(sent.scope, 'read mail');
+  assert.equal(code.deviceCode, 'dc-1');
+  assert.equal(code.interval, 7);
+  assert.equal(code.expiresAt, 10_000 + 300_000);
+});
+
+test('requestDeviceCode can call the provider directly and surfaces errors', async () => {
+  const ok = jsonFetch(() => ({ status: 200, text: JSON.stringify({ device_code: 'd', user_code: 'u', verification_uri: 'https://v' }) }));
+  const code = await requestDeviceCode({
+    deviceAuthorizationUrl: 'https://id/device', clientId: 'c', scope: 's', fetchImpl: ok,
+  });
+  assert.equal(code.deviceCode, 'd');
+  assert.match(ok.calls[0].body, /grant_type|client_id=c/);
+
+  const bad = jsonFetch(() => ({ status: 401, text: JSON.stringify({ error: 'invalid_client', error_description: 'bad client' }) }));
+  await assert.rejects(() => requestDeviceCode({ deviceAuthorizationUrl: 'https://id/device', fetchImpl: bad }), /bad client/);
+  await assert.rejects(() => requestDeviceCode({ fetchImpl: bad }), /deviceAuthorizationUrl/);
+});
+
+test('pollDeviceToken handles pending → slow_down → success', async () => {
+  let attempt = 0;
+  const fetchImpl = jsonFetch(() => {
+    attempt++;
+    if (attempt === 1) return { envelope: { status: 400, body: JSON.stringify({ error: 'authorization_pending' }) } };
+    if (attempt === 2) return { envelope: { status: 400, body: JSON.stringify({ error: 'slow_down' }) } };
+    return { envelope: { status: 200, body: JSON.stringify({ access_token: 'at', expires_in: 120 }) } };
+  });
+  const slept = [];
+  const pending = [];
+  const tokens = await pollDeviceToken({
+    deviceCode: 'dc', tokenUrl: 'https://id/token', clientId: 'c', interval: 5,
+    expiresAt: Date.now() + 60_000, serverUrl: 'http://srv', fetchImpl,
+    sleep: async (ms) => { slept.push(ms); },
+    onPending: (info) => pending.push(info.status),
+  });
+  assert.equal(tokens.accessToken, 'at');
+  assert.deepEqual(pending, ['pending', 'slow_down']);
+  assert.deepEqual(slept, [5_000, 10_000], 'slow_down เพิ่ม interval 5 วิ');
+  assert.equal(JSON.parse(fetchImpl.calls[0].body).grant_type, DEVICE_GRANT);
+  assert.equal(JSON.parse(fetchImpl.calls[0].body).device_code, 'dc');
+});
+
+test('pollDeviceToken maps expired/denied/timeout to Thai errors', async () => {
+  const expired = jsonFetch(() => ({ envelope: { status: 400, body: JSON.stringify({ error: 'expired_token' }) } }));
+  await assert.rejects(
+    () => pollDeviceToken({ deviceCode: 'd', tokenUrl: 'https://t', serverUrl: 'http://s', fetchImpl: expired, sleep: async () => {} }),
+    /หมดอายุ/,
+  );
+
+  const denied = jsonFetch(() => ({ envelope: { status: 400, body: JSON.stringify({ error: 'access_denied' }) } }));
+  await assert.rejects(
+    () => pollDeviceToken({ deviceCode: 'd', tokenUrl: 'https://t', serverUrl: 'http://s', fetchImpl: denied, sleep: async () => {} }),
+    /ปฏิเสธ/,
+  );
+
+  let clock = 0;
+  const alwaysPending = jsonFetch(() => ({ envelope: { status: 400, body: JSON.stringify({ error: 'authorization_pending' }) } }));
+  await assert.rejects(
+    () => pollDeviceToken({
+      deviceCode: 'd', tokenUrl: 'https://t', serverUrl: 'http://s', fetchImpl: alwaysPending,
+      now: () => clock, sleep: async (ms) => { clock += ms; }, expiresAt: 1_000_000, maxAttempts: 3,
+    }),
+    /หมดเวลา/,
+  );
+});
+
+test('registerClient performs DCR through the proxy and directly', async () => {
+  const proxy = jsonFetch(() => ({ envelope: { status: 201, body: JSON.stringify({ client_id: 'dcr-1', client_secret: 'sec', token_endpoint_auth_method: 'client_secret_basic' }) } }));
+  const reg = await registerClient({
+    registrationUrl: 'https://id/register', clientName: 'No7', scopes: ['read', 'mail'],
+    redirectUris: ['https://no7.local/oauth-callback.html'], serverUrl: 'http://srv', fetchImpl: proxy,
+  });
+  assert.equal(proxy.calls[0].url, 'http://srv/api/oauth/register');
+  const sent = JSON.parse(proxy.calls[0].body);
+  assert.equal(sent.registrationUrl, 'https://id/register');
+  assert.equal(sent.client.client_name, 'No7');
+  assert.deepEqual(sent.client.redirect_uris, ['https://no7.local/oauth-callback.html']);
+  assert.ok(sent.client.grant_types.includes(DEVICE_GRANT));
+  assert.equal(reg.clientId, 'dcr-1');
+  assert.equal(reg.clientSecret, 'sec');
+  assert.equal(reg.tokenEndpointAuthMethod, 'client_secret_basic');
+
+  const direct = jsonFetch(() => ({ status: 201, text: JSON.stringify({ client_id: 'dcr-2' }) }));
+  const reg2 = await registerClient({ registrationUrl: 'https://id/register', fetchImpl: direct });
+  assert.equal(reg2.clientId, 'dcr-2');
+  assert.equal(JSON.parse(direct.calls[0].body).token_endpoint_auth_method, 'none');
+
+  const bad = jsonFetch(() => ({ status: 400, text: JSON.stringify({ error: 'invalid_redirect_uri' }) }));
+  await assert.rejects(() => registerClient({ registrationUrl: 'https://id/register', fetchImpl: bad }), /invalid_redirect_uri/);
+  await assert.rejects(() => registerClient({ fetchImpl: bad }), /registrationUrl/);
+
+  const none = jsonFetch(() => ({ status: 201, text: JSON.stringify({ ok: true }) }));
+  await assert.rejects(() => registerClient({ registrationUrl: 'https://id/register', fetchImpl: none }), /client_id/);
+});
+
+test('oauthMethodFor prefers device flow, then PKCE', () => {
+  assert.equal(oauthMethodFor({ deviceAuthorizationUrl: 'https://d' }), 'device');
+  assert.equal(oauthMethodFor({ authorizeUrl: 'https://a' }), 'pkce');
+  assert.equal(oauthMethodFor({}), 'none');
 });

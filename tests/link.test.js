@@ -9,6 +9,8 @@ globalThis.localStorage = (() => {
 const {
   signRequest, canonical, hexToBytes, bytesToHex, DeviceRegistry,
   sendCommand, testConnection, deviceStatus, QUICK_COMMANDS,
+  encodeBase64, decodeBase64, linkCapabilities, helloDevice, sendEyes, getEyes,
+  sendVoiceChunk, pullVoice, voiceStatus, ackVoice,
 } = await import('../web/src/core/link.js');
 
 const SECRET = 'a'.repeat(64);
@@ -109,4 +111,65 @@ test('quick commands have ids and labels', () => {
     assert.ok(c.id && c.label);
     assert.equal(typeof c.args, 'object');
   }
+});
+
+test('base64 helpers round-trip binary voice chunks', () => {
+  const bytes = new Uint8Array([0, 1, 2, 127, 128, 255]);
+  const b64 = encodeBase64(bytes);
+  assert.equal(b64, 'AAECf4D/');
+  assert.deepEqual([...decodeBase64(b64)], [...bytes]);
+  assert.equal(encodeBase64(new Uint8Array()).length, 0);
+  assert.deepEqual([...decodeBase64('###')], []);
+});
+
+test('linkCapabilities reports mic/speaker/eyes/screen/buttons/voice', () => {
+  const plain = linkCapabilities({});
+  assert.deepEqual(Object.keys(plain).sort(), ['buttons', 'eyes', 'mic', 'screen', 'speaker', 'voice']);
+  for (const key of Object.keys(plain)) assert.equal(typeof plain[key], 'boolean');
+
+  const scope = {
+    no7: { native: { isDesktop: true } },
+    navigator: { mediaDevices: { getUserMedia: () => {} } },
+    MediaRecorder: class {},
+    speechSynthesis: {},
+    document: {},
+  };
+  const rich = linkCapabilities(scope);
+  assert.equal(rich.mic, true);
+  assert.equal(rich.speaker, true);
+  assert.equal(rich.eyes, true);
+  assert.equal(rich.voice, true);
+});
+
+test('hello/eyes/voice client helpers sign and hit the right paths', async () => {
+  const device = { name: 'PC', baseUrl: 'http://srv', code: '42', secret: SECRET };
+  const seen = [];
+  globalThis.fetch = async (url, opts = {}) => {
+    seen.push({ url: String(url), method: opts.method, body: opts.body, sig: opts.headers?.['X-No7-Signature'] });
+    return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true }) };
+  };
+
+  await helloDevice(device, { name: 'PC', kind: 'pc', capabilities: { mic: true } });
+  assert.equal(seen.at(-1).url, 'http://srv/api/link/hello');
+  assert.equal(JSON.parse(seen.at(-1).body).capabilities.mic, true);
+  assert.equal(seen.at(-1).sig, await signRequest(SECRET, 'POST', '/api/link/hello', seen.at(-1).body));
+
+  await sendEyes(device, { emotion: 'happy', intensity: 70 });
+  assert.equal(seen.at(-1).url, 'http://srv/api/link/eyes');
+  await assert.rejects(() => sendEyes(device, { emotion: '' }), /อารมณ์/);
+
+  await getEyes(device);
+  assert.equal(seen.at(-1).method, 'GET');
+  assert.equal(seen.at(-1).url, 'http://srv/api/link/eyes');
+
+  await sendVoiceChunk(device, { chunk: new Uint8Array([1, 2, 3]), mime: 'audio/ogg', seq: 4, final: true });
+  assert.equal(seen.at(-1).url, 'http://srv/api/link/voice');
+  assert.equal(JSON.parse(seen.at(-1).body).chunk, 'AQID');
+
+  await pullVoice(device, 3);
+  assert.match(seen.at(-1).url, /\/api\/link\/voice\?since=3/);
+  await voiceStatus(device);
+  assert.equal(seen.at(-1).url, 'http://srv/api/link/voice/status');
+  await ackVoice(device, 4);
+  assert.equal(JSON.parse(seen.at(-1).body).upto, 4);
 });

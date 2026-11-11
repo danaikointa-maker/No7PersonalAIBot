@@ -3,16 +3,28 @@ import { StateMachine, STATES } from './core/state.js';
 import { allPersonas, customPersonas, getPersona, createPersona, updatePersona, deletePersona, duplicatePersona, personaVoice } from './core/persona-store.js';
 import { getCalendar, formatWhen } from './core/calendar.js';
 import { collectBundle, pushBundle, pullBundle, mergeBundle } from './core/sync.js';
-import { getDeviceRegistry, sendCommand, deviceStatus, testConnection, QUICK_COMMANDS } from './core/link.js';
+import {
+  getDeviceRegistry, sendCommand, deviceStatus, testConnection, QUICK_COMMANDS,
+  helloDevice, sendEyes, getEyes, voiceStatus, linkCapabilities,
+} from './core/link.js';
 import { detectCapabilities, summarizeCapabilities, requestMicrophone, requestNotifications } from './core/capabilities.js';
 import { usageBreakdown, formatBytes, estimateQuota, isPersisted, requestPersistentStorage, clearGroup } from './core/storage.js';
 import { MemoryStore } from './core/memory.js';
 import { PROVIDERS, ModelFallback, resolveProviderChain, chatWithFallback, chatWithFallbackStream } from './core/ai-providers.js';
 import { getTool, TOOL_IDS, runTool, toolMeta, restoreReminders, registerDynamicTools } from './core/tools.js';
 import { McpRegistry } from './core/mcp.js';
-import { createPkcePair, randomState, buildAuthorizeUrl, parseCallback } from './core/oauth.js';
+import {
+  createPkcePair, randomState, buildAuthorizeUrl, parseCallback,
+  requestDeviceCode, pollDeviceToken, registerClient, oauthMethodFor,
+} from './core/oauth.js';
 import { ControlAudit, normalizeControlPolicy, CONTROL_ACTION_META } from './core/control.js';
-import { TaskStore, TaskScheduler, PRIORITIES, parseDue, formatTaskTime, isOverdue } from './core/tasks.js';
+import {
+  TaskStore, TaskScheduler, PRIORITIES, parseDue, formatTaskTime, isOverdue, describeRecurrence,
+} from './core/tasks.js';
+import {
+  RecipeStore, listWindows, focusWindow, matchWindows, parseRecipeText, stringifyRecipeSteps,
+  planRecipe, runRecipe, MAX_RECIPE_STEPS,
+} from './core/desktop.js';
 import { withRetry, classifyError, OfflineQueue } from './core/retry.js';
 import { Metrics, formatMs, METRIC_KINDS } from './core/metrics.js';
 import { buildDiagnosticsReport, diagnosticsFilename, redact } from './core/diagnostics.js';
@@ -68,6 +80,8 @@ function renderMcp() {
       </div>
       <div class="row">
         ${s.oauth ? '<button data-mcp-oauth>🔑 ล็อกอิน</button>' : ''}
+        ${s.oauth?.deviceAuthorizationUrl ? '<button data-mcp-device>🔢 ล็อกอินด้วยรหัส</button>' : ''}
+        ${s.oauth?.registrationUrl ? '<button data-mcp-register>🆕 ขอ client id</button>' : ''}
         <label class="switch"><input type="checkbox" data-mcp-toggle ${on ? 'checked' : ''} /> เปิด</label>
         <button data-mcp-remove>ลบ</button>
       </div>
@@ -164,11 +178,12 @@ $('#device-info').textContent = `${platformLabel(platform)} · จอ ${window.i
 function showView(name) {
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${name}`));
   document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
-  $('#view-title').textContent = { chat: 'แชทกับ No7', tools: 'เครื่องมือ', memory: 'ความจำ', calendar: 'ตารางนัด', devices: 'อุปกรณ์', settings: 'ตั้งค่า' }[name] || name;
+  $('#view-title').textContent = { chat: 'แชทกับ No7', tools: 'เครื่องมือ', memory: 'ความจำ', calendar: 'ตารางนัด', devices: 'อุปกรณ์', desktop: 'เดสก์ท็อป', settings: 'ตั้งค่า' }[name] || name;
   $('#sidebar').classList.remove('open');
   if (name === 'tools') renderToolsGrid();
   if (name === 'calendar') renderCalendar();
   if (name === 'devices') renderDevices();
+  if (name === 'desktop') renderDesktop();
   if (name === 'memory') {
     memQuery = '';                       // เข้าหน้าความจำ = ดูทั้งหมดก่อน
     const q = $('#mem-query');
@@ -887,7 +902,22 @@ function devLog(text) {
   el.textContent = `${new Date().toLocaleTimeString('th-TH')} — ${text}\n${el.textContent}`.slice(0, 4000);
 }
 
+function renderLinkDeviceOptions(selected = '') {
+  const sel = $('#link-device');
+  if (!sel) return;
+  const list = devices.list();
+  sel.innerHTML = list.length
+    ? list.map((d) => `<option value="${esc(d.id)}"${d.id === selected ? ' selected' : ''}>${esc(d.name)} · ${esc(d.baseUrl)}</option>`).join('')
+    : '<option value="">— ยังไม่มีอุปกรณ์ —</option>';
+}
+
+function selectedLinkDevice() {
+  const id = $('#link-device')?.value || '';
+  return devices.get(id) || devices.list()[0] || null;
+}
+
 function renderDevices() {
+  renderLinkDeviceOptions($('#link-device')?.value || '');
   const box = $('#dev-list');
   if (!box) return;
   const list = devices.list();
@@ -1376,7 +1406,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '1.4.0',
+      version: window.NO7_VERSION || '1.5.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -1452,14 +1482,19 @@ function renderTasks() {
     when.textContent = formatTaskTime(t.due, now);
     const title = document.createElement('span');
     title.className = 'fact-text';
-    title.textContent = `${PRIORITIES[t.priority].emoji} ${t.title}`;
+    title.textContent = `${PRIORITIES[t.priority].emoji} ${t.title}${t.recurrence ? ` 🔁 ${describeRecurrence(t.recurrence)}` : ''}`;
     const done = document.createElement('button');
     done.textContent = t.done ? '↩️' : '✅';
     done.title = t.done ? 'เปิดใหม่' : 'ทำเสร็จแล้ว';
-    done.addEventListener('click', () => { tasks.complete(t.id, !t.done); renderTasks(); });
+    done.addEventListener('click', () => {
+      const res = tasks.complete(t.id, !t.done);
+      if (res.advanced) $('#task-status').textContent = `🔁 เลื่อนไปรอบถัดไป: ${formatTaskTime(res.task.due)}`;
+      renderTasks();
+      pushRemindersToServer();
+    });
     const del = document.createElement('button');
     del.textContent = 'ลบ';
-    del.addEventListener('click', () => { tasks.remove(t.id); renderTasks(); });
+    del.addEventListener('click', () => { tasks.remove(t.id); renderTasks(); pushRemindersToServer(); });
     row.append(when, title, done, del);
     box.appendChild(row);
   }
@@ -1470,12 +1505,19 @@ $('#task-add')?.addEventListener('click', () => {
   if (!title) { $('#task-status').textContent = 'ต้องใส่ชื่องาน'; return; }
   const rawWhen = $('#task-when').value;
   const due = rawWhen ? parseDue(rawWhen) : null;
+  const repeat = $('#task-repeat').value || null;
   try {
-    tasks.add({ title, due, priority: Number($('#task-priority').value) || 0, device: platform });
+    tasks.add({
+      title, due,
+      priority: Number($('#task-priority').value) || 0,
+      recurrence: repeat,
+      device: platform,
+    });
     $('#task-title').value = '';
     $('#task-when').value = '';
     $('#task-status').textContent = 'เพิ่มงานแล้ว ✅ (จะเตือนตามเวลา)';
     renderTasks();
+    pushRemindersToServer();
   } catch (e) {
     $('#task-status').textContent = e.message;
   }
@@ -1488,6 +1530,7 @@ $('#task-clear-done')?.addEventListener('click', () => {
   for (const t of done) tasks.remove(t.id);
   $('#task-status').textContent = done.length ? `ล้าง ${done.length} งานที่เสร็จแล้ว` : 'ไม่มีงานที่เสร็จให้ล้าง';
   renderTasks();
+  pushRemindersToServer();
 });
 
 /** เตือนเมื่อถึงเวลา — Notification + ข้อความในแชท + subtitle */
@@ -1501,6 +1544,284 @@ const taskScheduler = new TaskScheduler({
     try { new Notification('No7 — ถึงเวลางาน', { body: task.title }); } catch { /* ไม่ได้อนุญาตแจ้งเตือน */ }
     renderTasks();
   },
+});
+
+/* ------------------------------------------------- reminders via server */
+let reminderPushTimer = null;
+let reminderPollTimer = null;
+
+function remindersBase() {
+  return String(settings.serverUrl || 'http://localhost:8787').replace(/\/$/, '');
+}
+
+/** ส่งงานที่มีเวลาไปให้ server เพื่อให้เตือนได้แม้ปิดแอป (Telegram) */
+function pushRemindersToServer({ immediate = false } = {}) {
+  clearTimeout(reminderPushTimer);
+  const run = async () => {
+    if (!navigator.onLine) return;
+    const items = tasks.list({ done: null })
+      .filter((t) => t.due)
+      .map((t) => ({
+        id: t.id, title: t.title, due: t.due, priority: t.priority,
+        recurrence: t.recurrence, done: t.done, updatedAt: t.updatedAt, device: t.device,
+      }));
+    try {
+      const res = await fetch(`${remindersBase()}/api/reminders`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ tasks: items }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      renderReminderStatus();
+    } catch {
+      if ($('#task-server-status')) $('#task-server-status').textContent = 'server: ส่งงานไม่สำเร็จ (จะลองใหม่เมื่อแก้งาน)';
+    }
+  };
+  if (immediate) return run();
+  reminderPushTimer = setTimeout(run, 1200);
+  return Promise.resolve();
+}
+
+/** ดึงงานที่ server เห็นว่าถึงเวลา (เช่น เตือนจากเครื่องอื่น) */
+async function pollReminderDue() {
+  if (!navigator.onLine) return [];
+  try {
+    const res = await fetch(`${remindersBase()}/api/reminders/due`);
+    const data = await res.json();
+    const items = Array.isArray(data.items) ? data.items : [];
+    if (!items.length) return [];
+    for (const item of items) {
+      addMessage('bot', `⏰ ถึงเวลา (จาก server): ${item.title}`);
+      try { new Notification('No7 — ถึงเวลางาน', { body: item.title }); } catch { /* ไม่ได้อนุญาต */ }
+      setSubtitle(`⏰ ${item.title}`);
+    }
+    await fetch(`${remindersBase()}/api/reminders/ack`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids: items.map((i) => i.id) }),
+    });
+    renderTasks();
+    return items;
+  } catch {
+    return [];
+  }
+}
+
+async function renderReminderStatus() {
+  const el = $('#task-server-status');
+  if (!el) return null;
+  try {
+    const res = await fetch(`${remindersBase()}/api/reminders/status`);
+    const data = await res.json();
+    el.textContent = `server: ${data.count || 0} งาน · ถึงเวลา ${data.due || 0} · Telegram ${data.telegram?.configured ? '✅' : '—'}`
+      + `${data.next ? ` · ถัดไป ${formatTaskTime(data.next.due)}` : ''}`;
+    return data;
+  } catch {
+    el.textContent = 'server: ยังไม่เชื่อม (รัน npm run server เพื่อให้เตือนได้แม้ปิดแอป)';
+    return null;
+  }
+}
+
+function scheduleReminderPolling() {
+  clearInterval(reminderPollTimer);
+  reminderPollTimer = setInterval(() => { pollReminderDue(); }, 60_000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') pollReminderDue();
+  });
+}
+
+/* --------------------------------------------------------------- desktop */
+const recipes = new RecipeStore();
+let desktopWindows = [];
+
+function setDesktopStatus(text) {
+  const el = $('#recipe-status');
+  if (el) el.textContent = text;
+}
+
+function renderRecipeOptions(selectedId = '') {
+  const sel = $('#recipe-select');
+  if (!sel) return;
+  const list = recipes.list();
+  sel.innerHTML = '<option value="">— สูตรใหม่ —</option>'
+    + list.map((r) => `<option value="${esc(r.id)}"${r.id === selectedId ? ' selected' : ''}>${esc(r.name)} (${r.steps.length} ขั้น)</option>`).join('');
+}
+
+function fillRecipeEditor(recipe) {
+  $('#recipe-name').value = recipe?.name || '';
+  $('#recipe-steps').value = recipe ? stringifyRecipeSteps(recipe.steps) : '';
+}
+
+function recipeFromEditor() {
+  const parsed = parseRecipeText($('#recipe-steps').value);
+  return { name: $('#recipe-name').value.trim(), steps: parsed.steps, errors: parsed.errors };
+}
+
+function renderWindows() {
+  const box = $('#win-list');
+  if (!box) return;
+  const query = $('#win-query').value.trim();
+  const found = matchWindows(desktopWindows, query);
+  box.innerHTML = found.length
+    ? ''
+    : `<p class="hint">${desktopWindows.length ? 'ไม่พบหน้าต่างที่ตรงกับคำค้น' : 'ยังไม่มีรายการหน้าต่าง'}</p>`;
+  for (const title of found.slice(0, 40)) {
+    const row = document.createElement('div');
+    row.className = 'fact';
+    const label = document.createElement('span');
+    label.className = 'fact-text';
+    label.textContent = `🪟 ${title}`;
+    const btn = document.createElement('button');
+    btn.textContent = 'โฟกัส';
+    btn.addEventListener('click', async () => {
+      try {
+        const res = await focusWindow({ target: title, windows: desktopWindows });
+        $('#win-status').textContent = `✅ โฟกัสแล้ว: ${res.big}`;
+      } catch (e) {
+        $('#win-status').textContent = e.message;
+      }
+    });
+    row.append(label, btn);
+    box.appendChild(row);
+  }
+}
+
+async function refreshDesktopWindows() {
+  $('#win-status').textContent = 'กำลังอ่านรายการหน้าต่าง…';
+  const res = await listWindows();
+  desktopWindows = res.windows;
+  $('#win-status').textContent = res.ok
+    ? `พบ ${res.windows.length} หน้าต่าง (อ่านสด ๆ จากระบบ)`
+    : res.reason;
+  renderWindows();
+  return res;
+}
+
+async function renderDesktop() {
+  renderRecipeOptions($('#recipe-select')?.value || '');
+  if (!desktopWindows.length) await refreshDesktopWindows();
+}
+
+$('#win-refresh')?.addEventListener('click', () => { refreshDesktopWindows(); });
+$('#win-query')?.addEventListener('input', () => renderWindows());
+
+$('#recipe-select')?.addEventListener('change', () => {
+  const id = $('#recipe-select').value;
+  const recipe = id ? recipes.get(id) : null;
+  fillRecipeEditor(recipe);
+  setDesktopStatus(recipe ? `แก้ไข "${recipe.name}" ได้เลย` : 'สร้างสูตรใหม่ — หนึ่งบรรทัด = หนึ่งขั้น');
+  const log = $('#recipe-log');
+  if (log) log.hidden = true;
+});
+
+$('#recipe-save')?.addEventListener('click', () => {
+  const draft = recipeFromEditor();
+  if (draft.errors.length) { setDesktopStatus(draft.errors[0]); return; }
+  try {
+    const saved = recipes.save({ name: draft.name, steps: draft.steps, id: $('#recipe-select').value || '' });
+    renderRecipeOptions(saved.id);
+    setDesktopStatus(`💾 บันทึกสูตร "${saved.name}" แล้ว (${saved.steps.length} ขั้น)`);
+  } catch (e) {
+    setDesktopStatus(e.message);
+  }
+});
+
+function showStepLog(result) {
+  const log = $('#recipe-log');
+  if (!log) return;
+  const icon = { done: '✅', planned: '•', blocked: '⛔', failed: '⛔' };
+  log.textContent = result.steps.map((s) => `${icon[s.status] || '•'} ${s.label}${s.reason ? ` — ${s.reason}` : ''}`).join('\n');
+  log.hidden = !result.steps.length;
+}
+
+$('#recipe-try')?.addEventListener('click', () => {
+  const draft = recipeFromEditor();
+  if (draft.errors.length) { setDesktopStatus(draft.errors[0]); return; }
+  const plan = planRecipe(draft, { policy: settings.controlPolicy, windows: desktopWindows });
+  showStepLog({ steps: plan.steps.map((s) => ({ ...s, status: s.allowed ? 'planned' : 'blocked' })) });
+  const blocked = plan.steps.filter((s) => !s.allowed).length;
+  setDesktopStatus(plan.errors[0]
+    || (blocked ? `🔍 จะรันได้ ${plan.steps.length - blocked}/${plan.steps.length} ขั้น — ${blocked} ขั้นถูกบล็อก` : `🔍 ทั้ง ${plan.steps.length} ขั้นพร้อมรัน (ยังไม่ได้ทำอะไรจริง)`));
+});
+
+$('#recipe-run')?.addEventListener('click', async () => {
+  const draft = recipeFromEditor();
+  if (draft.errors.length) { setDesktopStatus(draft.errors[0]); return; }
+  if (!desktopWindows.length) await refreshDesktopWindows();
+  setDesktopStatus('กำลังรันสูตร…');
+  const res = await runRecipe(draft, { policy: settings.controlPolicy, windows: desktopWindows });
+  showStepLog(res);
+  setDesktopStatus(res.ok ? `▶️ รันครบ ${res.steps.length} ขั้นแล้ว` : `⛔ ${res.error}`);
+});
+
+$('#recipe-delete')?.addEventListener('click', () => {
+  const id = $('#recipe-select').value;
+  if (!id) { setDesktopStatus('เลือกสูตรที่ต้องการลบก่อน'); return; }
+  const removed = recipes.remove(id);
+  renderRecipeOptions();
+  fillRecipeEditor(null);
+  setDesktopStatus(removed ? '🗑 ลบสูตรแล้ว' : 'ไม่พบสูตรนี้');
+});
+
+/* ------------------------------------------------- phone-link: hello/eyes/voice */
+function setLinkStatus(text) {
+  const el = $('#link-status');
+  if (el) el.textContent = text;
+}
+
+$('#link-hello')?.addEventListener('click', async () => {
+  const device = selectedLinkDevice();
+  if (!device) { setLinkStatus('ยังไม่มีอุปกรณ์ — เพิ่มด้านบนก่อน'); return; }
+  setLinkStatus('กำลังส่ง hello…');
+  try {
+    const caps = linkCapabilities();
+    const res = await helloDevice(device, { name: device.name, kind: platform, capabilities: caps, firmware: 'no7-web/1.5' });
+    const on = Object.entries(res.device?.capabilities || {}).filter(([, v]) => v).map(([k]) => k);
+    setLinkStatus(`✅ ${res.device?.name || device.name}: ${res.protocol} · ความสามารถ: ${on.join(', ') || '—'} · ${res.features?.length || 0} features`);
+    devices.touch(device.id);
+    renderDevices();
+  } catch (e) {
+    setLinkStatus(`⛔ ${e.message}`);
+  }
+});
+
+$('#link-eyes')?.addEventListener('click', async () => {
+  const device = selectedLinkDevice();
+  if (!device) { setLinkStatus('ยังไม่มีอุปกรณ์ — เพิ่มด้านบนก่อน'); return; }
+  const emotion = $('#link-emotion').value.trim() || 'happy';
+  try {
+    const res = await sendEyes(device, { emotion, intensity: 85, text: 'จาก No7' });
+    setLinkStatus(`👀 ส่งอารมณ์ "${res.eyes.emotion}" (${res.eyes.intensity}%) ไปที่ ${device.name} แล้ว — จอจะดึงไปวาด`);
+  } catch (e) {
+    setLinkStatus(`⛔ ${e.message}`);
+  }
+});
+
+$('#link-eyes-read')?.addEventListener('click', async () => {
+  const device = selectedLinkDevice();
+  if (!device) { setLinkStatus('ยังไม่มีอุปกรณ์'); return; }
+  try {
+    const res = await getEyes(device);
+    const e = res.eyes;
+    setLinkStatus(e
+      ? `📖 ${device.name}: ${e.emotion} ${e.intensity}% · ${e.stale ? 'เก่าแล้ว' : 'สด'} (${Math.round((e.ageMs || 0) / 1000)} วิที่แล้ว)`
+      : `📖 ${device.name}: ยังไม่มีอารมณ์ที่บันทึกไว้`);
+  } catch (e) {
+    setLinkStatus(`⛔ ${e.message}`);
+  }
+});
+
+$('#link-voice-status')?.addEventListener('click', async () => {
+  const device = selectedLinkDevice();
+  if (!device) { setLinkStatus('ยังไม่มีอุปกรณ์'); return; }
+  try {
+    const st = await voiceStatus(device);
+    setLinkStatus(st.chunks
+      ? `🎧 ${device.name}: ค้าง ${st.chunks} chunk · ${formatBytes(st.bytes)} · seq ล่าสุด ${st.lastSeq}${st.dropped ? ` · ทิ้งไป ${st.dropped}` : ''}`
+      : `🎧 ${device.name}: ไม่มีเสียงค้าง (seq ล่าสุด ${st.lastSeq})`);
+  } catch (e) {
+    setLinkStatus(`⛔ ${e.message}`);
+  }
 });
 
 /* ------------------------------------------------------------- control UI */
@@ -1601,6 +1922,8 @@ $('#mcp-add').addEventListener('click', () => {
       tokenUrl,
       clientId: $('#mcp-oauth-client').value.trim(),
       scopes: $('#mcp-oauth-scopes').value.trim(),
+      deviceAuthorizationUrl: $('#mcp-oauth-device')?.value.trim() || '',
+      registrationUrl: $('#mcp-oauth-register')?.value.trim() || '',
     };
   })();
   const id = transport === 'stdio' ? stdioId : mcpSlug(name, url);
@@ -1704,6 +2027,93 @@ window.addEventListener('message', async (event) => {
   }
 });
 
+/* ------------------- OAuth device flow (รหัส + ลิงก์) ------------------- */
+function mcpServerUrl() {
+  return String(settings.serverUrl || 'http://localhost:8787').replace(/\/$/, '');
+}
+
+function updateMcpOauth(id, patch) {
+  const list = (Array.isArray(settings.mcpServers) ? settings.mcpServers : [])
+    .map((s) => ((s.id || s.name || s.url) === id ? { ...s, oauth: { ...(s.oauth || {}), ...patch } } : s));
+  saveMcpServers(list);
+  return list.find((s) => (s.id || s.name || s.url) === id) || null;
+}
+
+async function registerMcpClient(cfg) {
+  const oauth = cfg?.oauth || {};
+  if (!oauth.registrationUrl) throw new Error('server นี้ยังไม่มี Registration URL');
+  $('#mcp-status').textContent = 'กำลังขอ client id (DCR)…';
+  const reg = await registerClient({
+    registrationUrl: oauth.registrationUrl,
+    redirectUris: [`${location.origin}${location.pathname.replace(/[^/]*$/, '')}oauth-callback.html`],
+    scopes: String(oauth.scopes || '').split(/\s+/).filter(Boolean),
+    serverUrl: mcpServerUrl(),
+  });
+  updateMcpOauth(cfg.id, { clientId: reg.clientId, clientSecret: reg.clientSecret || '' });
+  return reg;
+}
+
+async function startDeviceLogin(cfg) {
+  const serverUrl = mcpServerUrl();
+  try {
+    if (!cfg?.oauth?.deviceAuthorizationUrl) {
+      $('#mcp-status').textContent = 'server นี้ยังไม่มี Device Authorization URL';
+      return;
+    }
+    if (!cfg.oauth.clientId && cfg.oauth.registrationUrl) {
+      const reg = await registerMcpClient(cfg);
+      cfg = { ...cfg, oauth: { ...cfg.oauth, clientId: reg.clientId, clientSecret: reg.clientSecret || '' } };
+    }
+    if (!cfg.oauth.clientId) {
+      $('#mcp-status').textContent = 'ต้องมี client id ก่อน — ใส่ในช่อง OAuth หรือตั้ง Registration URL';
+      return;
+    }
+
+    $('#mcp-status').textContent = 'กำลังขอรหัสล็อกอิน…';
+    const code = await requestDeviceCode({
+      deviceAuthorizationUrl: cfg.oauth.deviceAuthorizationUrl,
+      clientId: cfg.oauth.clientId,
+      scope: String(cfg.oauth.scopes || '').split(/\s+/).filter(Boolean).join(' '),
+      serverUrl,
+    });
+
+    const link = code.verificationUriComplete || code.verificationUri;
+    $('#mcp-status').textContent = `🔢 ไปที่ ${code.verificationUri || link} แล้วกรอกรหัส ${code.userCode} (หมดอายุใน ${Math.round(code.expiresIn / 60)} นาที)`;
+    if (link) {
+      try {
+        const popup = window.open(link, 'no7-oauth-device', 'width=520,height=680');
+        if (!popup) $('#mcp-status').textContent += ' · เบราว์เซอร์บล็อกหน้าต่าง — เปิดลิงก์เองได้';
+      } catch {
+        $('#mcp-status').textContent += ' · เปิดลิงก์เองได้';
+      }
+    }
+
+    const tokens = await pollDeviceToken({
+      deviceCode: code.deviceCode,
+      tokenUrl: cfg.oauth.tokenUrl,
+      clientId: cfg.oauth.clientId,
+      clientSecret: cfg.oauth.clientSecret || '',
+      scope: String(cfg.oauth.scopes || '').split(/\s+/).filter(Boolean).join(' '),
+      interval: code.interval,
+      expiresAt: code.expiresAt,
+      serverUrl,
+      onPending: ({ status, interval }) => {
+        $('#mcp-status').textContent = status === 'slow_down'
+          ? `รอช้าลงเป็น ${interval} วิ… (ผู้ให้บริการขอ slow_down)`
+          : `รอการยืนยันรหัส ${code.userCode}… (ทุก ${interval} วิ)`;
+      },
+    });
+
+    const session = mcp.oauthSession(cfg.id);
+    if (!session) throw new Error('server นี้ไม่ได้ตั้ง OAuth');
+    session.store.set(session.name, tokens);
+    $('#mcp-status').textContent = '✅ ล็อกอินด้วยรหัสสำเร็จ — กำลังดึงเครื่องมือ';
+    await refreshMcp();
+  } catch (e) {
+    $('#mcp-status').textContent = `ล็อกอินด้วยรหัสไม่สำเร็จ: ${e.message}`;
+  }
+}
+
 $('#mcp-refresh').addEventListener('click', () => { refreshMcp(); });
 
 $('#mcp-list').addEventListener('click', (e) => {
@@ -1711,6 +2121,18 @@ $('#mcp-list').addEventListener('click', (e) => {
   if (!row) return;
   const id = row.dataset.id;
   const list = Array.isArray(settings.mcpServers) ? settings.mcpServers : [];
+  if (e.target.matches('[data-mcp-device]')) {
+    const cfg = mcp.configFor(id) || (Array.isArray(settings.mcpServers) ? settings.mcpServers.find((x) => (x.id || x.name || x.url) === id) : null);
+    startDeviceLogin(cfg);
+    return;
+  }
+  if (e.target.matches('[data-mcp-register]')) {
+    const cfg = mcp.configFor(id) || (Array.isArray(settings.mcpServers) ? settings.mcpServers.find((x) => (x.id || x.name || x.url) === id) : null);
+    registerMcpClient(cfg)
+      .then((reg) => { $('#mcp-status').textContent = `✅ ได้ client id: ${reg.clientId}`; renderMcp(); })
+      .catch((err) => { $('#mcp-status').textContent = `ขอ client id ไม่ได้: ${err.message}`; });
+    return;
+  }
   if (e.target.matches('[data-mcp-oauth]')) {
     const cfg = mcp.configFor(id) || (Array.isArray(settings.mcpServers) ? settings.mcpServers.find((x) => (x.id || x.name || x.url) === id) : null);
     startOAuth(cfg ? { ...cfg, oauth: cfg.oauth || mcp.configFor(id)?.oauth } : null);
@@ -1828,6 +2250,7 @@ $('#sync-pull-btn').addEventListener('click', async () => {
     renderMemory(); renderCalendar(); renderPersonaList(); renderSettingsForm();
     $('#sync-status').textContent = `✅ ผสานแล้ว: ความจำ +${res.facts} · persona +${res.personas} · นัด +${res.events} · งาน ${res.tasks || 0}`;
     renderTasks();
+    pushRemindersToServer();
   } catch (e) { $('#sync-status').textContent = `❌ ${e.message}`; }
 });
 
@@ -2031,6 +2454,8 @@ if (bootView && document.getElementById(`view-${bootView}`)) showView(bootView);
 
 taskScheduler.start();
 renderTasks();
+renderReminderStatus().then(() => pushRemindersToServer({ immediate: true }));
+scheduleReminderPolling();
 
 mcp.hydrateFromCache();
 applyMcpTools();
@@ -2040,6 +2465,7 @@ renderModeChips();
 renderToolsGrid();
 if (Array.isArray(settings.mcpServers) && settings.mcpServers.length) refreshMcp({ quiet: true });
 restoreReminders();
+renderRecipeOptions();
 addMessage('bot', getPersona(settings.persona).greeting
   || `สวัสดีครับ ผม ${getPersona(settings.persona).name} 👋\nพิมพ์คุยได้เลย หรือกด 🎤 เพื่อพูด\n\nลองถาม: "อากาศกรุงเทพวันนี้", "ราคาบิทคอยน์", "ตั้งเวลา 5 นาที"`);
 setSubtitle('สวัสดีครับ ผม No7 พร้อมช่วยแล้ว');

@@ -9,12 +9,15 @@
 //     if (cmd == "eyes") { /* เปลี่ยนอารมณ์ตา */ }
 //     link.report(id, true, "{\"ok\":1}");
 //   });
+//   link.hello("จอโต๊ะทำงาน", "esp32", "{\"mic\":true,\"eyes\":true}");
+//   link.onEyes([](const String& emotion, int intensity, bool stale) { /* วาดตา */ });
 //   link.loop();   // เรียกใน loop()
 #pragma once
 #include <WiFiClient.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <mbedtls/md.h>
+#include <mbedtls/base64.h>
 #include <functional>
 
 class No7Link {
@@ -27,10 +30,15 @@ class No7Link {
   void onCommand(std::function<void(const String&, const String&, const String&)> cb) { handler_ = cb; }
 
   void loop() {
-    if (millis() - lastPoll_ < intervalMs_) return;
-    lastPoll_ = millis();
     if (WiFi.status() != WL_CONNECTED) return;
-    pollAndRun();
+    if (millis() - lastPoll_ >= intervalMs_) {
+      lastPoll_ = millis();
+      pollAndRun();
+    }
+    if (millis() - lastEyes_ >= eyesIntervalMs_) {
+      lastEyes_ = millis();
+      pollEyes();
+    }
   }
 
   void report(const String& id, bool ok, const String& dataJson) {
@@ -42,10 +50,76 @@ class No7Link {
     request("POST", "/api/link/result", body);
   }
 
+  /* ---- 13.1 hello: บอก server ว่าบอร์ดนี้เป็นใคร มีอะไรบ้าง ---- */
+  bool hello(const String& name, const String& kind = "esp32", const String& capsJson = "{}") {
+    StaticJsonDocument<384> doc;
+    doc["name"] = name;
+    doc["kind"] = kind;
+    doc["firmware"] = "no7-esp32/1.5";
+    deserializeJson(doc["capabilities"], capsJson.isEmpty() ? "{}" : capsJson);
+    String body; serializeJson(doc, body);
+    return request("POST", "/api/link/hello", body).indexOf("\"ok\":true") >= 0;
+  }
+
+  /* ---- 13.2 eyes: ส่งอารมณ์ขึ้น server (จอ = บอร์ดนี้เอง หรือเครื่องอื่น) ---- */
+  bool sendEyes(const String& emotion, int intensity = 80, int ttlMs = 15000) {
+    StaticJsonDocument<192> doc;
+    doc["emotion"] = emotion;
+    doc["intensity"] = intensity;
+    doc["ttlMs"] = ttlMs;
+    String body; serializeJson(doc, body);
+    return request("POST", "/api/link/eyes", body).indexOf("\"ok\":true") >= 0;
+  }
+
+  /// callback(emotion, intensity, stale) — เรียกเฉพาะเมื่อค่าที่ได้เปลี่ยนจากเดิม
+  void onEyes(std::function<void(const String&, int, bool)> cb) { eyesHandler_ = cb; }
+
+  /// อ่านอารมณ์ล่าสุดแล้วเรียก callback (ถ้ามีและเปลี่ยน)
+  void pollEyes() {
+    if (!eyesHandler_) return;
+    String payload = request("GET", "/api/link/eyes");
+    if (payload.isEmpty()) return;
+    StaticJsonDocument<256> doc;
+    if (deserializeJson(doc, payload)) return;
+    if (doc["eyes"].isNull()) return;
+    String emotion = doc["eyes"]["emotion"] | "";
+    int intensity = doc["eyes"]["intensity"] | 80;
+    bool stale = doc["eyes"]["stale"] | false;
+    String key = emotion + "|" + String(intensity) + "|" + String(stale ? 1 : 0);
+    if (key == lastEyesKey_) return;
+    lastEyesKey_ = key;
+    eyesHandler_(emotion, intensity, stale);
+  }
+
+  /* ---- 13.3 voice: ส่ง chunk เสียงขึ้น server ให้ PC ดึงไปเล่น ---- */
+  bool sendVoice(const uint8_t* data, size_t len, bool final = false) {
+    if (len == 0) return false;
+    size_t b64Len = 0;
+    mbedtls_base64_encode(nullptr, 0, &b64Len, data, len);
+    if (b64Len == 0) return false;
+    char* b64 = (char*)malloc(b64Len + 1);
+    if (!b64) return false;
+    size_t written = 0;
+    int rc = mbedtls_base64_encode((unsigned char*)b64, b64Len + 1, &written, data, len);
+    if (rc != 0) { free(b64); return false; }
+    b64[written] = '\0';
+    DynamicJsonDocument doc(b64Len + 256);
+    doc["chunk"] = b64;
+    doc["mime"] = "audio/ogg";
+    doc["final"] = final;
+    String body; serializeJson(doc, body);
+    String res = request("POST", "/api/link/voice", body);
+    free(b64);
+    return res.indexOf("\"ok\":true") >= 0;
+  }
+
  private:
   String baseUrl_, code_, secretHex_;
   unsigned long lastPoll_ = 0, intervalMs_ = 3000;
+  unsigned long lastEyes_ = 0, eyesIntervalMs_ = 1000;
+  String lastEyesKey_;
   std::function<void(const String&, const String&, const String&)> handler_;
+  std::function<void(const String&, int, bool)> eyesHandler_;
 
   static void hexToBytes(const String& hex, uint8_t* out, size_t len) {
     for (size_t i = 0; i < len; i++) out[i] = strtoul(hex.substring(i * 2, i * 2 + 2).c_str(), nullptr, 16);

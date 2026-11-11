@@ -12,6 +12,16 @@ export const PRIORITIES = {
   3: { label: 'ด่วนมาก', emoji: '🔴' },
 };
 
+export const RECURRENCE_FREQS = {
+  hourly: 'ทุกชั่วโมง',
+  daily: 'ทุกวัน',
+  weekdays: 'วันจันทร์–ศุกร์',
+  weekly: 'ทุกสัปดาห์',
+  monthly: 'ทุกเดือน',
+};
+
+export const WEEKDAYS_TH = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'];
+
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
@@ -62,6 +72,87 @@ export function parseDue(input, now = Date.now()) {
   return null;
 }
 
+/** ทำความสะอาดกติกาการทำซ้ำ — คืน null ถ้าไม่ถูกต้อง/ปิด */
+export function normalizeRecurrence(raw) {
+  if (!raw) return null;
+  if (raw === 'daily' || raw === 'weekdays' || raw === 'weekly' || raw === 'hourly' || raw === 'monthly') {
+    return { freq: raw, interval: 1, weekday: null, at: '' };
+  }
+  if (typeof raw !== 'object') return null;
+  const freq = String(raw.freq || raw.type || '').toLowerCase();
+  if (!RECURRENCE_FREQS[freq]) return null;
+  const interval = Number(raw.interval);
+  const weekday = Number(raw.weekday);
+  const at = /^([01]?\d|2[0-3]):([0-5]\d)$/.test(String(raw.at || '')) ? String(raw.at) : '';
+  return {
+    freq,
+    interval: Number.isFinite(interval) && interval > 0 ? Math.min(90, Math.round(interval)) : 1,
+    weekday: freq === 'weekly' && Number.isInteger(weekday) && weekday >= 0 && weekday <= 6 ? weekday : null,
+    at,
+  };
+}
+
+/**
+ * เวลารอบถัดไปของงานที่ทำซ้ำ
+ * @param {string|number|Date} from จุดเริ่ม (ปกติคือ due เดิม หรือ now)
+ * @param {object|string} recurrence
+ */
+export function nextOccurrence(from, recurrence, now = Date.now()) {
+  const rec = normalizeRecurrence(recurrence);
+  if (!rec) return null;
+  const base = new Date(from ?? now);
+  const start = Number.isNaN(base.getTime()) ? new Date(now) : base;
+  const next = new Date(start.getTime());
+  const every = rec.interval || 1;
+  const [hh, mm] = rec.at ? rec.at.split(':').map(Number) : [start.getHours(), start.getMinutes()];
+
+  if (rec.freq === 'hourly') {
+    next.setTime(start.getTime() + every * HOUR);
+    return next.toISOString();
+  }
+  if (rec.freq === 'daily' || rec.freq === 'weekdays' || rec.freq === 'weekly') {
+    if (rec.freq === 'weekly') {
+      const target = rec.weekday ?? start.getDay();
+      // ถ้าอยู่ในวันเป้าหมายแล้ว → ข้ามไปอีก interval สัปดาห์
+      const days = rec.weekday != null && start.getDay() !== target
+        ? (target - start.getDay() + 7) % 7
+        : 7 * every;
+      next.setDate(next.getDate() + (days || 7 * every));
+    } else {
+      next.setDate(next.getDate() + 1);
+    }
+    next.setHours(hh, mm, 0, 0);
+    if (rec.freq === 'weekdays') {
+      // ข้ามเสาร์–อาทิตย์
+      while (next.getDay() === 0 || next.getDay() === 6) next.setDate(next.getDate() + 1);
+      if (every > 1) {
+        // ทุก N วันทำการ: นับเฉพาะวันจันทร์–ศุกร์
+        let remaining = every - 1;
+        while (remaining > 0) {
+          next.setDate(next.getDate() + 1);
+          if (next.getDay() !== 0 && next.getDay() !== 6) remaining -= 1;
+        }
+      }
+    }
+    return next.toISOString();
+  }
+  if (rec.freq === 'monthly') {
+    next.setMonth(next.getMonth() + every);
+    next.setHours(hh, mm, 0, 0);
+    return next.toISOString();
+  }
+  return null;
+}
+
+export function describeRecurrence(recurrence) {
+  const rec = normalizeRecurrence(recurrence);
+  if (!rec) return '';
+  const base = RECURRENCE_FREQS[rec.freq];
+  const every = rec.interval > 1 ? `ทุก ${rec.interval} ${rec.freq === 'hourly' ? 'ชั่วโมง' : rec.freq === 'monthly' ? 'เดือน' : 'สัปดาห์'}` : base;
+  const weekday = rec.freq === 'weekly' && rec.weekday != null ? ` (${WEEKDAYS_TH[rec.weekday]})` : '';
+  return `${every}${weekday}${rec.at ? ` ${rec.at}` : ''}`.trim();
+}
+
 export function normalizeTask(raw = {}, now = Date.now()) {
   const title = String(raw.title || raw.text || '').trim().slice(0, 200);
   if (!title) return null;
@@ -79,6 +170,8 @@ export function normalizeTask(raw = {}, now = Date.now()) {
     updatedAt: Number(raw.updatedAt) || created,
     notifiedAt: raw.notifiedAt ? Number(raw.notifiedAt) : null,
     deleted: raw.deleted === true,
+    recurrence: normalizeRecurrence(raw.recurrence),
+    repeatCount: Number(raw.repeatCount) || 0,
     device: raw.device ? String(raw.device).slice(0, 40) : '',
   };
 }
@@ -142,11 +235,13 @@ export class TaskStore {
     try { this.storage?.setItem(this.key, JSON.stringify(this.tasks)); } catch { /* quota */ }
   }
 
-  add({ title, notes = '', due = null, priority = 0, tags = [], device = '' } = {}) {
+  add({ title, notes = '', due = null, priority = 0, tags = [], device = '', recurrence = null } = {}) {
     const now = this.now();
+    const rec = normalizeRecurrence(recurrence);
+    const firstDue = due ? parseDue(due, now) : rec ? nextOccurrence(now, rec, now) : null;
     const task = normalizeTask({
       id: `t_${now.toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
-      title, notes, due, priority, tags, device,
+      title, notes, due: firstDue, priority, tags, device, recurrence: rec,
       createdAt: now, updatedAt: now,
     }, now);
     if (!task) throw new Error('ต้องมีชื่องาน');
@@ -179,7 +274,29 @@ export class TaskStore {
     return task;
   }
 
-  complete(id, done = true) { return this.update(id, { done }); }
+  /**
+   * ปิดงาน — ถ้าเป็นงานซ้ำ จะเลื่อนไปรอบถัดไปโดยไม่ปิดจริง
+   * @returns {{task: object|null, advanced: boolean}}
+   */
+  complete(id, done = true) {
+    const task = this.get(id);
+    if (!task) return { task: null, advanced: false };
+    if (!done) { this.update(id, { done: false }); return { task: this.get(id), advanced: false }; }
+    const rec = normalizeRecurrence(task.recurrence);
+    if (!rec) {
+      this.update(id, { done: true });
+      return { task: this.get(id), advanced: false };
+    }
+    const next = nextOccurrence(task.due || this.now(), rec, this.now());
+    task.done = false;
+    task.doneAt = this.now();
+    task.due = next;
+    task.notifiedAt = null;
+    task.repeatCount = (task.repeatCount || 0) + 1;
+    task.updatedAt = this.now();
+    this._save();
+    return { task, advanced: true };
+  }
 
   remove(id) {
     const task = this.get(id);

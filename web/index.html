@@ -26,6 +26,7 @@
           <button data-view="memory">🧠 ความจำ</button>
           <button data-view="calendar">📅 ตารางนัด</button>
           <button data-view="devices">🔗 อุปกรณ์</button>
+          <button data-view="desktop">🖥️ เดสก์ท็อป</button>
           <button data-view="settings">⚙️ ตั้งค่า</button>
         </nav>
         <div class="sidebar-foot">
@@ -137,6 +138,7 @@
           <h3>✅ งานที่ต้องทำ</h3>
           <p class="hint">มีเวลาเตือน + ซิงก์ข้ามเครื่องผ่าน <code>/api/sync</code> (last-write-wins)</p>
           <div id="task-stats" class="hint"></div>
+          <div id="task-server-status" class="hint"></div>
           <div class="row">
             <input id="task-title" placeholder="งาน เช่น ส่งรายงาน" />
             <input id="task-when" type="datetime-local" />
@@ -148,6 +150,14 @@
               <option value="1">🔵 สำคัญ</option>
               <option value="2">🟠 ด่วน</option>
               <option value="3">🔴 ด่วนมาก</option>
+            </select>
+            <select id="task-repeat" title="ทำซ้ำ">
+              <option value="">ไม่ซ้ำ</option>
+              <option value="daily">🔁 ทุกวัน</option>
+              <option value="weekdays">🔁 จันทร์–ศุกร์</option>
+              <option value="weekly">🔁 ทุกสัปดาห์</option>
+              <option value="monthly">🔁 ทุกเดือน</option>
+              <option value="hourly">🔁 ทุกชั่วโมง</option>
             </select>
             <select id="task-filter">
               <option value="open">ค้างอยู่</option>
@@ -183,6 +193,59 @@
           </div>
           <p id="dev-status" class="hint"></p>
           <pre id="dev-log" class="code" hidden></pre>
+
+          <h3>🔊 hello · eyes · voice</h3>
+          <p class="hint">
+            hello = อุปกรณ์บอกว่าตัวเองมีความสามารถอะไร · eyes = ส่งอารมณ์ให้จอ ESP32 วาด ·
+            voice = ดูคิวเสียงที่อุปกรณ์ส่งขึ้นมาให้ PC ดึง
+          </p>
+          <div class="row">
+            <select id="link-device"></select>
+            <button id="link-hello">💓 hello</button>
+            <input id="link-emotion" placeholder="อารมณ์" value="happy" maxlength="20" />
+            <button id="link-eyes">👀 ส่งอารมณ์</button>
+          </div>
+          <div class="row">
+            <button id="link-eyes-read">📖 ดึงอารมณ์ล่าสุด</button>
+            <button id="link-voice-status">🎧 สถานะเสียง</button>
+          </div>
+          <p id="link-status" class="hint">เลือกอุปกรณ์แล้วกด hello เพื่อเริ่ม</p>
+        </section>
+
+        <section id="view-desktop" class="view">
+          <h2>🖥️ เดสก์ท็อป</h2>
+          <p class="hint">
+            รู้ว่ามีหน้าต่างอะไรเปิดอยู่ และรัน "สูตร" หลายขั้นให้จบในครั้งเดียว —
+            ทุกขั้นวิ่งผ่าน allowlist ในหน้าตั้งค่า และลองก่อน (dry-run) ได้เสมอ
+          </p>
+
+          <h3>🪟 หน้าต่างที่เปิดอยู่</h3>
+          <div class="row">
+            <input id="win-query" placeholder="ค้นหาชื่อหน้าต่าง เช่น Chrome" autocomplete="off" />
+            <button id="win-refresh">🔄 อ่านรายการ</button>
+          </div>
+          <p id="win-status" class="hint">กด "อ่านรายการ" เพื่อดูหน้าต่างบนจอ (เดสก์ท็อปแอปเท่านั้น)</p>
+          <div id="win-list"></div>
+
+          <h3>🧩 สูตรอัตโนมัติ</h3>
+          <p class="hint">
+            หนึ่งบรรทัด = หนึ่งขั้น: <code>open_app notepad</code> · <code>open_url https://…</code> ·
+            <code>focus_window Chrome</code> · <code>wait 800</code> · <code>notify เริ่มงาน</code>
+            (สูงสุด 8 ขั้น, รอรวมไม่เกิน 15 วินาที)
+          </p>
+          <div class="row">
+            <select id="recipe-select" title="สูตรที่บันทึกไว้"><option value="">— สูตรใหม่ —</option></select>
+            <input id="recipe-name" placeholder="ชื่อสูตร เช่น โหมดทำงานเช้า" maxlength="60" />
+          </div>
+          <textarea id="recipe-steps" rows="5" placeholder="open_url https://calendar.google.com&#10;wait 800&#10;notify เริ่มงานได้เลย"></textarea>
+          <div class="row">
+            <button id="recipe-save">💾 บันทึกสูตร</button>
+            <button id="recipe-try">🔍 ลองก่อน (dry-run)</button>
+            <button id="recipe-run">▶️ รันสูตร</button>
+            <button id="recipe-delete">🗑 ลบสูตร</button>
+          </div>
+          <p id="recipe-status" class="hint"></p>
+          <pre id="recipe-log" class="code" hidden></pre>
         </section>
 
         <section id="view-settings" class="view">
@@ -456,7 +519,14 @@
               <label>Client ID <input id="mcp-oauth-client" /></label>
               <label>Scopes (คั่นด้วยช่องว่าง) <input id="mcp-oauth-scopes" placeholder="https://www.googleapis.com/auth/gmail.readonly" /></label>
             </div>
-            <p class="hint">ต้องเปิดผ่าน https:// หรือ localhost · token เก็บในเครื่องนี้เท่านั้น</p>
+            <div class="grid2">
+              <label>Device Authorization URL <input id="mcp-oauth-device" placeholder="https://…/oauth/device_authorization" /></label>
+              <label>Registration URL (DCR) <input id="mcp-oauth-register" placeholder="https://…/register" /></label>
+            </div>
+            <p class="hint">
+              ต้องเปิดผ่าน https:// หรือ localhost · token เก็บในเครื่องนี้เท่านั้น ·
+              มี Device URL = ล็อกอินด้วยรหัสได้ (ไม่ต้องมี redirect) · มี Registration URL = ขอ client id เองได้
+            </p>
           </details>
           <div class="row">
             <button id="mcp-add">➕ เพิ่ม server</button>

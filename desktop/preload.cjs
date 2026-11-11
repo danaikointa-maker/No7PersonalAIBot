@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('no7', {
     notify: (title, body) => ipcRenderer.invoke('no7:notify', { title, body }),
     runCommand: (req) => ipcRenderer.invoke('no7:run-command', req),
     controlInfo: () => ipcRenderer.invoke('no7:control-info'),
+    listWindows: () => ipcRenderer.invoke('no7:list-windows'),
+    focusWindow: (target) => ipcRenderer.invoke('no7:focus-window', target),
     toggleOverlay: () => ipcRenderer.invoke('no7:toggle-overlay'),
     sendSubtitle: (text) => ipcRenderer.send('no7:subtitle', text),
     sendEmotion: (emotion) => ipcRenderer.send('no7:emotion', emotion),

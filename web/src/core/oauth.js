@@ -270,3 +270,233 @@ export class OAuthSession {
     return this.store.set(this.name, tokens);
   }
 }
+
+/* ============================================================================
+ * OAuth 2.0 Device Authorization Grant (RFC 8628) + Dynamic Client Registration
+ * (RFC 7591) — สำหรับ MCP server ที่ไม่รองรับ redirect URI (เช่น CLI/เดสก์ท็อป)
+ *
+ * ผู้ใช้เห็น "รหัสสั้น ๆ + ลิงก์" ไปกรอกบนมือถือ/เบราว์เซอร์ แล้วแอปจะ poll
+ * จนได้ token — ไม่ต้องมี redirect, ไม่ต้องมี client secret ในเบราว์เซอร์
+ * ========================================================================== */
+
+export const DEVICE_GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
+export const DEVICE_DEFAULT_TTL_SEC = 600;
+export const DEVICE_MAX_INTERVAL_SEC = 60;
+
+/** แปลงผล device authorization → รูปแบบที่ UI ใช้ */
+export function normalizeDeviceCode(json = {}, now = Date.now()) {
+  const expiresIn = Number(json.expires_in);
+  const interval = Number(json.interval);
+  return {
+    deviceCode: json.device_code || json.deviceCode || '',
+    userCode: json.user_code || json.userCode || '',
+    verificationUri: json.verification_uri || json.verificationUri || json.verification_url || '',
+    verificationUriComplete: json.verification_uri_complete || json.verificationUriComplete || '',
+    expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : DEVICE_DEFAULT_TTL_SEC,
+    expiresAt: now + (Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : DEVICE_DEFAULT_TTL_SEC) * 1000,
+    interval: Number.isFinite(interval) && interval > 0 ? Math.min(DEVICE_MAX_INTERVAL_SEC, Math.max(1, interval)) : 5,
+    scope: typeof json.scope === 'string' ? json.scope : '',
+    raw: json,
+  };
+}
+
+async function readJson(res) {
+  const text = await res.text();
+  try { return { json: text ? JSON.parse(text) : {}, text }; } catch { return { json: {}, text }; }
+}
+
+/** POST ฟอร์มไปที่ endpoint (ผ่าน proxy หรือตรง) แล้วคืน JSON + status */
+async function postForm({ url, fields, serverUrl, proxyPath, extraBody = {}, fetchImpl = null }) {
+  const doFetch = fetchImpl || ((...a) => fetch(...a));
+  const clean = {};
+  for (const [k, v] of Object.entries(fields)) if (v !== '' && v != null) clean[k] = String(v);
+
+  if (serverUrl && proxyPath) {
+    const res = await doFetch(`${String(serverUrl).replace(/\/$/, '')}${proxyPath}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...extraBody, ...clean }),
+    });
+    if (!res.ok) throw new Error(`oauth proxy HTTP ${res.status}`);
+    const envelope = await res.json();
+    const { json, text } = await readJson({ text: async () => String(envelope.body || '') });
+    return { status: Number(envelope.status) || 0, json, text };
+  }
+
+  const params = new URLSearchParams(clean);
+  const res = await doFetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
+    body: params.toString(),
+  });
+  const { json, text } = await readJson(res);
+  return { status: res.status, json, text };
+}
+
+/**
+ * 14.1 ขอ device code
+ * @returns {Promise<object>} ผลจาก normalizeDeviceCode()
+ */
+export async function requestDeviceCode({
+  deviceAuthorizationUrl, clientId = '', scope = '', serverUrl = '',
+  fetchImpl = null, now = () => Date.now(), extraParams = {},
+} = {}) {
+  if (!deviceAuthorizationUrl) throw new Error('ต้องระบุ deviceAuthorizationUrl');
+  const { status, json, text } = await postForm({
+    url: deviceAuthorizationUrl,
+    serverUrl,
+    proxyPath: '/api/oauth/device',
+    extraBody: { deviceAuthorizationUrl },
+    fields: { client_id: clientId, scope, ...extraParams },
+    fetchImpl,
+  });
+  if (status >= 400 || json.error) {
+    throw new Error(`device code ${status}: ${json.error_description || json.error || text.slice(0, 160)}`);
+  }
+  const out = normalizeDeviceCode(json, now());
+  if (!out.deviceCode || !out.userCode) throw new Error('device code: response ไม่มี device_code/user_code');
+  return out;
+}
+
+/** ขอ token หนึ่งครั้งด้วย device code (คืน error code ผ่าน err.code) */
+export async function requestDeviceToken({
+  tokenUrl, deviceCode, clientId = '', clientSecret = '', scope = '',
+  serverUrl = '', fetchImpl = null, now = () => Date.now(),
+} = {}) {
+  if (!tokenUrl) throw new Error('ต้องระบุ tokenUrl');
+  if (!deviceCode) throw new Error('ต้องระบุ deviceCode');
+  const { status, json, text } = await postForm({
+    url: tokenUrl,
+    serverUrl,
+    proxyPath: '/api/oauth/token',
+    extraBody: { tokenUrl },
+    fields: {
+      grant_type: DEVICE_GRANT,
+      device_code: deviceCode,
+      client_id: clientId,
+      client_secret: clientSecret,
+      scope,
+    },
+    fetchImpl,
+  });
+  if (json.error) {
+    const err = new Error(`oauth: ${json.error_description || json.error}`);
+    err.code = json.error;
+    err.status = status;
+    throw err;
+  }
+  if (status >= 400) {
+    throw Object.assign(new Error(`oauth ${status}: ${text.slice(0, 160)}`), { code: 'server_error', status });
+  }
+  const tokens = normalizeTokenResponse(json, now());
+  if (!tokens.accessToken) throw new Error('oauth: ไม่ได้รับ access_token');
+  return tokens;
+}
+
+/**
+ * 14.1 poll จนได้ token — จัดการ `authorization_pending`, `slow_down`, `expired_token`,
+ * `access_denied` ตาม RFC 8628
+ * @returns {Promise<object>} token ที่ normalize แล้ว
+ */
+export async function pollDeviceToken({
+  deviceCode, tokenUrl, clientId = '', clientSecret = '', scope = '',
+  interval = 5, expiresAt = 0, serverUrl = '', fetchImpl = null,
+  now = () => Date.now(), sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  onPending = null, maxAttempts = 200,
+} = {}) {
+  let waitSec = Math.min(DEVICE_MAX_INTERVAL_SEC, Math.max(1, Number(interval) || 5));
+  const deadline = Number(expiresAt) > 0 ? Number(expiresAt) : now() + DEVICE_DEFAULT_TTL_SEC * 1000;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (now() > deadline) break;
+    try {
+      return await requestDeviceToken({
+        tokenUrl, deviceCode, clientId, clientSecret, scope, serverUrl, fetchImpl, now,
+      });
+    } catch (err) {
+      const code = err?.code || '';
+      if (code === 'authorization_pending') {
+        onPending?.({ status: 'pending', attempt, interval: waitSec });
+      } else if (code === 'slow_down') {
+        waitSec = Math.min(DEVICE_MAX_INTERVAL_SEC, waitSec + 5);
+        onPending?.({ status: 'slow_down', attempt, interval: waitSec });
+      } else if (code === 'expired_token') {
+        throw Object.assign(new Error('รหัสล็อกอินหมดอายุ — เริ่มขั้นตอนใหม่'), { code });
+      } else if (code === 'access_denied') {
+        throw Object.assign(new Error('ผู้ใช้ปฏิเสธการให้สิทธิ์'), { code });
+      } else {
+        throw err;
+      }
+    }
+    if (now() >= deadline) break;
+    await sleep(waitSec * 1000);
+  }
+  throw Object.assign(new Error('หมดเวลารอการยืนยันรหัส — ลองใหม่'), { code: 'expired_token' });
+}
+
+/** 14.2 Dynamic Client Registration — ลงทะเบียน client เอง (MCP spec 2025) */
+export async function registerClient({
+  registrationUrl, clientName = 'No7 Personal AI Bot', redirectUris = [],
+  grantTypes = ['authorization_code', 'refresh_token', DEVICE_GRANT],
+  scopes = [], tokenEndpointAuthMethod = 'none', softwareId = 'no7-personal-ai-bot',
+  softwareVersion = '1.5', serverUrl = '', fetchImpl = null,
+} = {}) {
+  if (!registrationUrl) throw new Error('ต้องระบุ registrationUrl');
+  const payload = {
+    client_name: clientName,
+    redirect_uris: redirectUris,
+    grant_types: grantTypes,
+    response_types: ['code'],
+    token_endpoint_auth_method: tokenEndpointAuthMethod,
+    software_id: softwareId,
+    software_version: softwareVersion,
+  };
+  if (scopes.length) payload.scope = Array.isArray(scopes) ? scopes.join(' ') : String(scopes);
+
+  const doFetch = fetchImpl || ((...a) => fetch(...a));
+  let status = 0;
+  let json = {};
+  let text = '';
+  if (serverUrl) {
+    const res = await doFetch(`${String(serverUrl).replace(/\/$/, '')}/api/oauth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ registrationUrl, client: payload }),
+    });
+    if (!res.ok) throw new Error(`register proxy HTTP ${res.status}`);
+    const envelope = await res.json();
+    status = Number(envelope.status) || 0;
+    text = String(envelope.body || '');
+    try { json = text ? JSON.parse(text) : {}; } catch { json = {}; }
+  } else {
+    const res = await doFetch(registrationUrl, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    status = res.status;
+    ({ json, text } = await readJson(res));
+  }
+
+  if (status >= 400 || json.error) {
+    throw new Error(`register ${status}: ${json.error_description || json.error || text.slice(0, 160)}`);
+  }
+  const clientId = json.client_id || json.clientId || '';
+  if (!clientId) throw new Error('register: response ไม่มี client_id');
+  return {
+    clientId,
+    clientSecret: json.client_secret || json.clientSecret || '',
+    registrationAccessToken: json.registration_access_token || '',
+    registrationClientUri: json.registration_client_uri || '',
+    tokenEndpointAuthMethod: json.token_endpoint_auth_method || tokenEndpointAuthMethod,
+    scope: json.scope || payload.scope || '',
+    raw: json,
+  };
+}
+
+/** ช่วยเลือกวิธีล็อกอินที่ server รองรับ (device flow ก่อน แล้วค่อย PKCE) */
+export function oauthMethodFor(oauth = {}) {
+  if (oauth.deviceAuthorizationUrl || oauth.deviceAuthorizationEndpoint) return 'device';
+  if (oauth.authorizeUrl) return 'pkce';
+  return 'none';
+}

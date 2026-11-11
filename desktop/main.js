@@ -139,6 +139,52 @@ ipcMain.handle('no7:run-command', async (_e, req = {}) => {
   });
 });
 
+/* ------------------------------------------------- desktop awareness */
+/** รันคำสั่งสั้น ๆ แบบไม่ผ่าน shell (ใช้เฉพาะคำสั่งคงที่ของ OS) */
+async function runFile(cmd, args, timeout = 4000) {
+  const { execFile } = await import('node:child_process');
+  return new Promise((resolve) => {
+    execFile(cmd, args, { timeout, windowsHide: true, maxBuffer: 256 * 1024 }, (err, stdout, stderr) => {
+      resolve({ ok: !err, stdout: String(stdout || ''), stderr: String(stderr || '') || err?.message || '' });
+    });
+  });
+}
+
+ipcMain.handle('no7:list-windows', async () => {
+  const platform = process.platform;
+  if (platform === 'win32') {
+    const res = await runFile('powershell', ['-NoProfile', '-NonInteractive', '-Command',
+      'Get-Process | Where-Object { $_.MainWindowTitle } | Select-Object -ExpandProperty MainWindowTitle']);
+    return { platform, stdout: res.stdout, error: res.ok ? '' : res.stderr };
+  }
+  if (platform === 'darwin') {
+    const res = await runFile('osascript', ['-e', 'tell application "System Events" to get name of every process whose visible is true']);
+    return { platform, stdout: res.stdout, error: res.ok ? '' : res.stderr };
+  }
+  const res = await runFile('wmctrl', ['-l']);
+  return { platform, stdout: res.stdout, error: res.ok ? '' : res.stderr };
+});
+
+ipcMain.handle('no7:focus-window', async (_e, target) => {
+  const title = String(target || '').trim();
+  if (!title) throw new Error('ต้องระบุชื่อหน้าต่าง');
+  const platform = process.platform;
+  let res;
+  if (platform === 'win32') {
+    const escaped = title.replace(/'/g, "''");
+    res = await runFile('powershell', ['-NoProfile', '-NonInteractive', '-Command',
+      `(New-Object -ComObject WScript.Shell).AppActivate('${escaped}')`]);
+  } else if (platform === 'darwin') {
+    const escaped = title.replace(/["\\]/g, '\\$&');
+    res = await runFile('osascript', ['-e', `tell application "${escaped}" to activate`]);
+  } else {
+    res = await runFile('wmctrl', ['-a', title]);
+    if (!res.ok) res = await runFile('xdotool', ['search', '--name', title, 'windowactivate']);
+  }
+  if (!res.ok) throw new Error(res.stderr || `โฟกัส "${title}" ไม่สำเร็จ (ต้องมี wmctrl บน Linux)`);
+  return true;
+});
+
 ipcMain.handle('no7:notify', (_e, { title, body }) => {
   if (Notification.isSupported()) new Notification({ title, body }).show();
   return true;

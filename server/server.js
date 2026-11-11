@@ -17,6 +17,7 @@ import {
   BotSessions, normalizeTelegramUpdate, normalizeLineEvents, verifyLineSignature,
   handleBotMessage, sendTelegramMessage, replyLine,
 } from './bots.js';
+import { normalizeTask, nextOccurrence, mergeTaskLists } from '../web/src/core/tasks.js';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -47,7 +48,8 @@ const MIME = {
 const pairings = new Map();
 
 /** Sync store: เก็บล่าสุดในหน่วยความจำ + ไฟล์ .no7/sync.json (ถ้าเขียนได้) */
-const SYNC_DIR = path.join(ROOT, '.no7');
+const DATA_DIR = process.env.NO7_DATA_DIR ? path.resolve(process.env.NO7_DATA_DIR) : path.join(ROOT, '.no7');
+const SYNC_DIR = DATA_DIR;
 const SYNC_FILE = path.join(SYNC_DIR, 'sync.json');
 const SYNC_TOKEN = process.env.NO7_SYNC_TOKEN || '';
 
@@ -61,6 +63,81 @@ function writeSync(data) {
     return true;
   } catch { return false; }
 }
+/* ---------------- Reminders pushed by the server ----------------
+ * ไคลเอนต์ PUT งานที่มีเวลามาที่นี่ → server ตรวจทุก TICK และ
+ *   - เก็บคิวให้ไคลเอนต์ดึง (GET /api/reminders/due)
+ *   - ส่ง Telegram ให้ถ้าตั้ง TELEGRAM_REMINDER_CHAT_ID
+ * งานซ้ำจะถูกเลื่อนรอบถัดไปอัตโนมัติหลังแจ้ง
+ */
+const REMINDER_FILE = path.join(SYNC_DIR, 'reminders.json');
+const REMINDER_TICK_MS = Number(process.env.NO7_REMINDER_TICK_MS || 30000);
+const REMINDER_CHAT_ID = process.env.TELEGRAM_REMINDER_CHAT_ID || '';
+
+function readReminders() {
+  try {
+    const data = JSON.parse(fs.readFileSync(REMINDER_FILE, 'utf8'));
+    return Array.isArray(data?.items) ? data : { updatedAt: 0, items: [] };
+  } catch { return { updatedAt: 0, items: [] }; }
+}
+
+function writeReminders(data) {
+  try {
+    fs.mkdirSync(SYNC_DIR, { recursive: true });
+    fs.writeFileSync(REMINDER_FILE, JSON.stringify(data, null, 2));
+    return true;
+  } catch { return false; }
+}
+
+let reminderState = readReminders();
+
+function reminderDueList(now = Date.now()) {
+  return reminderState.items.filter((t) => !t.done && !t.deleted && t.due
+    && !t.pushedAt && Date.parse(t.due) <= now);
+}
+
+function reminderUpcoming(days = 7, limit = 10, now = Date.now()) {
+  const until = now + days * 24 * 3600 * 1000;
+  return reminderState.items
+    .filter((t) => !t.done && !t.deleted && !t.pushedAt && t.due && Date.parse(t.due) <= until)
+    .sort((a, b) => Date.parse(a.due) - Date.parse(b.due))
+    .slice(0, limit);
+}
+
+async function pushReminders() {
+  const due = reminderDueList();
+  if (!due.length) return [];
+  const sent = [];
+  for (const item of due) {
+    if (REMINDER_CHAT_ID && BOTS.telegram.token) {
+      try {
+        await sendTelegramMessage({
+          token: BOTS.telegram.token,
+          chatId: REMINDER_CHAT_ID,
+          text: `⏰ ${item.title}${item.recurrence ? ' 🔁' : ''}\n${new Date(item.due).toLocaleString('th-TH')}`,
+          apiBase: BOTS.telegram.apiBase,
+        });
+        sent.push(item.id);
+      } catch (e) {
+        console.warn('[reminders] telegram:', e.message);
+      }
+    }
+    item.pushedAt = Date.now();
+    if (item.recurrence) {
+      const next = nextOccurrence(item.due, item.recurrence, Date.now());
+      if (next) {
+        item.due = next;
+        item.pushedAt = null;          // รอบถัดไปต้องแจ้งอีก
+        item.repeatCount = (item.repeatCount || 0) + 1;
+      } else {
+        item.done = true;
+      }
+    }
+  }
+  reminderState.updatedAt = Date.now();
+  writeReminders(reminderState);
+  return sent;
+}
+
 /* ---------------- Chat bots: Telegram / LINE ---------------- */
 const BOTS = {
   telegram: {
@@ -253,7 +330,50 @@ const linkState = {
   queues: new Map(),    // code -> [{id, command, args, ts, delivered}]
   results: new Map(),   // code -> [{id, command, ok, data, ts}]
   seen: new Map(),      // code -> lastSeen ms
+  devices: new Map(),   // code -> {code,name,kind,firmware,capabilities,firstSeen,lastSeen,ip}
+  eyes: new Map(),      // code -> {emotion,mood,intensity,text,ttlMs,ts}
+  voice: new Map(),     // code -> {chunks:[{seq,mime,chunk,ts,final}], bytes, lastSeq}
 };
+
+/* ---------------- Phone-Link: hello / eyes / voice ---------------- */
+const LINK_DEVICES_FILE = path.join(SYNC_DIR, 'devices.json');
+const LINK_EYES_TTL_MS = 15000;
+const LINK_VOICE_MAX_CHUNK = 256 * 1024;       // ต่อ chunk (base64 decoded)
+const LINK_VOICE_MAX_BYTES = 2 * 1024 * 1024;  // ต่ออุปกรณ์ (ค้างในคิว)
+const LINK_VOICE_MAX_CHUNKS = 40;
+const LINK_VOICE_MIMES = ['audio/ogg', 'audio/opus', 'audio/pcm', 'audio/wav', 'audio/webm', 'audio/mpeg'];
+
+function loadLinkDevices() {
+  try {
+    const data = JSON.parse(fs.readFileSync(LINK_DEVICES_FILE, 'utf8'));
+    for (const [code, device] of Object.entries(data || {})) {
+      if (device && typeof device === 'object') linkState.devices.set(code, { ...device, code });
+    }
+  } catch { /* ยังไม่มีไฟล์ = เริ่มใหม่ */ }
+}
+function saveLinkDevices() {
+  try {
+    fs.mkdirSync(SYNC_DIR, { recursive: true });
+    const out = {};
+    for (const [code, device] of linkState.devices) out[code] = device;
+    fs.writeFileSync(LINK_DEVICES_FILE, JSON.stringify(out, null, 2));
+    return true;
+  } catch { return false; }
+}
+loadLinkDevices();
+
+function linkVoiceQueue(code) {
+  if (!linkState.voice.has(code)) linkState.voice.set(code, { chunks: [], bytes: 0, lastSeq: 0 });
+  return linkState.voice.get(code);
+}
+
+function currentEyes(code, ttlOverride) {
+  const eye = linkState.eyes.get(code);
+  if (!eye) return null;
+  const ttl = Number(ttlOverride) || eye.ttlMs || LINK_EYES_TTL_MS;
+  const ageMs = Date.now() - eye.ts;
+  return { ...eye, ageMs, stale: ageMs > ttl };
+}
 
 function verifyLink(req, method, raw = '') {
   const code = String(req.headers['x-no7-code'] || '');
@@ -350,9 +470,11 @@ async function handleApi(req, res, url) {
       hasDist: fs.existsSync(path.join(DIST, 'index.html')),
       sync: { enabled: true, requiresToken: !!SYNC_TOKEN, hasData: !!readSync() },
       endpoints: ['/api/health', '/api/chat', '/api/tools', '/api/tools/run', '/api/pair', '/api/sync', '/api/fetch',
-        '/api/link/command', '/api/link/poll', '/api/link/status', '/api/link/results', '/api/tts', '/api/mcp',
-        '/api/mcp/stdio', '/api/oauth/token',
-        '/api/bots/status', '/api/telegram/webhook', '/api/line/webhook'],
+        '/api/link/command', '/api/link/poll', '/api/link/status', '/api/link/results',
+        '/api/link/hello', '/api/link/eyes', '/api/link/voice', '/api/link/voice/ack', '/api/link/voice/status', '/api/tts', '/api/mcp',
+        '/api/mcp/stdio', '/api/oauth/token', '/api/oauth/device', '/api/oauth/register',
+        '/api/bots/status', '/api/telegram/webhook', '/api/line/webhook',
+        '/api/reminders', '/api/reminders/due', '/api/reminders/upcoming', '/api/reminders/ack', '/api/reminders/status'],
       aiKeys: {
         gemini: !!process.env.GEMINI_API_KEY,
         openai: !!process.env.OPENAI_API_KEY,
@@ -423,6 +545,55 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  // ---- Reminders (server-side push) ----
+  if (url.pathname === '/api/reminders' && req.method === 'PUT') {
+    let body;
+    try { body = await readBody(req); } catch (e) { return json(res, 400, { error: e.message }); }
+    const incoming = Array.isArray(body.tasks) ? body.tasks : [];
+    const normalized = incoming.map((t) => normalizeTask(t)).filter((t) => t && !t.deleted && t.due);
+    const merged = mergeTaskLists(reminderState.items, normalized).tasks
+      .filter((t) => !t.deleted && t.due);
+    reminderState = { updatedAt: Date.now(), items: merged };
+    const persisted = writeReminders(reminderState);
+    return json(res, 200, { ok: true, count: merged.length, persisted });
+  }
+
+  if (url.pathname === '/api/reminders/due' && req.method === 'GET') {
+    return json(res, 200, { now: Date.now(), items: reminderDueList() });
+  }
+
+  if (url.pathname === '/api/reminders/upcoming' && req.method === 'GET') {
+    const days = Math.max(1, Math.min(60, Number(url.searchParams.get('days')) || 7));
+    const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit')) || 10));
+    return json(res, 200, { items: reminderUpcoming(days, limit) });
+  }
+
+  if (url.pathname === '/api/reminders/ack' && req.method === 'POST') {
+    let body;
+    try { body = await readBody(req); } catch (e) { return json(res, 400, { error: e.message }); }
+    const ids = new Set(Array.isArray(body.ids) ? body.ids.map(String) : []);
+    let changed = 0;
+    for (const item of reminderState.items) {
+      if (ids.has(item.id) && !item.pushedAt) { item.pushedAt = Date.now(); changed += 1; }
+    }
+    reminderState.updatedAt = Date.now();
+    writeReminders(reminderState);
+    return json(res, 200, { ok: true, changed });
+  }
+
+  if (url.pathname === '/api/reminders/status' && req.method === 'GET') {
+    const now = Date.now();
+    const upcoming = reminderUpcoming(7, 3, now);
+    return json(res, 200, {
+      count: reminderState.items.length,
+      due: reminderDueList(now).length,
+      next: upcoming[0] || null,
+      telegram: { configured: !!(REMINDER_CHAT_ID && BOTS.telegram.token), chatId: REMINDER_CHAT_ID ? `***${String(REMINDER_CHAT_ID).slice(-4)}` : null },
+      tickMs: REMINDER_TICK_MS,
+      updatedAt: reminderState.updatedAt,
+    });
+  }
+
   // ---- Chat bots ----
   if (url.pathname === '/api/bots/status' && req.method === 'GET') {
     return json(res, 200, {
@@ -481,7 +652,7 @@ async function handleApi(req, res, url) {
     try { target = new URL(String(body.tokenUrl || '')); } catch { return json(res, 400, { error: 'tokenUrl ไม่ถูกต้อง' }); }
     if (!/^https?:$/.test(target.protocol)) return json(res, 400, { error: 'รองรับเฉพาะ http/https' });
     const form = new URLSearchParams();
-    for (const key of ['grant_type', 'code', 'redirect_uri', 'client_id', 'code_verifier', 'refresh_token', 'scope']) {
+    for (const key of ['grant_type', 'code', 'redirect_uri', 'client_id', 'code_verifier', 'refresh_token', 'scope', 'device_code']) {
       if (body[key] != null && body[key] !== '') form.set(key, String(body[key]));
     }
     if (!form.get('grant_type')) return json(res, 400, { error: 'ต้องมี grant_type' });
@@ -497,6 +668,54 @@ async function handleApi(req, res, url) {
         contentType: r.headers.get('content-type') || '',
         body: text.slice(0, 100000),
       });
+    } catch (e) {
+      return json(res, 502, { error: e.message, status: 0, body: '' });
+    }
+  }
+
+  // ---- OAuth device flow proxy (RFC 8628): ขอ device code ให้เบราว์เซอร์ ----
+  if (url.pathname === '/api/oauth/device' && req.method === 'POST') {
+    const body = await readBody(req);
+    let target;
+    try { target = new URL(String(body.deviceAuthorizationUrl || '')); } catch { return json(res, 400, { error: 'deviceAuthorizationUrl ไม่ถูกต้อง' }); }
+    if (!/^https?:$/.test(target.protocol)) return json(res, 400, { error: 'รองรับเฉพาะ http/https' });
+    const form = new URLSearchParams();
+    for (const key of ['client_id', 'scope']) {
+      if (body[key] != null && body[key] !== '') form.set(key, String(body[key]));
+    }
+    if (body.extra && typeof body.extra === 'object') {
+      for (const [k, v] of Object.entries(body.extra)) {
+        if (typeof k === 'string' && (typeof v === 'string' || typeof v === 'number')) form.set(k, String(v));
+      }
+    }
+    try {
+      const r = await fetch(target, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+        body: form.toString(),
+      });
+      const text = await r.text();
+      return json(res, 200, { status: r.status, contentType: r.headers.get('content-type') || '', body: text.slice(0, 100000) });
+    } catch (e) {
+      return json(res, 502, { error: e.message, status: 0, body: '' });
+    }
+  }
+
+  // ---- OAuth dynamic client registration proxy (RFC 7591) ----
+  if (url.pathname === '/api/oauth/register' && req.method === 'POST') {
+    const body = await readBody(req);
+    let target;
+    try { target = new URL(String(body.registrationUrl || '')); } catch { return json(res, 400, { error: 'registrationUrl ไม่ถูกต้อง' }); }
+    if (!/^https?:$/.test(target.protocol)) return json(res, 400, { error: 'รองรับเฉพาะ http/https' });
+    const client = body.client && typeof body.client === 'object' ? body.client : {};
+    try {
+      const r = await fetch(target, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(client),
+      });
+      const text = await r.text();
+      return json(res, 200, { status: r.status, contentType: r.headers.get('content-type') || '', body: text.slice(0, 100000) });
     } catch (e) {
       return json(res, 502, { error: e.message, status: 0, body: '' });
     }
@@ -575,10 +794,14 @@ async function handleApi(req, res, url) {
     if (method === 'POST') {
       const raw = await new Promise((resolve, reject) => {
         let b = '';
-        req.on('data', (c) => { b += c; });
+        req.on('data', (c) => {
+          b += c;
+          if (b.length > 3_000_000) { reject(new Error('body ใหญ่เกิน 3 MB')); req.destroy(); }
+        });
         req.on('end', () => resolve(b));
         req.on('error', reject);
-      });
+      }).catch((e) => { json(res, 413, { error: e.message }); return null; });
+      if (raw === null) return;
       const code = verifyLink(req, method, raw);
       if (!code) return json(res, 401, { error: 'bad signature' });
 
@@ -605,6 +828,99 @@ async function handleApi(req, res, url) {
         linkState.results.set(code, r.slice(-50));
         return json(res, 200, { ok: true });
       }
+
+      // 13.1 hello — อุปกรณ์ลงทะเบียนตัวเอง + บอกว่ามีความสามารถอะไร
+      if (url.pathname === '/api/link/hello') {
+        const caps = body.capabilities && typeof body.capabilities === 'object' ? body.capabilities : {};
+        const prev = linkState.devices.get(code) || {};
+        const now = Date.now();
+        const device = {
+          code,
+          name: String(body.name || prev.name || 'device').slice(0, 40),
+          kind: String(body.kind || prev.kind || 'esp32').slice(0, 20),
+          firmware: String(body.firmware || prev.firmware || '').slice(0, 40),
+          capabilities: Object.fromEntries(['mic', 'speaker', 'eyes', 'screen', 'buttons', 'voice'].map((key) => [
+            key,
+            key in caps ? caps[key] === true : prev.capabilities?.[key] === true,
+          ])),
+          firstSeen: prev.firstSeen || now,
+          lastSeen: now,
+          ip: String(req.socket?.remoteAddress || '').replace('::ffff:', ''),
+        };
+        linkState.devices.set(code, device);
+        const persisted = saveLinkDevices();
+        return json(res, 200, {
+          ok: true,
+          protocol: 'no7-link/1',
+          serverTime: now,
+          device,
+          features: ['hello', 'eyes', 'voice', 'command', 'results'],
+          pollMs: 3000,
+          eyesTtlMs: LINK_EYES_TTL_MS,
+          persisted,
+        });
+      }
+
+      // 13.2 eyes — เก็บอารมณ์/ตาล่าสุดไว้ให้จอ ESP32 ดึงไปวาด
+      if (url.pathname === '/api/link/eyes') {
+        const emotion = String(body.emotion || body.mood || '').trim().slice(0, 20);
+        if (!emotion) return json(res, 400, { error: 'ต้องระบุ emotion' });
+        const intensityRaw = Number(body.intensity);
+        const eye = {
+          emotion,
+          mood: String(body.mood || emotion).slice(0, 20),
+          intensity: Number.isFinite(intensityRaw) ? Math.max(0, Math.min(100, Math.round(intensityRaw))) : 80,
+          text: String(body.text || '').slice(0, 120),
+          ttlMs: Math.max(1000, Math.min(60000, Number(body.ttlMs) || LINK_EYES_TTL_MS)),
+          ts: Date.now(),
+        };
+        linkState.eyes.set(code, eye);
+        return json(res, 200, { ok: true, eyes: { ...eye, code } });
+      }
+
+      // 13.3 voice — รับ chunk เสียงจากอุปกรณ์ (base64) เข้าคิวให้ไคลเอนต์ PC ดึง
+      if (url.pathname === '/api/link/voice') {
+        const chunk = typeof body.chunk === 'string' ? body.chunk.trim() : '';
+        if (!chunk) return json(res, 400, { error: 'ต้องส่ง chunk (base64)' });
+        if (!/^[A-Za-z0-9+/=\r\n]+$/.test(chunk)) return json(res, 400, { error: 'chunk ต้องเป็น base64' });
+        const bytes = Buffer.from(chunk, 'base64');
+        if (bytes.length > LINK_VOICE_MAX_CHUNK) {
+          return json(res, 413, { error: `chunk ใหญ่เกิน ${LINK_VOICE_MAX_CHUNK} ไบต์` });
+        }
+        const mime = String(body.mime || 'audio/ogg').toLowerCase();
+        if (!LINK_VOICE_MIMES.includes(mime)) {
+          return json(res, 415, { error: `ไม่รองรับ ${mime} — ใช้ ${LINK_VOICE_MIMES.join(', ')}` });
+        }
+        const queue = linkVoiceQueue(code);
+        const seqRaw = Number(body.seq);
+        const seq = Number.isFinite(seqRaw) && seqRaw > 0 ? Math.round(seqRaw) : queue.lastSeq + 1;
+        queue.chunks.push({
+          seq, mime, chunk, bytes: bytes.length, final: body.final === true, ts: Date.now(),
+        });
+        queue.bytes += bytes.length;
+        queue.lastSeq = Math.max(queue.lastSeq, seq);
+        while (queue.chunks.length > LINK_VOICE_MAX_CHUNKS || queue.bytes > LINK_VOICE_MAX_BYTES) {
+          const dropped = queue.chunks.shift();
+          queue.bytes -= dropped?.bytes || 0;
+          queue.dropped = (queue.dropped || 0) + 1;
+        }
+        return json(res, 200, {
+          ok: true, seq, chunks: queue.chunks.length, bytes: queue.bytes,
+          final: body.final === true, dropped: queue.dropped || 0,
+        });
+      }
+
+      // 13.3 ack — ไคลเอนต์ PC บอกว่าเล่นถึง seq ไหนแล้ว
+      if (url.pathname === '/api/link/voice/ack') {
+        const uptoRaw = Number(body.upto ?? body.seq);
+        const upto = Number.isFinite(uptoRaw) ? uptoRaw : Infinity;
+        const queue = linkVoiceQueue(code);
+        const before = queue.chunks.length;
+        queue.chunks = queue.chunks.filter((c) => c.seq > upto);
+        queue.bytes = queue.chunks.reduce((sum, c) => sum + c.bytes, 0);
+        return json(res, 200, { ok: true, removed: before - queue.chunks.length, chunks: queue.chunks.length, bytes: queue.bytes });
+      }
+
       return json(res, 404, { error: 'not found' });
     }
 
@@ -620,19 +936,57 @@ async function handleApi(req, res, url) {
       }
       if (url.pathname === '/api/link/status') {
         const q = linkState.queues.get(code) || [];
-        const lastSeen = linkState.seen.get(code) || 0;
+        const lastSeen = linkState.seen.get(code) || Date.now();
+        const device = linkState.devices.get(code) || null;
+        const voice = linkState.voice.get(code) || { chunks: [], bytes: 0 };
+        const eyes = currentEyes(code);
         return json(res, 200, {
           code,
           online: Date.now() - lastSeen < 30000,
           lastSeen,
           pending: q.filter((c) => !c.delivered).length,
           delivered: q.filter((c) => c.delivered).length,
+          device,
+          eyes: eyes ? { emotion: eyes.emotion, stale: eyes.stale, ageMs: eyes.ageMs } : null,
+          voice: { chunks: voice.chunks.length, bytes: voice.bytes, dropped: voice.dropped || 0 },
         });
       }
       if (url.pathname === '/api/link/results') {
         const since = Number(url.searchParams.get('since') || 0);
         const all = linkState.results.get(code) || [];
         return json(res, 200, { results: all.filter((r) => r.ts > since) });
+      }
+
+      if (url.pathname === '/api/link/hello') {
+        const device = linkState.devices.get(code);
+        if (!device) return json(res, 404, { error: 'ยังไม่ลงทะเบียน — POST /api/link/hello ก่อน' });
+        return json(res, 200, { ok: true, protocol: 'no7-link/1', device, eyesTtlMs: LINK_EYES_TTL_MS });
+      }
+      if (url.pathname === '/api/link/eyes') {
+        return json(res, 200, { ok: true, eyes: currentEyes(code, url.searchParams.get('ttlMs')) });
+      }
+      if (url.pathname === '/api/link/voice') {
+        const since = Number(url.searchParams.get('since') || 0);
+        const queue = linkVoiceQueue(code);
+        const chunks = queue.chunks.filter((c) => c.seq > since);
+        return json(res, 200, {
+          ok: true,
+          chunks,
+          bytes: chunks.reduce((sum, c) => sum + c.bytes, 0),
+          final: chunks.some((c) => c.final),
+          lastSeq: queue.lastSeq,
+        });
+      }
+      if (url.pathname === '/api/link/voice/status') {
+        const queue = linkVoiceQueue(code);
+        return json(res, 200, {
+          ok: true,
+          chunks: queue.chunks.length,
+          bytes: queue.bytes,
+          lastSeq: queue.lastSeq,
+          dropped: queue.dropped || 0,
+          final: queue.chunks.some((c) => c.final),
+        });
       }
       return json(res, 404, { error: 'not found' });
     }
@@ -849,6 +1203,14 @@ server.listen(PORT, HOST, () => {
   console.log(`  health: /api/health · tools: /api/tools · sync: /api/sync`);
   if (!SYNC_TOKEN) console.log('  ⚠️  ยังไม่ได้ตั้ง NO7_SYNC_TOKEN — /api/sync เปิดให้ทุกคนใน LAN อ่านได้');
   else console.log('  🔐 sync protected by NO7_SYNC_TOKEN');
+  console.log(`  ⏰ reminders: ${reminderState.items.length} รายการ · ตรวจทุก ${Math.round(REMINDER_TICK_MS / 1000)}s`
+    + `${REMINDER_CHAT_ID ? ' · ส่ง Telegram' : ''}`);
 });
+
+// ตรวจงานที่ถึงเวลาทุก TICK (unref เพื่อให้ process จบได้ในเทสต์)
+const reminderTimer = setInterval(() => {
+  pushReminders().catch((e) => console.warn('[reminders]', e.message));
+}, REMINDER_TICK_MS);
+reminderTimer.unref?.();
 
 export { server, runServerTool, proxyChat, verifySignature, pairings };
