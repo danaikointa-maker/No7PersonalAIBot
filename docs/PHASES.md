@@ -1082,3 +1082,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 109.1 version 2.29.0 + CHANGELOG
 - [x] 109.2 README + PHASES ปิดครบ
 - [x] 109.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 35 (v2.30)
+
+เป้าหมาย: ให้ health-history snapshot ใช้วันตามปฏิทินท้องถิ่นเดียวกับตัวกรอง 7/30 วัน แทน UTC date ที่อาจข้ามวันไม่ตรงกับเวลาบนเครื่อง
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AX1 | บันทึก health snapshot ตาม local calendar day | 110.1–110.3 | ✅ |
+| AX2 | ตรวจ boundary รอบเที่ยงคืนและ same-day replacement | 111.1–111.3 | ✅ |
+| AX3 | Release 2.30 | 112.1–112.3 | ✅ |
+
+## AX1 — บันทึก health snapshot ตาม local calendar day
+
+- [x] 110.1 ใช้ local date key เดียวกับ filter/render สำหรับวันที่ของ snapshot
+- [x] 110.2 ป้องกัน UTC midnight ทำให้การสแกนวันท้องถิ่นเดียวกันแยก/รวมผิดวัน
+- [x] 110.3 Unit tests จำลอง timezone Bangkok และการแทนที่ snapshot ใน local day เดียวกัน
+
+## AX2 — ตรวจ boundary รอบเที่ยงคืนและ same-day replacement
+
+- [x] 111.1 ทดสอบสอง instant รอบ UTC/local midnight ที่อยู่คนละวันใน Bangkok
+- [x] 111.2 ทดสอบสอง scan ใน local date เดียวแทนที่กัน ไม่เพิ่ม duplicate
+- [x] 111.3 อัปเดต `docs/HEALTH.md`
+
+## AX3 — Release 2.30
+
+- [x] 112.1 version 2.30.0 + CHANGELOG
+- [x] 112.2 README + PHASES ปิดครบ
+- [x] 112.3 ตรวจรับรวม (check/test/browser/perf/build) + PR

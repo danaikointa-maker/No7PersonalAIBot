@@ -41,6 +41,23 @@ test('a scan on the same day replaces that day without pruning earlier history',
   assert.equal(repeat.snapshots.at(-1).score, 55);
 });
 
+test('daily snapshots use the local calendar date across UTC midnight', () => {
+  const previousTz = process.env.TZ;
+  process.env.TZ = 'Asia/Bangkok';
+  try {
+    let history = recordHealthSnapshot(null, report(70), Date.parse('2026-11-10T16:30:00Z'));
+    history = recordHealthSnapshot(history, report(80), Date.parse('2026-11-10T17:30:00Z'));
+    assert.deepEqual(history.snapshots.map((item) => item.date), ['2026-11-10', '2026-11-11']);
+    history = recordHealthSnapshot(history, report(85), Date.parse('2026-11-11T02:00:00Z'));
+    assert.equal(history.snapshots.length, 2, 'a second scan on the same local date replaces the prior summary');
+    assert.equal(history.snapshots.at(-1).date, '2026-11-11');
+    assert.equal(history.snapshots.at(-1).score, 85);
+  } finally {
+    if (previousTz === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTz;
+  }
+});
+
 test('normalize drops malformed rows, clamps values and strips non-summary fields', () => {
   const clean = normalizeHealthHistory({ schema: 1, snapshots: [
     { date: 'bad', score: 12, title: 'private item text' },

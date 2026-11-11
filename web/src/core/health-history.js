@@ -38,7 +38,7 @@ export function normalizeHealthHistory(value) {
 
 export function recordHealthSnapshot(history, report, now = Date.now()) {
   const normalized = normalizeHealthHistory(history);
-  const day = new Date(now).toISOString().slice(0, 10);
+  const day = dateKey(now);
   const counts = { high: 0, medium: 0, low: 0 };
   for (const item of report?.issues || []) {
     if (Object.hasOwn(counts, item.severity)) counts[item.severity] += Math.max(1, count(item.count));
