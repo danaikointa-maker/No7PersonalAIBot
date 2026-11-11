@@ -1166,3 +1166,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 118.1 version 2.32.0 + CHANGELOG
 - [x] 118.2 README + PHASES ปิดครบ
 - [x] 118.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 38 (v2.33)
+
+เป้าหมาย: ป้องกัน persona ที่ผู้ใช้สร้าง/แก้ไข/ลบ/นำเข้าเสียหายเมื่อ localStorage เต็ม โดยให้ CRUD บันทึก candidate ก่อนรายงาน success และแสดงข้อผิดพลาดโดยไม่ปิดฟอร์มหรือล้างข้อมูลเดิม
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| BA1 | ทำ persona writes แบบ fail-loud และ persist-before-success | 119.1–119.3 | ⬜ |
+| BA2 | จัดการ UI errors สำหรับ create/update/delete/duplicate | 120.1–120.3 | ⬜ |
+| BA3 | Release 2.33 | 121.1–121.3 | ⬜ |
+
+## BA1 — ทำ persona writes แบบ fail-loud และ persist-before-success
+
+- [ ] 119.1 storage error โยน `PersonaStorageError` และคง raw personas เดิม
+- [ ] 119.2 create/update/delete/duplicate/restore รายงาน success เฉพาะเมื่อเขียนสำเร็จ
+- [ ] 119.3 Unit tests จำลอง quota failure ครอบคลุม CRUD และ restore
+
+## BA2 — จัดการ UI errors สำหรับ create/update/delete/duplicate
+
+- [ ] 120.1 create/update เก็บฟอร์มและข้อมูลเมื่อเขียนไม่ได้; success state หลัง commit เท่านั้น
+- [ ] 120.2 delete/duplicate แสดง error และคง persona เดิม
+- [ ] 120.3 Browser smoke จำลอง quota failure สำหรับ create/delete และตรวจ state เดิม
+
+## BA3 — Release 2.33
+
+- [ ] 121.1 version 2.33.0 + CHANGELOG
+- [ ] 121.2 README + PHASES ปิดครบ
+- [ ] 121.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
