@@ -2,6 +2,49 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.0.0] — 2026-11-10
+
+รอบที่ห้า: ยกระดับจาก "ผู้ช่วยที่ใช้ได้" → "ผู้ช่วยที่ไว้ใจได้ทุกวัน" — เสียงพรีเมียม, สมองในเครื่อง
+สองภาษา, ด่านคุณภาพที่วัดได้ และการอัปเดตที่ไม่ต้องโหลดใหม่ทั้งแอป
+
+### เพิ่ม
+**T1 — เสียงพรีเมียม + แคช**
+- `core/tts.js`: provider `elevenlabs` (multilingual v2, `xi-api-key`, mp3_44100_128),
+  ค่าเริ่มต้นต่อ provider, `resolveTTSConfig` ไม่พาค่าเก่าข้าม provider
+- `AudioCache` (20 รายการ / 5 MB, key = provider|voice|model|lang|text) — ผลลัพธ์ `{engine, cached}`
+- server `POST /api/tts` รองรับ ElevenLabs · `docs/VOICE.md` อัปเดต
+
+**T2 — สมองในเครื่อง (Ollama / LM Studio)**
+- `core/local-models.js`: `LOCAL_PRESETS`, `probeLocal` (timeout 4s, cache 60s), `matchModel`/`pickBestModel`,
+  `warmModel`, `offlineChainSettings`, `normalizeOfflineBrain`
+- สลับอัตโนมัติเมื่อออฟไลน์ → `costMode: private`, `provider: ollama`, ไม่ใช้คีย์
+- server `/api/local-models` + `/warm` พร้อม guard กัน SSRF (`NO7_LOCAL_ALLOW_REMOTE=1` สำหรับกรณีพิเศษ)
+- UI แผง "🧠 สมองในเครื่อง" (สแกน/อุ่นเครื่อง/สถานะ) · `docs/LOCAL_MODELS.md`
+
+**T3 — สองภาษา ไทย/อังกฤษ**
+- `core/i18n.js`: `LANGS`, `DICT` th/en (คีย์ตรงกันบังคับด้วยเทสต์), `t()` + interpolation, `applyI18n`,
+  `langOf`, `detectLang`, `viewTitle`
+- `settings.uiLang` + `#set-uilang` — สลับทันทีไม่ต้องรีโหลด, อัปเดต `<html lang>`
+- ~90 จุดผ่าน `data-i18n` / `-placeholder` / `-title` · `docs/I18N.md`
+
+**T4 — คุณภาพที่วัดได้**
+- `tools/perf.js` + `perf-budget.json` + `npm run perf` (source + gzip bundle, exit 1 เมื่อเกิน) เข้า CI
+- E2E เพิ่มเส้นทางงานซ้ำ (เลื่อนรอบ) → 97 checks · `docs/QUALITY.md`
+
+**T5 — อัปเดตเวอร์ชัน + release**
+- `desktop/updater.js`: opt-in `NO7_AUTO_UPDATE=1` (packaged เท่านั้น), feed/channel/delay ปรับได้,
+  แจ้งเตือนทุกขั้น, ติดตั้งตอนปิดแอป, เมนู tray "ตรวจอัปเดต"
+- `.github/workflows/release.yml`: verify → matrix linux/mac/win → draft GitHub Release + `latest*.yml`
+- `build.publish` (GitHub) + `electron-updater` · `docs/BUILD.md` §2.1
+
+### เปลี่ยน
+- เวอร์ชัน 2.0.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics) — `window.NO7_VERSION` มาจาก build
+- CI รัน `npm run perf` หลัง build
+
+### แก้
+- `renderTTSVoiceOptions` ถูกประกาศซ้อนในฟังก์ชัน → ย้ายไป module scope
+- เปลี่ยน provider แล้วไม่พา model/voice เดิมข้าม (กันค่าไม่ตรง)
+
 ## [1.5.0] — 2026-11-10
 
 รอบที่สี่: ลงลึกที่อุปกรณ์และความต่อเนื่อง — งานซ้ำที่เตือนได้แม้ปิดแอป, รู้จักหน้าต่างบนจอ

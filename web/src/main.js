@@ -1437,7 +1437,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '1.5.0',
+      version: window.NO7_VERSION || '2.0.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },

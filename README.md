@@ -1,4 +1,4 @@
-# No7 Personal AI Bot `v1.5`
+# No7 Personal AI Bot `v2.0`
 
 > ผู้ช่วย AI ส่วนตัวที่ **โค้ดชุดเดียวกันรันได้ทั้งมือถือและ PC** — พูดไทยก่อน ฟังได้ด้วยเสียง มีความจำระยะยาว
 > เรียกเครื่องมือจริง ทำงานหลายก้าวได้ ซิงก์ข้ามเครื่อง และสั่งงานอุปกรณ์ผ่าน HMAC
@@ -22,14 +22,15 @@ npm run build         # dist/ ชุดเดียวสำหรับ PWA + E
 npm run server        # companion server: static + AI proxy + tools + sync + phone-link
 npm run desktop       # เปิดเป็นแอปเดสก์ท็อป (Electron)
 npm run mobile:sync   # ซิงก์ dist/ เข้าโปรเจค Android/iOS
-npm test              # 266 unit tests
-npm run test:browser  # 82 end-to-end checks (รันแอปจริงใน jsdom)
+npm test              # 301 unit tests
+npm run test:browser  # 97 end-to-end checks (รันแอปจริงใน jsdom)
 npm run check         # syntax + structure check
+npm run perf          # performance budget (ขนาด bundle/source)
 ```
 
 ---
 
-## ทำอะไรได้ (v1.5)
+## ทำอะไรได้ (v2.0)
 
 ### 🎭 เลือกได้ทั้งหมด — 5 บทบาทในที่เดียว
 `✨ ทั้งหมด` (สลับบทบาทเองตามคำขอ) · `💛 เพื่อนคุย` · `💼 งาน` · `📅 ชีวิตประจำวัน` · `🏠 อุปกรณ์`
@@ -50,7 +51,8 @@ npm run check         # syntax + structure check
 - สตรีมคำตอบทีละคำ (SSE/NDJSON) + **เริ่มพูดก่อนคำตอบจบ** แล้วหยุดทันทีถ้าเป็นการเรียกเครื่องมือ
 - ฟังด้วยเสียงไทย (STT) + **ปลุกด้วยคำว่า "No7"** (หยุดฟังขณะพูด กันเสียงตัวเอง)
 - **พูดขัดจังหวะได้ (barge-in)**: โหมด `keyword` ("หยุด/เดี๋ยว/รอ/stop") หรือ `any` พร้อมกันเสียงสะท้อนของตัวเอง
-- **TTS 3 ระดับ**: เสียงเครื่อง (ฟรี/ออฟไลน์) · OpenAI-compatible ผ่าน `POST /api/tts` (เปลี่ยน base URL ได้) · ปิดเสียง
+- **TTS 4 เจ้า**: เสียงเครื่อง (ฟรี/ออฟไลน์) · OpenAI-compatible · **ElevenLabs** (`eleven_multilingual_v2`) · ปิดเสียง
+  พร้อม **แคชเสียงในหน่วยความจำ** (20 คลิป / 5 MB) — เล่นซ้ำทันที ไม่เสียโควตา
   ถ้าผู้ให้บริการล่มจะ fallback ไปเสียงเครื่องให้อัตโนมัติ
 - ปรับความเร็ว/pitch/เลือกเสียง, ปุ่มหยุดพูด, คำบรรยายใต้จอ, อวาตาร์ 14 อารมณ์
 
@@ -74,6 +76,23 @@ npm run check         # syntax + structure check
 - เพิ่มงานด้วยเสียง/ข้อความ ("เตือนส่งรายงานพรุ่งนี้ 9 โมง"), priority 0–3, เตือนตามเวลา
 - ซิงก์ข้ามเครื่องแบบ last-write-wins + tombstone (การลบตามไปทุกเครื่อง)
 - `parseDue` เข้าใจ ISO, `+30m`, `+2h`, `วันนี้ 18:00`, `พรุ่งนี้ 09:30`
+
+### 🧠⚡ สมองในเครื่อง (ออฟไลน์ได้จริง)
+- ต่อ **Ollama** หรือ **LM Studio** ที่เครื่องตัวเอง (LAN) — สแกนรุ่นที่มี ตรวจว่าพร้อม แล้วเลือกตัวที่เหมาะ
+- ตั้ง chain อัตโนมัติ: ออนไลน์ใช้คลาวด์ → เน็ตหลุดสลับเป็นรุ่นในเครื่องทันที (โหมด `private`, ไม่มีคีย์)
+- server proxy `/api/local-models` + `/api/local-models/warm` พร้อม guard กัน SSRF (เฉพาะ LAN/localhost)
+
+### 🌐 สองภาษา ไทย/อังกฤษ
+- สลับภาษาหน้าจอได้ทันทีโดยไม่กระทบภาษาที่ AI ตอบ (`uiLang` ≠ `language`)
+- ~90 จุดใน UI ผ่าน `data-i18n` + `applyI18n()` — เพิ่มภาษาใหม่ได้ด้วยการเพิ่มพจนานุกรมชุดเดียว
+
+### 📦 คุณภาพที่วัดได้
+- `npm run perf` = performance budget จริง (source + gzip bundle) ทำงานใน CI ทุก PR
+- E2E 97 จุดครอบเส้นทางหลัก: แชท → เครื่องมือ → งานซ้ำ → เดสก์ท็อป → MCP → i18n → ออฟไลน์
+
+### 🔄 อัปเดตเวอร์ชัน (opt-in)
+- เดสก์ท็อปแอปเช็คอัปเดตเองเมื่อเปิด `NO7_AUTO_UPDATE=1` (แจ้งเตือนเมื่อมีใหม่, ติดตั้งตอนปิดแอป)
+- `git tag v2.0.0` → GitHub Actions build win/mac/linux + draft release พร้อม `latest*.yml`
 
 ### 🧯 ความเสถียรและความเร็ว
 - Retry แบบ exponential + jitter เฉพาะ error ชั่วคราว (429/5xx/network) และไม่ลองซ้ำถ้าเริ่มพูดไปแล้ว
@@ -118,6 +137,7 @@ tray · hotkey ระดับระบบ (`Ctrl/Cmd+Shift+Space`) · overlay a
 web/                 ชุด UI + core ที่ทุกแพลตฟอร์มใช้
   src/core/          state · memory · consolidate · tools · agent · permissions · modes
                      · ai-providers (stream/fallback) · voice · stream · wake · bargein · tts
+                     · local-models · i18n · oauth · desktop · tasks
                      · mcp · retry · metrics · diagnostics · capabilities · storage
                      · calendar · net · sync · link · prompt · settings · platform
   src/ui/            avatar (14 emotions) · cards
@@ -153,7 +173,8 @@ docs/                เอกสาร 19 ไฟล์
 | [docs/I18N.md](docs/I18N.md) | สองภาษา ไทย/อังกฤษ (สลับหน้าจอได้ทันที) |
 | [docs/DEVICES.md](docs/DEVICES.md) | Phone-Link protocol + ESP32 |
 | [docs/PHONE_LINK.md](docs/PHONE_LINK.md) | HMAC canonical signing + ตัวอย่าง curl |
-| [docs/BUILD.md](docs/BUILD.md) | build ทั้ง 3 แพลตฟอร์ม |
+| [docs/QUALITY.md](docs/QUALITY.md) | performance budget + E2E + integration tests |
+| [docs/BUILD.md](docs/BUILD.md) | build ทั้ง 3 แพลตฟอร์ม + release/auto-update |
 | [docs/CONCEPT.md](docs/CONCEPT.md) | คอนเซ็บผู้ใช้ → สเปก |
 | [CHANGELOG.md](CHANGELOG.md) | ประวัติเวอร์ชัน |
 

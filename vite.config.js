@@ -1,11 +1,16 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 // One build → Mobile browser + PC browser (PWA), Electron (desktop/),
 // and Capacitor (mobile/) all consume the same dist/.
 export default defineConfig({
   root: 'web',
+  // เวอร์ชันเดียวกับ package.json — ใช้ใน diagnostics และ MCP clientInfo
+  define: { 'window.NO7_VERSION': JSON.stringify(pkg.version) },
   base: './', // relative paths so file:// works inside Electron & Capacitor
   build: {
     outDir: '../dist',
