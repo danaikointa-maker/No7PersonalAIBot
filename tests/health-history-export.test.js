@@ -49,6 +49,17 @@ test('JSON export adds a versioned envelope and strips unrecognized private fiel
   assert.doesNotMatch(json, /private note|personal event|secret/);
 });
 
+test('JSON export includes all retained daily summary metrics beyond the former 30-day cap', () => {
+  const snapshots = Array.from({ length: 45 }, (_, i) => {
+    const date = new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10);
+    return { date, score: i, grade: 'D', issues: { high: 0, medium: 0, low: 0 } };
+  });
+  const exported = JSON.parse(healthHistoryJson({ schema: 1, snapshots }));
+  assert.equal(exported.snapshots.length, 45);
+  assert.equal(exported.snapshots[0].date, '2026-01-01');
+  assert.equal(exported.snapshots.at(-1).date, '2026-02-14');
+});
+
 test('empty reports still return localized safe output', () => {
   assert.match(healthHistoryCsv(null), /^\ufeffวันที่,/);
   assert.match(healthHistoryMarkdown(null), /ยังไม่มีประวัติสุขภาพ/);

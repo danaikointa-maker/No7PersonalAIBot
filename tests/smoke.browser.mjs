@@ -287,6 +287,7 @@ $('#nav button[data-view="settings"]').click();
 $('#export-btn').click();
 check('backup: export reports a schema-2 file', $('#backup-status').textContent.includes('schema 2'), $('#backup-status').textContent.slice(0, 80));
 check('backup: export summary includes health history count', $('#backup-status').textContent.includes('ประวัติสุขภาพ'));
+check('backup: export summary includes every conversation count', $('#backup-status').textContent.includes('บทสนทนา'));
 $('#set-apikey').value = 'local-api-key';
 $('#set-ttsapikey').value = 'local-tts-key';
 $('#set-synctoken').value = 'local-sync-token';
@@ -297,7 +298,7 @@ const backupPayload = {
     settings: { language: 'th', uiLang: 'th', apiKey: '', ttsApiKey: '', syncToken: '' },
     facts: [{ id: 'imp-1', text: 'ความจำจากการนำเข้า', ts: Date.now(), importance: 2 }],
     log: [], notes: [{ text: 'โน้ตจากไฟล์สำรอง', ts: Date.now() }], todos: [], tasks: [], events: [],
-    log: [{ role: 'user', text: 'ข้อความสำรองทดสอบ', ts: 5000, extra: 'strip' }, { role: 'assistant', text: 'คำตอบสำรองทดสอบ', ts: 6000 }, { role: 'user', text: '<img src=x onerror=alert(1)>', ts: 7000 }, { role: 'assistant', text: 'ข้อความวันนี้', ts: new Date().setHours(12, 0, 0, 0) }, { role: 'tool', text: 'invalid role', ts: 8000 }],
+    log: [{ role: 'user', text: 'ข้อความสำรองทดสอบ', ts: 5000, extra: 'strip' }, { role: 'assistant', text: 'คำตอบสำรองทดสอบ', ts: 6000 }, ...Array.from({ length: 55 }, (_, i) => ({ role: 'user', text: `archive-old-${i}`, ts: 10_000 + i * 1000 })), { role: 'user', text: '<img src=x onerror=alert(1)>', ts: 100_000 }, { role: 'assistant', text: 'ข้อความวันนี้', ts: new Date().setHours(12, 0, 0, 0) }, { role: 'tool', text: 'invalid role', ts: 8000 }],
     healthHistory: [{ date: new Date().toISOString().slice(0, 10), score: 41, grade: 'D', issues: { high: 1, medium: 2, low: 3 }, privateText: 'must stay private' }],
     personas: [{ id: 'p-smoketest1', name: 'จากไฟล์สำรอง', system: 'ตัวตนที่นำเข้ามา', desc: 'persona custom', gender: 'neutral', createdAt: Date.now(), updatedAt: Date.now(), extra: 'strip' }],
   },
@@ -316,7 +317,11 @@ check('backup: chat log restored with safe roles and fields', restoredChatLog.so
 const restoredCustomPersonas = JSON.parse(window.localStorage.getItem('no7.personas.v1') || '[]');
 check('backup: custom persona restored and unknown fields stripped', restoredCustomPersonas.some((p) => p.id === 'p-smoketest1' && p.name === 'จากไฟล์สำรอง') && !JSON.stringify(restoredCustomPersonas).includes('strip'));
 $('#nav button[data-view="memory"]').click();
+$('#chat-archive [data-archive-query]').value = 'ข้อความสำรองทดสอบ';
+$('#chat-archive [data-archive-query]').dispatchEvent(new window.Event('input', { bubbles: true }));
 check('memory archive: restored chat log is searchable and local', $('#chat-archive').textContent.includes('ข้อความสำรองทดสอบ') && !$('#chat-archive').textContent.includes('invalid role'));
+$('#chat-archive [data-archive-query]').value = '';
+$('#chat-archive [data-archive-query]').dispatchEvent(new window.Event('input', { bubbles: true }));
 check('memory archive: message HTML is rendered as text', !$('#chat-archive').querySelector('img') && $('#chat-archive').textContent.includes('<img src=x onerror=alert(1)>'));
 const archiveStorageBeforeSearch = window.localStorage.getItem('no7.memory.v2');
 $('#chat-archive [data-archive-query]').value = 'สำรอง';
@@ -340,7 +345,10 @@ $('#chat-archive [data-archive-from]').value = sameArchiveDay;
 $('#chat-archive [data-archive-from]').dispatchEvent(new window.Event('change', { bubbles: true }));
 $('#chat-archive [data-archive-to]').value = sameArchiveDay;
 $('#chat-archive [data-archive-to]').dispatchEvent(new window.Event('change', { bubbles: true }));
-check('memory archive: inclusive local date range shows matching restored messages', $('#chat-archive').querySelectorAll('.chat-archive-entry').length === 3);
+check('memory archive: inclusive local date range reaches older pages', $('#chat-archive').querySelectorAll('.chat-archive-entry').length === 50 && !$('#chat-archive [data-archive-older]').hidden && $('#chat-archive [data-archive-status]').textContent.includes('58 ข้อความ'));
+$('#chat-archive [data-archive-older]').click();
+check('memory archive: older/newer navigation reaches all restored history', $('#chat-archive').querySelectorAll('.chat-archive-entry').length === 8 && $('#chat-archive [data-archive-status]').textContent.includes('51–58') && !$('#chat-archive [data-archive-newer]').hidden);
+$('#chat-archive [data-archive-newer]').click();
 archiveDate.setDate(archiveDate.getDate() + 1);
 $('#chat-archive [data-archive-from]').value = archiveDateKey(archiveDate);
 $('#chat-archive [data-archive-from]').dispatchEvent(new window.Event('change', { bubbles: true }));
@@ -359,6 +367,23 @@ Object.defineProperty(oversizedBackupFile, 'size', { value: 20 * 1024 * 1024 + 1
 Object.defineProperty($('#import-file'), 'files', { value: [oversizedBackupFile], configurable: true });
 $('#import-file').dispatchEvent(new window.Event('change'));
 check('backup: oversized file rejected before reading', $('#backup-status').textContent.includes('20 MiB'));
+const memoryBeforeOversizeImport = window.localStorage.getItem('no7.memory.v2');
+const oversizedMemoryFile = new window.File(['{}'], 'huge-memory.json', { type: 'application/json' });
+Object.defineProperty(oversizedMemoryFile, 'size', { value: 20 * 1024 * 1024 + 1, configurable: true });
+Object.defineProperty($('#mem-import-file'), 'files', { value: [oversizedMemoryFile], configurable: true });
+$('#mem-import-file').dispatchEvent(new window.Event('change'));
+check('memory: oversized import rejected without changing existing history', $('#mem-status').textContent.includes('20 MiB') && window.localStorage.getItem('no7.memory.v2') === memoryBeforeOversizeImport);
+const memoryImportPayload = JSON.stringify({ facts: [{ text: 'memory import confirmation fact', importance: 3 }], log: [{ role: 'user', text: 'memory import confirmation log', ts: Date.now() - 1 }] });
+const memoryImportFile = new window.File([memoryImportPayload], 'memory.json', { type: 'application/json' });
+Object.defineProperty($('#mem-import-file'), 'files', { value: [memoryImportFile], configurable: true });
+window.confirm = () => false;
+$('#mem-import-file').dispatchEvent(new window.Event('change'));
+await wait(10);
+check('memory: import cancel does not write to storage', $('#mem-status').textContent.includes('ยกเลิก') && window.localStorage.getItem('no7.memory.v2') === memoryBeforeOversizeImport);
+window.confirm = () => true;
+$('#mem-import-file').dispatchEvent(new window.Event('change'));
+await wait(20);
+check('memory: import writes only after explicit confirmation', $('#mem-status').textContent.includes('นำเข้าแล้ว') && JSON.parse(window.localStorage.getItem('no7.memory.v2')).facts.some((fact) => fact.text === 'memory import confirmation fact'));
 
 // command palette (Ctrl/⌘ K)
 window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }));

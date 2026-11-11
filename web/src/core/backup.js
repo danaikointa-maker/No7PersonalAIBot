@@ -12,7 +12,7 @@ import { normalizeImportedPersonas } from './persona-store.js';
 export const BACKUP_APP = 'no7-personal-ai';
 export const BACKUP_SCHEMA = 2;
 export const BACKUP_MAX_BYTES = 20 * 1024 * 1024;
-export const BACKUP_COLLECTION_LIMITS = { facts: 3000, log: 500, notes: 50_000, todos: 50_000, tasks: 50_000, events: 50_000, personas: 100, healthHistory: 30 };
+export const BACKUP_COLLECTION_LIMITS = { facts: 100_000, log: 100_000, notes: 50_000, todos: 50_000, tasks: 50_000, events: 50_000, personas: 100, healthHistory: 1_000_000 };
 export const SETTINGS_SECRET_KEYS = ['apiKey', 'ttsApiKey', 'syncToken'];
 
 /** คอลเลกชันที่สำรอง + คีย์หลัก/เวลาสำหรับ merge */
@@ -57,10 +57,10 @@ export function backupByteSize(input) {
   } catch { return Infinity; }
 }
 
-export function normalizeBackupLog(input, limit = 800) {
+export function normalizeBackupLog(input, limit = Infinity) {
   if (!Array.isArray(input)) return [];
   const unique = new Map();
-  for (const raw of input.slice(-Math.max(limit * 2, 500))) {
+  for (const raw of input) {
     if (!raw || typeof raw !== 'object' || !['user', 'assistant'].includes(raw.role)) continue;
     if (typeof raw.text !== 'string' || !raw.text.trim()) continue;
     const ts = Number(raw.ts);
@@ -68,7 +68,10 @@ export function normalizeBackupLog(input, limit = 800) {
     const item = { role: raw.role, text: raw.text.slice(0, 2000), ts: Math.trunc(ts) };
     unique.set(JSON.stringify([item.role, item.ts, item.text]), item);
   }
-  return [...unique.values()].sort((a, b) => a.ts - b.ts).slice(-limit);
+  const normalized = [...unique.values()].sort((a, b) => a.ts - b.ts);
+  if (!Number.isFinite(limit)) return normalized;
+  const count = Math.max(0, Math.trunc(Number(limit) || 0));
+  return count ? normalized.slice(-count) : [];
 }
 
 /**
@@ -81,7 +84,7 @@ export function createBackup(state = {}, { now = Date.now(), includeSecrets = fa
   const data = {
     settings,
     facts: state.facts || [],
-    log: normalizeBackupLog(state.log, 500),
+    log: normalizeBackupLog(state.log),
     notes: state.notes || [],
     todos: state.todos || [],
     tasks: state.tasks || [],
@@ -248,13 +251,13 @@ export function planRestore(backup = {}, local = {}, { mode = 'merge' } = {}) {
   for (const [key, meta] of Object.entries(COLLECTIONS)) {
     const rawIncoming = Array.isArray(data[key]) ? data[key] : [];
     const rawExisting = Array.isArray(local[key]) ? local[key] : [];
-    const sanitize = (items, logLimit = 800) => {
+    const sanitize = (items) => {
       const records = items.filter((item) => item && typeof item === 'object' && !Array.isArray(item));
       if (key === 'healthHistory') return normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: records }).snapshots;
       if (key === 'personas') return normalizeImportedPersonas(records);
-      return key === 'log' ? normalizeBackupLog(records, logLimit) : records;
+      return key === 'log' ? normalizeBackupLog(records) : records;
     };
-    const incoming = sanitize(rawIncoming, 500);
+    const incoming = sanitize(rawIncoming);
     const existing = sanitize(rawExisting);
     if (mode === 'replace') {
       values[key] = incoming;

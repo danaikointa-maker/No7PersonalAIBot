@@ -5,7 +5,7 @@ const fail = (error) => ({ ok: false, error, history: { schema: HEALTH_HISTORY_S
 export function parseHealthHistoryBackup(input) {
   let raw = input;
   if (typeof raw === 'string') {
-    if (raw.length > 65_536) return fail('too-large');
+    if (new TextEncoder().encode(raw).byteLength > 20 * 1024 * 1024) return fail('too-large');
     try { raw = JSON.parse(raw); } catch { return fail('invalid-json'); }
   }
   if (!raw || typeof raw !== 'object' || raw.format !== 'no7-health-history') return fail('invalid-format');
@@ -36,7 +36,7 @@ export function planHealthHistoryImport(current, parsedBackup) {
     byDate.set(item.date, item);
   }
   const all = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
-  const trimmed = Math.max(0, all.length - HEALTH_HISTORY_LIMIT);
+  const trimmed = 0;
   const next = normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: all });
   return {
     ok: true, next, added, replaced, unchanged, trimmed,

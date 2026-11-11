@@ -22,11 +22,11 @@ test('parse accepts the export format and whitelists normalized summary fields',
 
 test('rejects malformed JSON, wrong formats, schemas, timestamps and oversized files', () => {
   assert.equal(parseHealthHistoryBackup('{').error, 'invalid-json');
-  assert.equal(parseHealthHistoryBackup(' '.repeat(65_537)).error, 'too-large');
+  assert.equal(parseHealthHistoryBackup(' '.repeat(20 * 1024 * 1024 + 1)).error, 'too-large');
   assert.equal(parseHealthHistoryBackup({}).error, 'invalid-format');
   assert.equal(parseHealthHistoryBackup(backup([]) && { ...backup([]), schema: 2 }).error, 'unsupported-schema');
   assert.equal(parseHealthHistoryBackup({ ...backup([]), exportedAt: 'not-a-date' }).error, 'invalid-export-date');
-  assert.equal(parseHealthHistoryBackup(backup(Array.from({ length: 31 }, (_, i) => snapshot(`2026-10-${String(i + 1).padStart(2, '0')}`, 70)))).error, 'too-many-snapshots');
+  assert.equal(parseHealthHistoryBackup(backup(Array(1_000_001).fill(null))).error, 'too-many-snapshots');
 });
 
 test('import plan merges by local date, incoming wins conflicts, and does not mutate current', () => {
@@ -39,7 +39,7 @@ test('import plan merges by local date, incoming wins conflicts, and does not mu
   assert.equal(current.snapshots[1].score, 80);
 });
 
-test('import plan trims oldest rows to 30 and tracks unchanged entries', () => {
+test('import plan retains all older summary rows and tracks unchanged entries', () => {
   const dates = Array.from({ length: 30 }, (_, i) => {
     const date = new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10);
     return snapshot(date, 75);
@@ -49,9 +49,9 @@ test('import plan trims oldest rows to 30 and tracks unchanged entries', () => {
   const plan = planHealthHistoryImport(current, parsed);
   assert.equal(plan.unchanged, 1);
   assert.equal(plan.added, 1);
-  assert.equal(plan.trimmed, 1);
-  assert.equal(plan.next.snapshots.length, 30);
-  assert.equal(plan.next.snapshots[0].date, '2026-01-02');
+  assert.equal(plan.trimmed, 0);
+  assert.equal(plan.next.snapshots.length, 31);
+  assert.equal(plan.next.snapshots[0].date, '2026-01-01');
 });
 
 test('storage changes only when the approved plan is applied', () => {

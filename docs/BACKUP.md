@@ -27,13 +27,13 @@
 }
 ```
 
-- `log` เก็บ 500 ข้อความล่าสุด (ไฟล์ไม่บวม)
+- `log` สำรองทุกข้อความที่เก็บในเครื่อง (ไม่มีการตัดเก่าอัตโนมัติ); ไฟล์ยังมีเพดาน 20 MiB เพื่อป้องกันไฟล์ใหญ่/ผิดรูป
 - `checksum` (FNV-1a) ช่วยตรวจว่าไฟล์ถูกแก้/เสีย — ถ้าไม่ตรงจะ **เตือน** แต่ยังนำเข้าได้
 - ค่าเริ่มต้นตัด `apiKey`, `ttsApiKey`, `syncToken` และ `mcpServers[].apiKey` ออก
 - `includeSecrets: true` = เก็บคีย์ไว้ (ใช้เฉพาะย้ายเครื่องเอง)
 - เมื่อนำเข้าไฟล์ที่ redacted หรือคีย์ว่าง ระบบรักษา credentials ปัจจุบันในเครื่องไว้ (รวม MCP server ที่จับคู่ด้วย id/name/url) พร้อมแสดงคำเตือน; คีย์ที่มีค่าในไฟล์และเลือกเองยังถูกนำเข้าได้
 
-ไฟล์นำเข้าต้องไม่เกิน 20 MiB; UI ปฏิเสธก่อนอ่านไฟล์หากเกิน และ API ตรวจ UTF-8 bytes ก่อน parse เช่นกัน คอลเลกชันที่ระบุในไฟล์ต้องเป็น array และไม่เกินเพดาน: facts 3,000 · log 500 · personas 100 · healthHistory 30 · notes/todos/tasks/events 50,000 ต่อชุด แถวที่ไม่ใช่ object จะถูกข้ามในแผน restore โดยไม่ทำให้ทั้งแผนล้ม
+ไฟล์นำเข้าต้องไม่เกิน 20 MiB; UI ปฏิเสธก่อนอ่านไฟล์หากเกิน และ API ตรวจ UTF-8 bytes ก่อน parse เช่นกัน คอลเลกชันต้องเป็น array และไม่เกินเพดานป้องกัน malformed payload: facts/log 100,000 · healthHistory 1,000,000 · personas 100 · notes/todos/tasks/events 50,000 ต่อชุด ไม่มีการตัดประวัติเก่าเงียบ ๆ; ถ้าไฟล์ export ใหญ่กว่า 20 MiB จะแจ้งเตือนและไม่สร้างไฟล์ แถวที่ไม่ใช่ object จะถูกข้ามในแผน restore โดยไม่ทำให้ทั้งแผนล้ม
 
 ## 3) กู้คืนแบบ merge vs replace
 
@@ -54,13 +54,13 @@
 | `personas` | `id` | `updatedAt` |
 | `healthHistory` | `date` | วันตามปฏิทิน |
 
-`healthHistory` เก็บเฉพาะ snapshot summary ที่ whitelist แล้ว (`date`, `score`, `grade`, `issues`) ไม่เก็บข้อความส่วนตัว และจำกัด 30 วันล่าสุด; restore แบบ merge ใช้วันที่เป็นคีย์ (ค่าจากไฟล์ชนะเมื่อวันตรงกัน) แล้วคงขีดจำกัด 30 วัน
+`healthHistory` เก็บเฉพาะ snapshot summary ที่ whitelist แล้ว (`date`, `score`, `grade`, `issues`) ไม่เก็บข้อความส่วนตัว และไม่ตัดวันเก่าอัตโนมัติ; restore แบบ merge ใช้วันที่เป็นคีย์ (ค่าจากไฟล์ชนะเมื่อวันตรงกัน)
 
 ## 4) API (`core/backup.js`)
 
 | ฟังก์ชัน | หน้าที่ |
 |---|---|
-| `createBackup(state, {includeSecrets, version})` | สร้าง payload + counts + checksum; log ถูก normalize และจำกัด 500 |
+| `createBackup(state, {includeSecrets, version})` | สร้าง payload + counts + checksum; normalize log ทุกข้อความที่เก็บไว้ ไม่ตัดเก่าตามจำนวน |
 | `redactSettings` / `hasSecrets` | ตัด/ตรวจความลับ |
 | `validateBackup(input)` | รับ string/object → `{ok, errors, warnings, backup, migrated}` |
 | `migrateBackup(input)` | รองรับ export รุ่นเก่า (ก่อนมี `app/schema`) |
@@ -71,7 +71,7 @@
 
 ## 5) ข้อจำกัด
 
-- `log` สำรอง 500 ข้อความล่าสุดและ restore เข้า memory store (สูงสุด 800); รับเฉพาะ role `user`/`assistant`, text ≤ 2,000 ตัวอักษร และ timestamp ที่ใช้ได้; ฟิลด์ metadata อื่นถูกทิ้ง
+- `log` สำรองและ restore ทุกข้อความที่ผ่าน normalization (มีเพดาน byte 20 MiB ของไฟล์ ไม่ใช่จำนวนข้อความ); รับเฉพาะ role `user`/`assistant`, text ≤ 2,000 ตัวอักษร และ timestamp ที่ใช้ได้; ฟิลด์ metadata อื่นถูกทิ้ง
 - ไฟล์สำรองไม่รวม: ปลั๊กอินที่ผู้ใช้เพิ่ม (อยู่ใน settings → รวมแล้ว), ข้อมูลใน server/Telegram
 - `personas` รวมเฉพาะ Persona Studio ที่ผู้ใช้สร้างเอง; built-in ถูกป้องกันไม่ให้เขียนทับ และจำกัด 100 รายการพร้อม sanitize ฟิลด์ก่อน merge
 - `healthHistory` เป็นข้อมูลสรุปในเครื่องเท่านั้น; ไม่มีการอัปโหลดอัตโนมัติและรวมในไฟล์เฉพาะเมื่อผู้ใช้กดส่งออกข้อมูล

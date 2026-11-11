@@ -17,10 +17,14 @@ export function healthHistoryCsv(history, { lang = 'th' } = {}) {
 
 export function healthHistoryJson(history, { now = Date.now() } = {}) {
   const normalized = normalizeHealthHistory(history);
-  return `${JSON.stringify({
+  const output = `${JSON.stringify({
     format: 'no7-health-history', schema: 1, exportedAt: new Date(now).toISOString(),
-    snapshots: normalized.snapshots.slice(-30).map(({ date, score, grade, issues }) => ({ date, score, grade, issues })),
+    snapshots: normalized.snapshots.map(({ date, score, grade, issues }) => ({ date, score, grade, issues })),
   }, null, 2)}\n`;
+  if (new TextEncoder().encode(output).byteLength > 20 * 1024 * 1024) {
+    throw new Error('Health history JSON exceeds 20 MiB; history was kept on this device');
+  }
+  return output;
 }
 
 export function healthHistoryMarkdown(history, { lang = 'th', now = Date.now() } = {}) {

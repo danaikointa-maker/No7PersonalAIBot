@@ -2,6 +2,21 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.21.0] — 2026-11-10
+
+รอบที่ยี่สิบหก: หยุดตัด memory/history เก่าอัตโนมัติ
+
+### เปลี่ยน
+- ยกเลิก prune facts >3,000, conversation log >800 และ health summary >30; พื้นที่เต็มแจ้งเตือนและไม่ลบรายการเดิม
+- archive ใช้ปุ่มใหม่กว่า/เก่ากว่าทีละ 50 เพื่อเปิดดูประวัติทั้งหมด
+- memory JSON และ full-app backup รวม log ทั้งหมด; merge/restore ไม่ตัดเก่าโดยเงียบ
+- full backup/health JSON นำเข้าได้สูงสุด 20 MiB; export app backup ที่เกินเพดานแจ้งเตือนและไม่สร้างไฟล์
+- health history เก็บเฉพาะ summary metrics ต่อเนื่อง; manual import ยืนยันก่อนเขียนและไม่ auto-upload
+
+### ตรวจรับ
+- 462 unit tests · 178 browser checks · `npm run check` 118 JS files
+- Performance/build ผ่าน; source ใหญ่สุด 149.9 KB; main gzip 109.3 KB
+
 ## [2.20.0] — 2026-11-10
 
 รอบที่ยี่สิบห้า: เพิ่มช่วงวันที่ด่วนในประวัติบทสนทนา

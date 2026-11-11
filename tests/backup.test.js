@@ -42,12 +42,12 @@ test('createBackup produces a checksummed schema-2 payload without secrets', () 
   assert.deepEqual(b.counts, { facts: 1, log: 1, notes: 1, todos: 1, tasks: 1, events: 1, personas: 1, healthHistory: 0 });
 });
 
-test('backup log keeps only valid message fields and the newest 500 entries', () => {
+test('backup log keeps all valid entries without dropping older messages', () => {
   const log = Array.from({ length: 505 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', text: `message ${i}`, ts: i + 1, privateMeta: 'strip' }));
   log.push({ role: 'tool', text: 'not a chat role', ts: 9999 }, { role: 'user', text: 'missing timestamp' });
   const b = createBackup({ log });
-  assert.equal(b.data.log.length, 500);
-  assert.equal(b.data.log[0].text, 'message 5');
+  assert.equal(b.data.log.length, 505);
+  assert.equal(b.data.log[0].text, 'message 0');
   assert.equal(JSON.stringify(b.data.log).includes('privateMeta'), false);
   assert.equal(normalizeBackupLog([{ role: 'system', text: 'bad', ts: 1 }]).length, 0);
 });
@@ -71,17 +71,27 @@ test('planRestore merges chat log by full message identity and sorts by timestam
   assert.equal(plan.actions.find((item) => item.key === 'log').total, 4);
 });
 
-test('full backups include only normalized health-history summaries and cap at 30', () => {
+test('restore merge retains every old chat message beyond the former 800-entry cap', () => {
+  const localLog = Array.from({ length: 900 }, (_, i) => ({ role: 'user', text: `local ${i}`, ts: i + 1 }));
+  const incomingLog = Array.from({ length: 125 }, (_, i) => ({ role: 'assistant', text: `incoming ${i}`, ts: 2000 + i }));
+  const backup = createBackup({ log: incomingLog });
+  const plan = planRestore(backup, { log: localLog });
+  assert.equal(plan.values.log.length, 1025);
+  assert.equal(plan.values.log[0].text, 'local 0');
+  assert.equal(plan.values.log.at(-1).text, 'incoming 124');
+});
+
+test('full backups retain every normalized health-history summary without private fields', () => {
   const snapshots = Array.from({ length: 31 }, (_, i) => {
     const date = new Date(Date.UTC(2026, 0, i + 1)).toISOString().slice(0, 10);
     return { date, score: 80, grade: 'B', issues: { high: 1, medium: 2, low: 3 }, privateText: 'health detail' };
   });
   const b = createBackup({ healthHistory: snapshots });
-  assert.equal(b.data.healthHistory.length, 30);
-  assert.equal(b.data.healthHistory[0].date, '2026-01-02');
+  assert.equal(b.data.healthHistory.length, 31);
+  assert.equal(b.data.healthHistory[0].date, '2026-01-01');
   assert.equal(JSON.stringify(b.data.healthHistory).includes('privateText'), false);
   assert.equal(JSON.stringify(b.data.healthHistory).includes('health detail'), false);
-  assert.equal(b.counts.healthHistory, 30);
+  assert.equal(b.counts.healthHistory, 31);
 });
 
 test('includeSecrets keeps keys but marks the file', () => {
@@ -93,11 +103,12 @@ test('includeSecrets keeps keys but marks the file', () => {
   assert.ok(v.warnings.some((w) => /ความลับ/.test(w)));
 });
 
-test('log is capped at the newest 500 entries', () => {
-  const big = Array.from({ length: 700 }, (_, i) => ({ role: 'user', text: `m${i}`, ts: i }));
+test('full backup retains every unique valid chat message', () => {
+  const big = Array.from({ length: 1700 }, (_, i) => ({ role: 'user', text: `m${i}`, ts: i + 1 }));
   const b = createBackup({ log: big });
-  assert.equal(b.data.log.length, 500);
-  assert.equal(b.data.log.at(-1).text, 'm699');
+  assert.equal(b.data.log.length, 1700);
+  assert.equal(b.data.log[0].text, 'm0');
+  assert.equal(b.data.log.at(-1).text, 'm1699');
 });
 
 test('validateBackup accepts objects and strings, rejects broken input', () => {
@@ -134,7 +145,7 @@ test('validateBackup rejects byte-oversized payloads and malformed collection sh
   assert.match(validateBackup({ ...backup, payload: 'x'.repeat(BACKUP_MAX_BYTES) }).errors[0], /เกินขนาดสูงสุด/);
   assert.match(validateBackup({ ...backup, data: { ...backup.data, facts: {} } }).errors.join(' '), /facts ต้องเป็น array/);
   assert.match(validateBackup({ ...backup, data: { ...backup.data, settings: [] } }).errors.join(' '), /settings ต้องเป็น object/);
-  assert.match(validateBackup({ ...backup, data: { ...backup.data, log: Array(501).fill(null) } }).errors.join(' '), /log มีรายการเกินขีดจำกัด/);
+  assert.match(validateBackup({ ...backup, data: { ...backup.data, log: Array(100_001).fill(null) } }).errors.join(' '), /log มีรายการเกินขีดจำกัด/);
 });
 
 test('a tampered file yields a checksum warning but still validates', () => {
@@ -267,7 +278,7 @@ test('planRestore falls back to merge for unknown modes and warns about settings
   assert.ok(noSettings.warnings.some((w) => /ไม่มี settings/.test(w)));
 });
 
-test('planRestore merges health history by day, incoming wins, and trims to 30', () => {
+test('planRestore merges health history by day, incoming wins, and retains older snapshots', () => {
   const dates = Array.from({ length: 30 }, (_, i) => ({
     date: new Date(Date.UTC(2026, 0, i + 1)).toISOString().slice(0, 10),
     score: 70, grade: 'C', issues: { high: 1, medium: 0, low: 0 },
@@ -280,12 +291,12 @@ test('planRestore merges health history by day, incoming wins, and trims to 30',
   const action = plan.actions.find((item) => item.key === 'healthHistory');
   assert.equal(action.updated, 1);
   assert.equal(action.added, 1);
-  assert.equal(action.trimmed, 1);
-  assert.equal(plan.values.healthHistory.length, 30);
+  assert.equal(action.trimmed, 0);
+  assert.equal(plan.values.healthHistory.length, 31);
   assert.equal(plan.values.healthHistory.find((item) => item.date === dates[4].date).score, 95);
-  assert.equal(plan.values.healthHistory[0].date, '2026-01-02');
+  assert.equal(plan.values.healthHistory[0].date, '2026-01-01');
   assert.equal(JSON.stringify(plan.values.healthHistory).includes('do not restore'), false);
-  assert.match(describePlan(plan), /ตัดเก่าสุด 1/);
+  assert.doesNotMatch(describePlan(plan), /ตัดเก่าสุด/);
 });
 
 test('planRestore replace sanitizes health history; old backups default it to empty', () => {

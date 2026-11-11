@@ -830,3 +830,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 82.1 version 2.20.0 + CHANGELOG
 - [x] 82.2 README (32 docs, 459 unit / 173 checks) + PHASES ปิดครบ
 - [x] 82.3 ตรวจรับรวม: check 118 files · unit 459 · browser 173 · perf · build → PR
+
+# รอบที่ 26 (v2.21)
+
+เป้าหมาย: ป้องกันการทิ้ง facts, conversation history และ health summary เก่าโดยอัตโนมัติเมื่อเกินเพดานภายใน และให้ archive/backup เข้าถึงประวัติที่เก็บไว้ได้ทั้งหมด
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AO1 | ยกเลิกการ prune memory/log/health summary อัตโนมัติ | 83.1–83.3 | ✅ |
+| AO2 | archive paging และ backup แบบไม่ตัดประวัติเงียบ ๆ | 84.1–84.3 | ✅ |
+| AO3 | Release 2.21 | 85.1–85.3 | ✅ |
+
+## AO1 — ยกเลิกการ prune memory/log อัตโนมัติ
+
+- [x] 83.1 เพิ่ม facts/log/health summaries เกินเพดานเดิมแล้วยังเก็บของเก่าและใหม่ครบ
+- [x] 83.2 import/export และ merge memory ไม่ตัด record เก่า; การ replace ยังทำหลังผู้ใช้เลือกเอง
+- [x] 83.3 Tests สำหรับ retention และ persistence หลังเกินเพดานเดิม
+
+## AO2 — archive paging และ backup แบบไม่ตัดประวัติเงียบ ๆ
+
+- [x] 84.1 archive ใช้ older/newer ทีละ 50 ได้โดยไม่มีเพดาน 800
+- [x] 84.2 full backup รวม facts/log/health summaries ทั้งหมด; cap import อิงขนาดไฟล์ ไม่ silently slice ประวัติ
+- [x] 84.3 Browser smoke ตรวจ pagination, restore, memory-import confirmation; UI แจ้งเมื่อ export เกิน 20 MiB และอัปเดต docs memory/storage/backup/health
+
+## AO3 — Release 2.21
+
+- [x] 85.1 version 2.21.0 + CHANGELOG
+- [x] 85.2 README (32 docs, 462 unit / 178 checks) + PHASES ปิดครบ
+- [x] 85.3 ตรวจรับรวม: check 118 files · unit 462 · browser 178 · perf · build → PR
