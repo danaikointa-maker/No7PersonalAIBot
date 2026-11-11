@@ -81,7 +81,14 @@
         <section id="view-chat" class="view active">
           <div id="run-timeline" class="run-timeline" hidden aria-live="polite"></div>
           <div id="messages" aria-live="polite"></div>
-          <span id="outbox-badge" class="pill" hidden></span>
+          <div id="outbox-panel" class="outbox-panel" hidden>
+            <div class="outbox-toolbar">
+              <span id="outbox-badge" class="pill"></span>
+              <button id="outbox-retry" type="button" data-i18n="outbox.retry">ลองส่งคิวอีกครั้ง</button>
+              <button id="outbox-clear" type="button" class="danger" data-i18n="outbox.clear">ล้างคิว</button>
+            </div>
+            <div id="outbox-list" class="outbox-list" aria-label="ข้อความค้างส่ง"></div>
+          </div>
           <form id="composer">
             <input id="input" type="text" placeholder="พิมพ์หรือพูดกับ No7…" autocomplete="off" data-i18n-placeholder="chat.placeholder" />
             <button type="submit" id="send-btn" data-i18n="chat.send">ส่ง</button>

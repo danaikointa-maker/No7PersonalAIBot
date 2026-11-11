@@ -65,13 +65,26 @@ export async function withRetry(fn, opts = {}) {
 
 export const QUEUE_KEY = 'no7.outbox.v1';
 
+export class OfflineQueueStorageError extends Error {
+  constructor(message = 'บันทึกข้อความค้างส่งลงในเครื่องไม่สำเร็จ', options = {}) {
+    super(message, options);
+    this.name = 'OfflineQueueStorageError';
+  }
+}
+
+export class OfflineQueueFullError extends Error {
+  constructor(message = 'คิวออฟไลน์เต็ม — ข้อความเดิมยังอยู่ กรุณาลองส่งหรือลบข้อความค้างส่งก่อน') {
+    super(message);
+    this.name = 'OfflineQueueFullError';
+  }
+}
+
 /** คิวข้อความที่ยังส่งไม่ได้ (ออฟไลน์ / server ล่ม) — เก็บใน localStorage */
 export class OfflineQueue {
-  constructor({ storage = null, key = QUEUE_KEY, max = 20, ttlMs = 24 * 60 * 60 * 1000, now = () => Date.now() } = {}) {
+  constructor({ storage = null, key = QUEUE_KEY, max = 20, now = () => Date.now() } = {}) {
     this.storage = storage || (typeof localStorage !== 'undefined' ? localStorage : null);
     this.key = key;
-    this.max = max;
-    this.ttlMs = ttlMs;
+    this.max = Math.max(1, Math.floor(Number(max) || 20));
     this.now = now;
     this.items = this._load();
   }
@@ -80,69 +93,100 @@ export class OfflineQueue {
     try {
       const raw = this.storage?.getItem(this.key);
       const list = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(list)) return [];
-      const cutoff = this.now() - this.ttlMs;
-      return list.filter((i) => i && typeof i.text === 'string' && (i.at || 0) >= cutoff).slice(-this.max);
+      // ไม่ตัดรายการตามอายุหรือ max อัตโนมัติ: ข้อความค้างส่งเป็นข้อมูลผู้ใช้
+      return Array.isArray(list) ? list.filter((i) => i && typeof i.text === 'string') : [];
     } catch { return []; }
   }
 
-  _save() {
+  _save(candidate) {
     try {
-      if (!this.items.length) this.storage?.removeItem?.(this.key);
-      else this.storage?.setItem(this.key, JSON.stringify(this.items));
-    } catch { /* quota — ปล่อยผ่าน */ }
+      if (this.storage) {
+        if (candidate.length) this.storage.setItem(this.key, JSON.stringify(candidate));
+        else this.storage.removeItem(this.key);
+      }
+    } catch (cause) {
+      throw new OfflineQueueStorageError('บันทึกคิวออฟไลน์ไม่สำเร็จ — พื้นที่จัดเก็บอาจเต็ม', { cause });
+    }
+    this.items = candidate;
   }
 
   enqueue(text, meta = {}) {
+    const body = String(text || '').slice(0, 4000);
+    if (!body.trim()) return null;
+    if (this.items.length >= this.max) throw new OfflineQueueFullError();
     const item = {
+      ...meta,
       id: `${this.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-      text: String(text || '').slice(0, 4000),
+      text: body,
       at: this.now(),
       tries: 0,
-      ...meta,
     };
-    if (!item.text.trim()) return null;
-    this.items.push(item);
-    if (this.items.length > this.max) this.items = this.items.slice(-this.max);
-    this._save();
-    return item;
+    this._save([...this.items, item]);
+    return { ...item };
   }
 
-  list() { return [...this.items]; }
+  list() { return this.items.map((item) => ({ ...item })); }
   size() { return this.items.length; }
 
   remove(id) {
-    this.items = this.items.filter((i) => i.id !== id);
-    this._save();
+    const candidate = this.items.filter((item) => item.id !== id);
+    if (candidate.length === this.items.length) return false;
+    this._save(candidate);
+    return true;
   }
 
   markTried(id) {
-    const item = this.items.find((i) => i.id === id);
-    if (item) { item.tries += 1; this._save(); }
+    const index = this.items.findIndex((item) => item.id === id);
+    if (index < 0) return false;
+    const candidate = this.items.map((item, i) => i === index
+      ? { ...item, tries: (Number(item.tries) || 0) + 1 }
+      : item);
+    this._save(candidate);
+    return true;
+  }
+
+  resetTries() {
+    if (!this.items.some((item) => Number(item.tries) > 0)) return false;
+    this._save(this.items.map((item) => ({ ...item, tries: 0 })));
+    return true;
   }
 
   clear() {
-    this.items = [];
-    this._save();
+    if (!this.items.length) return;
+    this._save([]);
   }
 
   /**
-   * ส่งทุกรายการด้วย handler(item) — สำเร็จ = เอาออกจากคิว, ล้มเหลว = หยุดแล้วรอรอบหน้า
-   * @returns {Promise<{sent: number, left: number}>}
+   * ส่งตามลำดับ; เมื่อ retry หมดจะคงรายการไว้และรอให้ผู้ใช้สั่งลองใหม่
+   * failureStage: before-send | send | after-send | exhausted
    */
   async drain(handler, { maxTries = 3 } = {}) {
     let sent = 0;
     for (const item of this.list()) {
-      if (item.tries >= maxTries) { this.remove(item.id); continue; }
+      const current = this.items.find((entry) => entry.id === item.id);
+      if (!current) continue;
+      if ((Number(current.tries) || 0) >= maxTries) {
+        return { sent, left: this.size(), exhausted: true, failureStage: 'exhausted', itemId: item.id };
+      }
       try {
         this.markTried(item.id);
-        await handler(item);
+      } catch (error) {
+        return { sent, left: this.size(), error, failureStage: 'before-send', itemId: item.id };
+      }
+      const attempted = this.items.find((entry) => entry.id === item.id);
+      try {
+        const result = await handler({ ...attempted });
+        if (result === false) throw new Error('ไม่สามารถส่งข้อความที่ค้างอยู่ได้');
+      } catch (error) {
+        return { sent, left: this.size(), error, failureStage: 'send', itemId: item.id };
+      }
+      sent += 1;
+      try {
         this.remove(item.id);
-        sent += 1;
-      } catch {
-        break;
+      } catch (error) {
+        return { sent, left: this.size(), error, failureStage: 'after-send', itemId: item.id };
       }
     }
-    return { sent, left: this.size() };
+    return { sent, left: this.size(), exhausted: false, failureStage: null, itemId: null };
   }
 }

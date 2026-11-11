@@ -33,6 +33,7 @@ import {
   planRecipe, runRecipe, MAX_RECIPE_STEPS,
 } from './core/desktop.js';
 import { withRetry, classifyError, OfflineQueue } from './core/retry.js';
+import { createOfflineOutboxUI, describeOutboxEnqueueFailure } from './core/offline-outbox-ui.js';
 import { Metrics, formatMs, METRIC_KINDS } from './core/metrics.js';
 import { buildDiagnosticsReport, diagnosticsFilename, redact } from './core/diagnostics.js';
 import { Agent } from './core/agent.js';
@@ -375,7 +376,7 @@ let activeQueue = null;
 
 /** One chat turn: agent loop + streaming tokens + speak-while-generating. */
 async function respond(userText) {
-  if (busy) return;
+  if (busy) return false;
   busy = true;
   sm.set({ error: null, requestInFlight: true });
   memory.logTurn('user', userText);
@@ -528,6 +529,7 @@ async function respond(userText) {
 
     sm.set({ requestInFlight: false, toolRunning: false });
     if (!speakLive) await speak(botText);
+    return true;
   } catch (err) {
     chatOk = false;
     timeline.finish();
@@ -539,6 +541,7 @@ async function respond(userText) {
     sm.set({ error: err.message, requestInFlight: false, toolRunning: false });
     setSubtitle('มีปัญหาการเชื่อมต่อ ลองตรวจสอบการตั้งค่า');
     setTimeout(() => sm.set({ error: null }), 4000);
+    return false;
   } finally {
     busy = false;
     currentAgent = null;
@@ -555,6 +558,7 @@ async function respond(userText) {
       error: chatOk ? null : 'chat failed',
     });
     renderMetrics();
+    if (outbox.size() && navigator.onLine) queueMicrotask(() => { void flushOutbox(); });
   }
 }
 
@@ -574,37 +578,40 @@ $('#composer').addEventListener('submit', (e) => {
   e.preventDefault();
   const text = $('#input').value.trim();
   if (!text) return;
-  $('#input').value = '';
-  addMessage('user', text);
-
   if (!navigator.onLine) {
-    outbox.enqueue(text);
-    addMessage('bot', `📥 ออฟไลน์อยู่ — เก็บข้อความไว้ในคิวแล้ว (${outbox.size()} รายการ) จะส่งให้ทันทีที่กลับมาออนไลน์`);
-    setSubtitle('ออฟไลน์ — เก็บข้อความไว้ในคิว');
+    try {
+      outbox.enqueue(text);
+    } catch (error) {
+      $('#input').value = text;
+      addMessage('bot', describeOutboxEnqueueFailure(error, settings.uiLang));
+      updateOutboxBadge();
+      return;
+    }
+    $('#input').value = '';
+    addMessage('user', text);
+    addMessage('bot', `📥 ${settings.uiLang === 'en' ? 'Message queued and will send when online.' : `บันทึกข้อความลงคิวแล้ว (${outbox.size()} รายการ) จะส่งเมื่อกลับมาออนไลน์`}`);
+    setSubtitle(settings.uiLang === 'en' ? 'Offline — message saved in queue' : 'ออฟไลน์ — บันทึกข้อความไว้ในคิวแล้ว');
     updateOutboxBadge();
     return;
   }
+  $('#input').value = '';
+  addMessage('user', text);
   respond(text);
 });
 
-/** ส่งข้อความที่ค้างในคิวเมื่อกลับมาออนไลน์ */
-async function flushOutbox() {
-  if (!outbox.size() || !navigator.onLine) { updateOutboxBadge(); return; }
-  const { sent, left } = await outbox.drain(async (item) => {
-    if (busy) throw new Error('busy');
-    await respond(item.text);
-  });
-  if (sent) addMessage('bot', `📤 ส่งข้อความที่ค้างไว้ให้แล้ว ${sent} รายการ${left ? ` (เหลือ ${left})` : ''}`);
-  updateOutboxBadge();
-}
+const outboxUI = createOfflineOutboxUI({
+  queue: outbox,
+  isOnline: () => navigator.onLine,
+  isBusy: () => busy,
+  send: (text) => respond(text),
+  notify: (text) => addMessage('bot', text),
+  ask: (message) => confirm(message),
+  language: () => settings.uiLang,
+});
 
-function updateOutboxBadge() {
-  const n = outbox.size();
-  const el = $('#outbox-badge');
-  if (!el) return;
-  el.hidden = n === 0;
-  el.textContent = `📥 ค้างส่ง ${n}`;
-}
+/** ส่งข้อความที่ค้างในคิวเมื่อกลับมาออนไลน์ */
+function flushOutbox() { return outboxUI.flush(); }
+function updateOutboxBadge() { outboxUI.render(); }
 
 /** ฟังหนึ่งครั้ง → ส่งข้อความ (ใช้ร่วมกันทั้งปุ่มไมค์และ wake word) */
 async function triggerListen() {
@@ -1967,7 +1974,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.37.0',
+      version: window.NO7_VERSION || '2.38.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },

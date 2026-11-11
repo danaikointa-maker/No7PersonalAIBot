@@ -1306,3 +1306,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 133.1 version 2.37.0 + CHANGELOG
 - [x] 133.2 README + PHASES ปิดครบ
 - [x] 133.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 43 (v2.38)
+
+เป้าหมาย: ป้องกันข้อความที่พิมพ์ขณะออฟไลน์สูญหายเมื่อ localStorage เต็ม โดยให้ Outbox บันทึก candidate ก่อนเปลี่ยน state, คงข้อความในช่องพิมพ์เมื่อ enqueue ไม่สำเร็จ และแจ้งสถานะ drain อย่างชัดเจนเพื่อลดการส่งซ้ำ ทั้งไม่ลบข้อความเก่า/เกินจำนวน retry โดยอัตโนมัติ
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| BF1 | ทำ OfflineQueue แบบ persist-before-swap และไม่ทิ้งข้อความอัตโนมัติ | 134.1–134.3 | ✅ |
+| BF2 | จัดการ enqueue/drain storage failure ใน UI | 135.1–135.3 | ✅ |
+| BF3 | Release 2.38 | 136.1–136.3 | ✅ |
+
+## BF1 — ทำ OfflineQueue แบบ persist-before-swap และไม่ทิ้งข้อความอัตโนมัติ
+
+- [x] 134.1 เพิ่ม `OfflineQueueStorageError` และบันทึก candidate ก่อนเปลี่ยนคิวใน memory
+- [x] 134.2 enqueue/remove/markTried/clear คงคิวเดิมเมื่อ persist ล้มเหลว; คิวเต็มหรือ retry หมดจะไม่ลบข้อความเดิม
+- [x] 134.3 Unit tests ครอบคลุม quota failure, capacity, retention และ drain ก่อน/หลังส่งไม่สำเร็จ
+
+## BF2 — จัดการ enqueue/drain storage failure ใน UI
+
+- [x] 135.1 enqueue failure ไม่ล้างช่องพิมพ์และไม่รายงานว่าเข้าคิวสำเร็จ
+- [x] 135.2 drain แยก failure ก่อนส่ง, ขณะส่ง และหลังส่งแต่บันทึก removal ไม่ได้; มีปุ่ม retry และลบข้อความโดยผู้ใช้
+- [x] 135.3 Browser smoke จำลอง quota failure และยืนยันข้อความร่าง/คิวเดิม/ข้อความสถานะถูกต้อง
+
+## BF3 — Release 2.38
+
+- [x] 136.1 version 2.38.0 + CHANGELOG
+- [x] 136.2 README + PHASES ปิดครบ
+- [x] 136.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
