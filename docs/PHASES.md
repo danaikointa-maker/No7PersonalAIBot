@@ -1334,3 +1334,14 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 136.1 version 2.38.0 + CHANGELOG
 - [x] 136.2 README + PHASES ปิดครบ
 - [x] 136.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 44 (v2.39.0) — ป้องกันการซิงก์ข้อมูลไม่ครบ
+
+สถานะ: ✅ เสร็จสมบูรณ์
+
+- [x] Persist notes/todos ก่อน apply collections อื่น และ rollback สองคีย์เมื่อ write/apply ภายหลังล้มเหลว
+- [x] ไม่กลืน storage errors; แจ้ง error แทนสถานะสำเร็จ และแยกกรณี apply บางส่วนพร้อมระบุ collections ที่ commit แล้ว
+- [x] ใช้ TaskStore instance จริงของหน้าจอและส่ง tombstones เข้า merge เพื่อไม่ให้งานที่ลบแล้วฟื้นกลับ
+- [x] เพิ่ม tests สำหรับ quota failure, rollback, live cache/tombstones และ partial failure/retry report
+- [x] Release metadata, README และ CHANGELOG เป็น v2.39.0
+- [x] ตรวจรับ: unit, browser smoke, check, build, perf budget และ `git diff --check`
