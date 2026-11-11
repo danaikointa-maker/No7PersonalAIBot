@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.34.0] — 2026-11-11
+
+- Control audit entries now persist transactionally before updating memory. Desktop control actions require a durable audit entry before execution, so storage failures block the action; clearing logs also preserves the existing history if storage fails.
+
 ## [2.33.0] — 2026-11-11
 
 - Persona create/update/delete/duplicate/restore now surface storage write failures instead of silently appearing successful. Failed operations preserve existing personas, and the editor remains open with the unsaved input available for retry.

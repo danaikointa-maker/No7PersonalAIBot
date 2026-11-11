@@ -146,15 +146,22 @@ export class ControlAudit {
     } catch { return []; }
   }
 
-  _save() {
-    try { this.storage?.setItem(this.key, JSON.stringify(this.entries)); } catch { /* quota */ }
+  _save(candidate = this.entries) {
+    try {
+      this.storage?.setItem(this.key, JSON.stringify(candidate));
+      return true;
+    } catch (cause) {
+      const error = new Error('บันทึก audit log ไม่สำเร็จ — ยกเลิกการสั่งงานเพื่อรักษาประวัติความปลอดภัย', { cause });
+      error.name = 'ControlAuditStorageError';
+      throw error;
+    }
   }
 
   record({ action, target = '', allowed = false, reason = '', source = 'agent' } = {}) {
     const entry = { at: this.now(), action, target: String(target).slice(0, 200), allowed: !!allowed, reason, source };
-    this.entries.push(entry);
-    if (this.entries.length > this.max) this.entries = this.entries.slice(-this.max);
-    this._save();
+    const candidate = [...this.entries, entry].slice(-this.max);
+    this._save(candidate);
+    this.entries = candidate;
     return entry;
   }
 
@@ -175,7 +182,12 @@ export class ControlAudit {
     return { total, allowed, blocked: total - allowed };
   }
 
-  clear() { this.entries = []; this._save(); }
+  clear() {
+    if (!this.entries.length) return false;
+    this._save([]);
+    this.entries = [];
+    return true;
+  }
 }
 
 export function controlBridge(scope = globalThis) {
