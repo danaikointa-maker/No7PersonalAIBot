@@ -161,6 +161,13 @@ label input[type="checkbox"] { width: auto; }
   background: var(--bg2); color: var(--text); border: 1px solid var(--line);
 }
 .digest-actions button:hover { border-color: var(--accent, #6af); }
+.health-card { border-color: color-mix(in srgb, var(--accent, #6af) 45%, var(--line, #223)); }
+.health-issues, .health-cleanup { display: flex; flex-direction: column; gap: 4px; }
+.health-severity { display: inline-block; min-width: 48px; font-size: 10px; font-weight: 700; opacity: .85; }
+.health-severity.high { color: #ff7777; }
+.health-severity.medium { color: #ffc46b; }
+.health-severity.low { color: #81c7ff; }
+.health-cleanup { border-top: 1px solid var(--line, #223); padding-top: 7px; }
 .digest-sec-head { font-weight: 600; font-size: 13px; }
 .digest-item { font-size: 12px; opacity: .9; padding-left: 4px; }
 .digest-item small { opacity: .65; }

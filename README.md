@@ -152,6 +152,7 @@ npm run perf          # performance budget (ขนาด bundle/source)
 - ซิงก์มือถือ ↔ PC ผ่าน server ของคุณเอง (`/api/sync`, token) — ไม่มีคลาวด์ ไม่มีบัญชี
 - เลือกกลยุทธ์เมื่อข้อมูลชนกัน + ดูรายงาน "เพิ่ม/อัปเดต/คงเดิม/ชนกัน" (ดู [docs/SYNC.md](docs/SYNC.md))
 - ส่งออกสรุปวันนี้/รายงานสัปดาห์เป็น Markdown หรือ CSV (BOM พร้อม Excel ไทย) — [docs/REPORTS.md](docs/REPORTS.md)
+- ตรวจสุขภาพข้อมูล (คะแนน A–D), ดูรายการซ้ำ/ว่าง และล้างแบบยืนยันก่อน — [docs/HEALTH.md](docs/HEALTH.md)
 - **งาน + เตือนข้ามเครื่อง**: เพิ่มงานด้วยเสียง/ข้อความ, เตือนตามเวลา, ซิงก์แบบ last-write-wins (tombstone สำหรับการลบ)
 - **งานซ้ำ + เตือนแม้ปิดแอป**: `daily/weekdays/weekly/monthly/hourly`, server tick ส่ง Telegram, ปิดงานแล้วเลื่อนรอบถัดไปเอง
 
@@ -208,6 +209,7 @@ docs/                เอกสาร 31 ไฟล์
 | [docs/WEEKLY.md](docs/WEEKLY.md) | รายงานรายสัปดาห์ + ข้อเสนอโฟกัส |
 | [docs/SYNC.md](docs/SYNC.md) | ซิงก์ conflict-aware: กลยุทธ์, คีย์, รายงานความขัดแย้ง |
 | [docs/REPORTS.md](docs/REPORTS.md) | ส่งออกสรุปวันนี้/รายงานสัปดาห์เป็น Markdown หรือ CSV |
+| [docs/HEALTH.md](docs/HEALTH.md) | ตรวจสุขภาพข้อมูลและล้างรายการซ้ำ/ว่างอย่างปลอดภัย |
 | [docs/SEARCH.md](docs/SEARCH.md) | command palette ⌘K + การให้คะแนน/ไฮไลต์ |
 | [docs/BACKUP.md](docs/BACKUP.md) | สำรอง/กู้คืน schema 2 (dry-run, merge/replace) |
 | [docs/AGENT.md](docs/AGENT.md) | agent loop, event, timeline, การหยุดกลางทาง |

@@ -378,6 +378,20 @@ check('digest: Markdown export does not break the app', !$('#digest-card').hidde
 $('#set-digest-auto').checked = true;
 $('#set-digest-auto').dispatchEvent(new window.Event('change'));
 check('digest: auto toggle persists', JSON.parse(window.localStorage.getItem('no7.settings.v1') || '{}').digestAuto === true);
+
+// data health: report and explicitly confirmed cleanup of only empty entries
+window.localStorage.setItem('no7.notes.v1', JSON.stringify([{ text: '' }, { text: 'keep note' }]));
+window.localStorage.setItem('no7.todos.v1', JSON.stringify([{ text: '   ' }, { text: 'keep todo' }]));
+check('health: scan button is available', !!$('#health-btn'));
+$('#health-btn').click();
+await wait(20);
+check('health: report card rendered with cleanup preview', !$('#health-card').hidden && $('#health-card').textContent.includes('รายการที่ล้างได้อย่างปลอดภัย'), $('#health-card').textContent.slice(0, 100));
+check('health: report posted to chat', $('#messages').textContent.includes('สุขภาพข้อมูล'));
+window.confirm = () => true;
+$('#health-clean-btn').click();
+await wait(20);
+check('health: cleanup removes only flagged empty entries', JSON.parse(window.localStorage.getItem('no7.notes.v1')).length === 1 && JSON.parse(window.localStorage.getItem('no7.todos.v1')).length === 1);
+check('health: cleanup refreshes report', !$('#health-card').hidden && !$('#health-card').textContent.includes('รายการที่ล้างได้อย่างปลอดภัย'));
 $('#nav button[data-view="settings"]').click();
 
 // memory 2.0: pin + consolidate run
