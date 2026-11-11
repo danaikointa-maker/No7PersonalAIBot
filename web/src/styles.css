@@ -172,6 +172,9 @@ label input[type="checkbox"] { width: auto; }
 .health-history-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .health-history-head button { font-size: 11px; padding: 3px 8px; }
 .health-history-privacy { margin: 0; font-size: 11px; }
+.health-history-ranges { display: flex; gap: 5px; }
+.health-history-ranges button[aria-pressed="true"] { border-color: var(--accent, #6af); background: rgba(120, 180, 255, .14); }
+.health-window-summary { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; opacity: .85; }
 .health-trend { margin: 0; font-size: 12px; font-weight: 600; }
 .health-trend.up { color: #67d391; }
 .health-trend.down { color: #ff8a8a; }
