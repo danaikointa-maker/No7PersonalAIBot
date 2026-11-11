@@ -1,12 +1,10 @@
 // Long-term memory 2.0 — GraphRAG-lite (BM25) + episodic log + pin/edit/decay.
 // Ported from ESP32 memory/ (MemoryStore, TextFeatures, EpisodicLog), now with
-// usage-aware ranking, pruning and portable export/import.
+// usage-aware ranking and non-destructive portable export/import.
 
 const KEY = 'no7.memory.v2';
 const LEGACY_FACTS = 'no7.memory.facts.v1';
 const LEGACY_LOG = 'no7.memory.log.v1';
-const MAX_FACTS = 3000;
-const MAX_LOG = 800;
 const DAY = 24 * 60 * 60 * 1000;
 
 function loadRaw(key, fallback) {
@@ -26,7 +24,7 @@ function saveRaw(key, val) {
         detail: {
           key,
           message: quota
-            ? 'พื้นที่เก็บข้อมูลเต็ม — ส่งออกความจำแล้วลบรายการเก่า หรือเปิด "พื้นที่ถาวร" ในหน้าตั้งค่า'
+            ? 'พื้นที่เก็บข้อมูลเต็ม — ส่งออกความจำและจัดการพื้นที่ด้วยตนเองในหน้าตั้งค่า; ระบบจะไม่ลบข้อมูลเก่าอัตโนมัติ'
             : `บันทึกความจำไม่สำเร็จ: ${err?.message || err}`,
         },
       }));
@@ -124,7 +122,6 @@ export class MemoryStore {
       pinned: !!opts.pinned, used: 0, source: opts.source || 'user',
     };
     this.facts.push(fact);
-    if (this.facts.length > MAX_FACTS) this._prune();
     this._buildIndex();
     this._persist();
     return fact;
@@ -164,7 +161,7 @@ export class MemoryStore {
     const result = { restored: 0, skipped: 0 };
     for (const raw of records) {
       const text = String(raw?.text || '').trim();
-      if (!text || !raw?.id || this.facts.some((fact) => fact.id === raw.id || fact.text === text) || this.facts.length >= MAX_FACTS) {
+      if (!text || !raw?.id || this.facts.some((fact) => fact.id === raw.id || fact.text === text)) {
         result.skipped++;
         continue;
       }
@@ -232,7 +229,6 @@ export class MemoryStore {
 
   logTurn(role, text, meta = {}) {
     this.log.push({ role, text: String(text).slice(0, 2000), ts: Date.now(), ...meta });
-    if (this.log.length > MAX_LOG) this.log = this.log.slice(-MAX_LOG);
     this._persist();
   }
 
@@ -251,15 +247,6 @@ export class MemoryStore {
         : 0,
       lastConsolidated: this.meta.lastConsolidated || 0,
     };
-  }
-
-  /** Shrink when over capacity: drop oldest unpinned low-importance facts first. */
-  _prune() {
-    const keep = this.facts.filter((f) => f.pinned);
-    const rest = this.facts.filter((f) => !f.pinned)
-      .sort((a, b) => (a.importance - b.importance) || (a.ts - b.ts));
-    const room = Math.max(0, MAX_FACTS - keep.length);
-    this.facts = [...keep, ...rest.slice(-room)];
   }
 
   /** Importance decay for facts that were never used and are old. */
@@ -287,7 +274,7 @@ export class MemoryStore {
     return {
       kind: 'no7-memory', version: 2, exportedAt: new Date().toISOString(),
       facts: this.facts.map((f) => ({ ...f })),
-      log: this.log.slice(-200),
+      log: this.log.map((item) => ({ ...item })),
       meta: { ...this.meta },
     };
   }
@@ -312,7 +299,7 @@ export class MemoryStore {
       if (this.facts.length > before) result.added++; else result.merged++;
     }
     const byLogId = new Map();
-    for (const raw of (merge ? this.log : []).slice(-MAX_LOG)) {
+    for (const raw of (merge ? this.log : [])) {
       if (!raw || !['user', 'assistant'].includes(raw.role) || typeof raw.text !== 'string' || !raw.text.trim()) continue;
       const ts = Number(raw.ts);
       if (!Number.isFinite(ts) || ts <= 0) continue;
@@ -321,7 +308,7 @@ export class MemoryStore {
     }
     result.logAdded = 0;
     result.logSkipped = 0;
-    for (const raw of Array.isArray(payload?.log) ? payload.log.slice(-MAX_LOG * 2) : []) {
+    for (const raw of Array.isArray(payload?.log) ? payload.log : []) {
       if (!raw || !['user', 'assistant'].includes(raw.role) || typeof raw.text !== 'string' || !raw.text.trim()) {
         result.logSkipped++;
         continue;
@@ -334,7 +321,7 @@ export class MemoryStore {
       byLogId.set(id, item);
       result.logAdded++;
     }
-    this.log = [...byLogId.values()].sort((a, b) => a.ts - b.ts).slice(-MAX_LOG);
+    this.log = [...byLogId.values()].sort((a, b) => a.ts - b.ts);
     this._persist();
     return result;
   }

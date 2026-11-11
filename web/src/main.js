@@ -63,7 +63,7 @@ import {
   buildIndex, searchIndex, groupResults, defaultPaletteExtras, highlightRanges,
 } from './core/search.js';
 import {
-  createBackup, validateBackup, summarizeBackup, planRestore, describePlan, BACKUP_SCHEMA,
+  createBackup, validateBackup, summarizeBackup, planRestore, describePlan, BACKUP_SCHEMA, BACKUP_MAX_BYTES, BACKUP_COLLECTION_LIMITS, backupByteSize,
 } from './core/backup.js';
 import {
   LOCAL_PRESETS, probeLocal, warmModel, pickBestModel, normalizeOfflineBrain,
@@ -75,7 +75,6 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 }[c]));
 
-/* ------------------------------------------------------------------- MCP */
 const mcp = new McpRegistry({
   settings: () => settings,
   serverUrl: () => settings.serverUrl || 'http://localhost:8787',
@@ -312,8 +311,6 @@ async function speak(text) {
   }
 }
 
-/** Add one visible agent step (tool call / denial / error) into the chat. */
-/** แผง timeline ระหว่างทำงาน — แสดงทุกขั้นพร้อมสถานะ */
 function renderTimeline(timeline) {
   const box = $('#run-timeline');
   if (!box) return;
@@ -746,7 +743,6 @@ function stateEmotion(s) {
   }[s] || 'neutral';
 }
 
-/* ------------------------------------------------------------------ tools */
 function renderToolsGrid(force = false) {
   const grid = $('#tools-grid');
   const mode = getMode(settings.mode);
@@ -788,7 +784,6 @@ function renderToolsGrid(force = false) {
   }
 }
 
-/* ----------------------------------------------------------------- memory */
 let memFilter = 'all';
 let memQuery = '';
 let archiveRender = null;
@@ -924,7 +919,12 @@ $('#mem-consolidate-btn').addEventListener('click', async () => {
 });
 
 $('#mem-export-btn').addEventListener('click', () => {
-  downloadJson(memory.exportData(), `no7-memory-${Date.now()}.json`);
+  const data = memory.exportData();
+  if (backupByteSize(data) > BACKUP_MAX_BYTES || data.facts.length > BACKUP_COLLECTION_LIMITS.facts || data.log.length > BACKUP_COLLECTION_LIMITS.log) {
+    $('#mem-status').textContent = 'ส่งออกไม่ได้: เกินเพดานไฟล์/รายการ — ข้อมูลเดิมยังอยู่ในเครื่อง';
+    return;
+  }
+  downloadJson(data, `no7-memory-${Date.now()}.json`);
   $('#mem-status').textContent = 'ส่งออกแล้ว';
 });
 
@@ -933,7 +933,21 @@ $('#mem-import-file').addEventListener('change', async (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
   try {
-    const payload = JSON.parse(await file.text());
+    if (file.size > BACKUP_MAX_BYTES) throw new Error('ไฟล์เกินขนาด 20 MiB');
+    const text = await file.text();
+    if (backupByteSize(text) > BACKUP_MAX_BYTES) throw new Error('ไฟล์เกินขนาด 20 MiB');
+    const payload = JSON.parse(text);
+    for (const key of ['facts', 'log']) {
+      if (Array.isArray(payload?.[key]) && payload[key].length > BACKUP_COLLECTION_LIMITS[key]) {
+        throw new Error(`${key} เกินขีดจำกัด ${BACKUP_COLLECTION_LIMITS[key]} รายการ`);
+      }
+    }
+    const factCount = Array.isArray(payload?.facts) ? payload.facts.length : 0;
+    const logCount = Array.isArray(payload?.log) ? payload.log.length : 0;
+    if (!window.confirm(`นำเข้าไฟล์ความจำแบบรวมข้อมูลหรือไม่? มี ${factCount} ความจำและ ${logCount} บทสนทนา — ของเดิมจะคงอยู่ ไม่มีการลบ`)) {
+      $('#mem-status').textContent = 'ยกเลิกการนำเข้าแล้ว';
+      return;
+    }
     const res = memory.importData(payload, { merge: true });
     $('#mem-status').textContent = `นำเข้าแล้ว: เพิ่ม ${res.added} · รวม ${res.merged} · ข้าม ${res.skipped} · บทสนทนา +${res.logAdded || 0}`;
     renderMemory();
@@ -962,7 +976,6 @@ function downloadJson(data, filename) {
   return { downloaded: true, bytes: blob.size, filename };
 }
 
-/* ------------------------------------------------------- HTTP tool plugins */
 /** โหลดปลั๊กอินที่บันทึกไว้ → dynamic tool defs (คีย์ plugin__<id>) */
 function loadPlugins({ apply = true } = {}) {
   const res = customToolDefs(settings.customPlugins || []);
@@ -1017,7 +1030,6 @@ $('#plugin-save')?.addEventListener('click', () => {
   setPluginStatus(`✅ ใช้ ${tools.length} ปลั๊กอินแล้ว (เรียกได้ทั้ง AI และกดทดลองในหน้าเครื่องมือ)`);
 });
 
-/* ------------------------------------------------------------------ digest */
 const DIGEST_KEY = 'no7.digest.last';
 
 // ใช้ closure (ไม่ใช่ getter) เพื่อไม่ให้แตะ `tasks`/`calendar` ก่อนถูกประกาศ (TDZ)
@@ -1057,7 +1069,13 @@ function exportHealthHistory(format) {
   const now = Date.now();
   const lang = langOf(settings.uiLang);
   if (format === 'csv') return deliverReport(datedFilename('no7-health-history', 'csv', now), healthHistoryCsv(history, { lang }), 'text/csv;charset=utf-8');
-  if (format === 'json') return deliverReport(datedFilename('no7-health-history', 'json', now), healthHistoryJson(history, { now }), 'application/json;charset=utf-8');
+  if (format === 'json') {
+    try { return deliverReport(datedFilename('no7-health-history', 'json', now), healthHistoryJson(history, { now }), 'application/json;charset=utf-8'); }
+    catch (err) {
+      $('#settings-status').textContent = `⚠️ ${err.message} — ประวัติในเครื่องไม่ถูกลบ`;
+      return Promise.resolve(false);
+    }
+  }
   return deliverReport(datedFilename('no7-health-history', 'md', now), healthHistoryMarkdown(history, { lang, now }), 'text/markdown;charset=utf-8');
 }
 
@@ -1186,7 +1204,6 @@ function showWeekly({ inChat = true } = {}) {
   return weekly;
 }
 
-/* ---------------------------------------------------------------- calendar */
 const calendar = getCalendar();
 
 function renderCalendar() {
@@ -1414,7 +1431,6 @@ $('#cal-today-btn').addEventListener('click', () => {
     : 'ไม่มีนัดในช่วง 24 ชั่วโมง';
 });
 
-/* ----------------------------------------------------------------- devices */
 const devices = getDeviceRegistry();
 
 function devLog(text) {
@@ -1706,7 +1722,6 @@ function collectSettings() {
   };
 }
 
-/* ------------------------------------------------ device capabilities */
 async function renderCapabilities() {
   const box = $('#caps-list');
   if (!box) return;
@@ -1805,7 +1820,6 @@ window.addEventListener('no7:storage-error', (e) => {
   $('#offline-banner').textContent = `⚠️ ${msg}`;
 });
 
-/* ------------------------------------------------------- Persona Studio */
 let editingPersonaId = null;
 
 function renderPersonaList() {
@@ -1909,7 +1923,6 @@ $('#pf-preview').addEventListener('click', async () => {
   $('#pf-status').textContent = 'พูดจบแล้ว';
 });
 
-/* ------------------------------------------------- metrics + diagnostics */
 function renderMetrics() {
   const box = $('#metrics-list');
   if (!box) return;
@@ -1939,7 +1952,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.20.0',
+      version: window.NO7_VERSION || '2.21.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -1991,7 +2004,6 @@ $('#diag-download')?.addEventListener('click', async () => {
   $('#diag-status').textContent = `⬇️ ดาวน์โหลด ${a.download}`;
 });
 
-/* ------------------------------------------------------------------ tasks */
 const tasks = new TaskStore();
 
 function renderTasks() {
@@ -2080,7 +2092,6 @@ const taskScheduler = new TaskScheduler({
   },
 });
 
-/* ------------------------------------------------- reminders via server */
 let reminderPushTimer = null;
 let reminderPollTimer = null;
 
@@ -2164,7 +2175,6 @@ function scheduleReminderPolling() {
   });
 }
 
-/* --------------------------------------------------------------- desktop */
 const recipes = new RecipeStore();
 let desktopWindows = [];
 
@@ -2297,7 +2307,6 @@ $('#recipe-delete')?.addEventListener('click', () => {
   setDesktopStatus(removed ? '🗑 ลบสูตรแล้ว' : 'ไม่พบสูตรนี้');
 });
 
-/* ------------------------------------------------- phone-link: hello/eyes/voice */
 function setLinkStatus(text) {
   const el = $('#link-status');
   if (el) el.textContent = text;
@@ -2358,7 +2367,6 @@ $('#link-voice-status')?.addEventListener('click', async () => {
   }
 });
 
-/* ------------------------------------------------------------------ i18n */
 function applyUiLang(lang) {
   applyI18n(document, langOf(lang));
   $('#view-title').textContent = viewTitle(currentView, settings.uiLang);
@@ -2375,7 +2383,6 @@ $('#set-uilang')?.addEventListener('change', (e) => {
   $('#settings-status').textContent = settings.uiLang === 'en' ? 'Interface language: English' : 'ภาษาหน้าจอ: ไทย';
 });
 
-/* --------------------------------------------------------- local models */
 const localCache = new LocalModelCache();
 let localModels = [];
 
@@ -2525,7 +2532,6 @@ $('#local-kind')?.addEventListener('change', () => {
   $('#local-status').textContent = 'เปลี่ยนชนิดแล้ว — กดตรวจโมเดล';
 });
 
-/* ------------------------------------------------------------- control UI */
 function renderControl() {
   const policy = normalizeControlPolicy(settings.controlPolicy);
   $('#set-control-enabled').checked = policy.enabled;
@@ -2560,7 +2566,6 @@ $('#control-audit-clear')?.addEventListener('click', () => {
   renderControl();
 });
 
-/* ---------------------------------------------------------------- bots UI */
 function botsBase() {
   return String(settings.serverUrl || 'http://localhost:8787').replace(/\/$/, '');
 }
@@ -2595,7 +2600,6 @@ $('#bots-refresh')?.addEventListener('click', () => { renderBots(); });
 $('#bots-copy-telegram')?.addEventListener('click', () => copyText(`${botsBase()}/api/telegram/webhook`, 'webhook Telegram'));
 $('#bots-copy-line')?.addEventListener('click', () => copyText(`${botsBase()}/api/line/webhook`, 'webhook LINE'));
 
-/* -------- MCP UI -------- */
 function mcpSlug(name, url) {
   const base = String(name || url || 'mcp').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   return `${base || 'mcp'}-${Math.random().toString(36).slice(2, 6)}`;
@@ -2669,7 +2673,6 @@ async function loadStdioServers() {
   }
 }
 
-/* ------------------------------- OAuth (PKCE) ------------------------------- */
 const OAUTH_PENDING_KEY = 'no7.oauth.pending';
 
 async function startOAuth(serverCfg) {
@@ -2728,7 +2731,6 @@ window.addEventListener('message', async (event) => {
   }
 });
 
-/* ------------------- OAuth device flow (รหัส + ลิงก์) ------------------- */
 function mcpServerUrl() {
   return String(settings.serverUrl || 'http://localhost:8787').replace(/\/$/, '');
 }
@@ -3034,12 +3036,11 @@ $('#set-provider').addEventListener('change', () => {
   }
 });
 
-/* ------------------------------------------------- backup / restore (v2) */
 function collectBackupState() {
   return {
     settings,
     facts: memory.listFacts({ sort: 'recent' }),
-    log: memory.recentLog(500),
+    log: memory.log,
     notes: readList('no7.notes.v1'),
     todos: readList('no7.todos.v1'),
     tasks: tasks.list({ done: null }),
@@ -3060,7 +3061,16 @@ $('#export-btn').addEventListener('click', () => {
     includeSecrets: false,
     version: window.NO7_VERSION || '',
   });
-  setBackupStatus(`⬇️ สำรองข้อมูลแล้ว (schema ${BACKUP_SCHEMA} · ${backup.counts.facts} ความจำ · ${backup.counts.tasks} งาน · ${backup.counts.healthHistory} ประวัติสุขภาพ) — ไม่มีคีย์/โทเคนติดไป`);
+  const backupBytes = backupByteSize(backup);
+  const backupValidation = validateBackup(backup);
+  if (backupBytes > BACKUP_MAX_BYTES || !backupValidation.ok) {
+    const reason = backupBytes > BACKUP_MAX_BYTES
+      ? `ขนาด ${formatBytes(backupBytes)} เกิน 20 MiB`
+      : backupValidation.errors[0];
+    setBackupStatus(`⚠️ สำรองไม่ได้: ${reason} — ไม่มีไฟล์ถูกสร้างและข้อมูลในเครื่องไม่ถูกลบ; ส่งออกแยกหรือเลือกจัดการเอง`);
+    return;
+  }
+  setBackupStatus(`⬇️ สำรองข้อมูลแล้ว (schema ${BACKUP_SCHEMA} · ${backup.counts.facts} ความจำ · ${backup.counts.log} บทสนทนา · ${backup.counts.tasks} งาน · ${backup.counts.healthHistory} ประวัติสุขภาพ) — ไม่มีคีย์/โทเคนติดไป`);
   try {
     downloadJson(backup, `no7-backup-${new Date().toISOString().slice(0, 10)}.json`);
   } catch (err) {
@@ -3162,7 +3172,6 @@ $('#reset-btn').addEventListener('click', () => {
   $('#settings-status').textContent = 'ล้างข้อมูลแล้ว';
 });
 
-/* ---------------------------------------------------------------- PWA */
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   deferredInstall = e;
@@ -3176,7 +3185,6 @@ $('#install-btn').addEventListener('click', async () => {
   }
 });
 
-/* ------------------------------------------------------- companion mode */
 $('#companion-btn').addEventListener('click', () => {
   const c = $('#companion');
   c.hidden = !c.hidden;
@@ -3209,7 +3217,6 @@ function makeDraggable(el) {
   window.addEventListener('touchend', onUp);
 }
 
-/* ------------------------------------------------------- phone-link pairing */
 $('#pair-btn').addEventListener('click', async () => {
   const out = $('#pair-output');
   out.textContent = 'กำลังสร้าง…';
@@ -3231,7 +3238,6 @@ $('#pair-btn').addEventListener('click', async () => {
   }
 });
 
-/* ------------------------------------------------------------ timers */
 window.addEventListener('no7:timer', (e) => {
   const label = e.detail?.label || 'Timer';
   addMessage('system', `⏱️ ${label}: ครบเวลาแล้ว!`);
@@ -3249,7 +3255,6 @@ if ('Notification' in window && Notification.permission === 'default') {
   setTimeout(() => Notification.requestPermission().catch(() => {}), 5000);
 }
 
-/* ------------------------------------------------------- keyboard shortcuts */
 function isTyping(el) {
   return !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
 }
@@ -3281,7 +3286,6 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-/* -------------------------------------------------------- command palette */
 let paletteRows = [];
 let paletteActive = 0;
 
@@ -3439,7 +3443,6 @@ $('#palette-input')?.addEventListener('keydown', (e) => {
 });
 $('#palette')?.addEventListener('click', (e) => { if (e.target.id === 'palette') closePalette(); });
 
-/* -------------------------------------------------------------- startup */
 startDailyConsolidation(memory, () => consolidate(memory, { chat: llmChat, useLLM: !!settings.memoryLLM }));
 
 function syncOnlineState() {

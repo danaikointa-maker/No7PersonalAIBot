@@ -26,7 +26,7 @@ function localDateBoundary(value, inclusiveEnd = false) {
   return date.getTime();
 }
 
-export function filterConversationLog(log, { query = '', role = 'all', dateFrom = '', dateTo = '', limit = 50 } = {}) {
+export function filterConversationLog(log, { query = '', role = 'all', dateFrom = '', dateTo = '', offset = 0, limit = 50 } = {}) {
   const normalizedQuery = String(query).trim().toLocaleLowerCase();
   const from = localDateBoundary(dateFrom);
   const toExclusive = localDateBoundary(dateTo, true);
@@ -41,8 +41,10 @@ export function filterConversationLog(log, { query = '', role = 'all', dateFrom 
       && (toExclusive === undefined || item.ts < toExclusive)
       && (!normalizedQuery || item.text.toLocaleLowerCase().includes(normalizedQuery)))
     .sort((a, b) => b.ts - a.ts);
-  const size = Math.max(1, Math.min(800, Math.trunc(Number(limit) || 50)));
-  return { items: rows.slice(0, size), total: rows.length, hasMore: rows.length > size };
+  const size = Math.max(1, Math.min(200, Math.trunc(Number(limit) || 50)));
+  const start = Math.max(0, Math.trunc(Number(offset) || 0));
+  const items = rows.slice(start, start + size);
+  return { items, total: rows.length, offset: start, hasPrevious: start > 0, hasMore: start + items.length < rows.length };
 }
 
 export function mountConversationArchive(root, getLog, getLang = () => 'th') {
@@ -55,7 +57,8 @@ export function mountConversationArchive(root, getLog, getLang = () => 'th') {
     + '<label data-archive-from-label><span></span><input type="date" data-archive-from /></label>'
     + '<label data-archive-to-label><span></span><input type="date" data-archive-to /></label></div>'
     + '<p class="hint" data-archive-status role="status"></p><div data-archive-list></div>'
-    + '<button type="button" data-archive-more hidden></button>';
+    + '<div class="row archive-pagination"><button type="button" data-archive-newer hidden></button>'
+    + '<button type="button" data-archive-older hidden></button></div>';
   const query = root.querySelector('[data-archive-query]');
   const role = root.querySelector('[data-archive-role]');
   const dateFrom = root.querySelector('[data-archive-from]');
@@ -63,14 +66,16 @@ export function mountConversationArchive(root, getLog, getLang = () => 'th') {
   const preset = root.querySelector('[data-archive-preset]');
   const status = root.querySelector('[data-archive-status]');
   const list = root.querySelector('[data-archive-list]');
-  const more = root.querySelector('[data-archive-more]');
-  let limit = 50;
+  const newer = root.querySelector('[data-archive-newer]');
+  const older = root.querySelector('[data-archive-older]');
+  const pageSize = 50;
+  let offset = 0;
 
   function render() {
     const english = String(getLang()).toLowerCase().startsWith('en');
     const text = english
-      ? { title: '💬 Conversation archive', privacy: 'Stored on this device only. Search does not send messages to AI or the network.', search: 'Search saved messages…', from: 'From date', to: 'Through date', preset: 'Quick date range', presets: ['Any date', 'Today', 'Last 7 days', 'Last 30 days', 'Custom range'], all: 'All speakers', user: 'You', assistant: 'No7', empty: 'No matching saved messages.', shown: (count, total) => `Showing ${count} of ${total}`, capped: (count, total) => `Showing latest ${count} of ${total}; memory stores up to 800 messages.`, more: 'Load 50 more' }
-      : { title: '💬 ประวัติบทสนทนา', privacy: 'เก็บในเครื่องนี้เท่านั้น การค้นหาไม่ส่งข้อความให้ AI หรือเครือข่าย', search: 'ค้นหาข้อความที่บันทึก…', from: 'ตั้งแต่วันที่', to: 'ถึงวันที่', preset: 'ช่วงวันที่ด่วน', presets: ['ทุกช่วง', 'วันนี้', '7 วันล่าสุด', '30 วันล่าสุด', 'กำหนดเอง'], all: 'ทุกคน', user: 'ผู้ใช้', assistant: 'No7', empty: 'ไม่พบข้อความที่ตรงกัน', shown: (count, total) => `แสดง ${count} จาก ${total} ข้อความ`, capped: (count, total) => `แสดง ${count} จาก ${total} ข้อความ (ความจำเก็บได้สูงสุด 800 ข้อความ)`, more: 'โหลดเพิ่ม 50 ข้อความ' };
+      ? { title: '💬 Conversation archive', privacy: 'Stored on this device only. Search does not send messages to AI or the network.', search: 'Search saved messages…', from: 'From date', to: 'Through date', preset: 'Quick date range', presets: ['Any date', 'Today', 'Last 7 days', 'Last 30 days', 'Custom range'], all: 'All speakers', user: 'You', assistant: 'No7', empty: 'No matching saved messages.', shown: (start, end, total) => `Showing ${start}–${end} of ${total}`, newer: 'Newer 50', older: 'Older 50' }
+      : { title: '💬 ประวัติบทสนทนา', privacy: 'เก็บในเครื่องนี้เท่านั้น การค้นหาไม่ส่งข้อความให้ AI หรือเครือข่าย', search: 'ค้นหาข้อความที่บันทึก…', from: 'ตั้งแต่วันที่', to: 'ถึงวันที่', preset: 'ช่วงวันที่ด่วน', presets: ['ทุกช่วง', 'วันนี้', '7 วันล่าสุด', '30 วันล่าสุด', 'กำหนดเอง'], all: 'ทุกคน', user: 'ผู้ใช้', assistant: 'No7', empty: 'ไม่พบข้อความที่ตรงกัน', shown: (start, end, total) => `แสดง ${start}–${end} จาก ${total} ข้อความ`, newer: 'ใหม่กว่า 50 ข้อความ', older: 'เก่ากว่า 50 ข้อความ' };
     root.setAttribute('aria-label', text.title);
     root.querySelector('[data-archive-title]').textContent = text.title;
     root.querySelector('[data-archive-privacy]').textContent = text.privacy;
@@ -87,9 +92,15 @@ export function mountConversationArchive(root, getLog, getLang = () => 'th') {
     [...preset.options].forEach((option, index) => { option.textContent = text.presets[index]; });
     dateFrom.setAttribute('aria-label', text.from);
     dateTo.setAttribute('aria-label', text.to);
-    const result = filterConversationLog(getLog(), { query: query.value, role: role.value, dateFrom: dateFrom.value, dateTo: dateTo.value, limit });
-    const capped = result.hasMore && limit >= 800;
-    status.textContent = result.total ? (capped ? text.capped(result.items.length, result.total) : text.shown(result.items.length, result.total)) : text.empty;
+    const filters = { query: query.value, role: role.value, dateFrom: dateFrom.value, dateTo: dateTo.value, limit: pageSize };
+    let result = filterConversationLog(getLog(), { ...filters, offset });
+    if (result.total && offset >= result.total) {
+      offset = Math.floor((result.total - 1) / pageSize) * pageSize;
+      result = filterConversationLog(getLog(), { ...filters, offset });
+    } else if (!result.total) offset = 0;
+    status.textContent = result.total
+      ? text.shown(result.offset + 1, result.offset + result.items.length, result.total)
+      : text.empty;
     list.replaceChildren();
     for (const item of result.items) {
       const row = document.createElement('article');
@@ -108,23 +119,26 @@ export function mountConversationArchive(root, getLog, getLang = () => 'th') {
       row.append(header, body);
       list.appendChild(row);
     }
-    more.hidden = !result.hasMore || limit >= 800;
-    more.textContent = text.more;
+    newer.hidden = !result.hasPrevious;
+    older.hidden = !result.hasMore;
+    newer.textContent = text.newer;
+    older.textContent = text.older;
   }
-  query.addEventListener('input', () => { limit = 50; render(); });
-  role.addEventListener('change', () => { limit = 50; render(); });
-  dateFrom.addEventListener('change', () => { preset.value = 'custom'; limit = 50; render(); });
-  dateTo.addEventListener('change', () => { preset.value = 'custom'; limit = 50; render(); });
+  query.addEventListener('input', () => { offset = 0; render(); });
+  role.addEventListener('change', () => { offset = 0; render(); });
+  dateFrom.addEventListener('change', () => { preset.value = 'custom'; offset = 0; render(); });
+  dateTo.addEventListener('change', () => { preset.value = 'custom'; offset = 0; render(); });
   preset.addEventListener('change', () => {
     const range = conversationDatePresetRange(preset.value);
     if (preset.value !== 'custom') {
       dateFrom.value = range.dateFrom;
       dateTo.value = range.dateTo;
     }
-    limit = 50;
+    offset = 0;
     render();
   });
-  more.addEventListener('click', () => { limit = Math.min(800, limit + 50); render(); });
+  newer.addEventListener('click', () => { offset = Math.max(0, offset - pageSize); render(); });
+  older.addEventListener('click', () => { offset += pageSize; render(); });
   render();
   return render;
 }

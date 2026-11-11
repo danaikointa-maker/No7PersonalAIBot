@@ -833,28 +833,28 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 # รอบที่ 26 (v2.21)
 
-เป้าหมาย: ป้องกันการทิ้ง memory/conversation history เก่าโดยอัตโนมัติเมื่อเกินเพดานภายใน และให้ archive/backup เข้าถึงประวัติที่เก็บไว้ได้ทั้งหมด
+เป้าหมาย: ป้องกันการทิ้ง facts, conversation history และ health summary เก่าโดยอัตโนมัติเมื่อเกินเพดานภายใน และให้ archive/backup เข้าถึงประวัติที่เก็บไว้ได้ทั้งหมด
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AO1 | ยกเลิกการ prune memory/log อัตโนมัติ | 83.1–83.3 | ⬜ |
-| AO2 | archive paging และ backup แบบไม่ตัดประวัติเงียบ ๆ | 84.1–84.3 | ⬜ |
-| AO3 | Release 2.21 | 85.1–85.3 | ⬜ |
+| AO1 | ยกเลิกการ prune memory/log/health summary อัตโนมัติ | 83.1–83.3 | ✅ |
+| AO2 | archive paging และ backup แบบไม่ตัดประวัติเงียบ ๆ | 84.1–84.3 | ✅ |
+| AO3 | Release 2.21 | 85.1–85.3 | ✅ |
 
 ## AO1 — ยกเลิกการ prune memory/log อัตโนมัติ
 
-- [ ] 83.1 เพิ่ม facts/log เกิน 3,000/800 แล้วยังเก็บของเก่าและใหม่ครบ
-- [ ] 83.2 import/export และ merge memory ไม่ตัด record เก่า; การ replace ยังทำหลังผู้ใช้เลือกเอง
-- [ ] 83.3 Tests สำหรับ retention และ persistence หลังเกินเพดานเดิม
+- [x] 83.1 เพิ่ม facts/log/health summaries เกินเพดานเดิมแล้วยังเก็บของเก่าและใหม่ครบ
+- [x] 83.2 import/export และ merge memory ไม่ตัด record เก่า; การ replace ยังทำหลังผู้ใช้เลือกเอง
+- [x] 83.3 Tests สำหรับ retention และ persistence หลังเกินเพดานเดิม
 
 ## AO2 — archive paging และ backup แบบไม่ตัดประวัติเงียบ ๆ
 
-- [ ] 84.1 archive ใช้ older/newer ทีละ 50 ได้โดยไม่มีเพดาน 800
-- [ ] 84.2 full backup รวม log ทั้งหมด; cap import อิงขนาดไฟล์ ไม่ silently slice log
-- [ ] 84.3 Browser smoke/UI แจ้งเมื่อ export เกิน 20 MiB และตรวจ docs storage/backup
+- [x] 84.1 archive ใช้ older/newer ทีละ 50 ได้โดยไม่มีเพดาน 800
+- [x] 84.2 full backup รวม facts/log/health summaries ทั้งหมด; cap import อิงขนาดไฟล์ ไม่ silently slice ประวัติ
+- [x] 84.3 Browser smoke ตรวจ pagination, restore, memory-import confirmation; UI แจ้งเมื่อ export เกิน 20 MiB และอัปเดต docs memory/storage/backup/health
 
 ## AO3 — Release 2.21
 
-- [ ] 85.1 version 2.21.0 + CHANGELOG
-- [ ] 85.2 README + PHASES ปิดครบ
-- [ ] 85.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 85.1 version 2.21.0 + CHANGELOG
+- [x] 85.2 README (32 docs, 462 unit / 178 checks) + PHASES ปิดครบ
+- [x] 85.3 ตรวจรับรวม: check 118 files · unit 462 · browser 178 · perf · build → PR

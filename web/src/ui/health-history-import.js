@@ -17,7 +17,7 @@ export function bindHealthHistoryImport(card, { copy, readHistory, confirm, rend
   input.addEventListener('change', async () => {
     const file = input.files?.[0];
     if (!file) return;
-    if (file.size > 65_536) {
+    if (file.size > 20 * 1024 * 1024) {
       notify(copy.importInvalid);
       input.value = '';
       return;

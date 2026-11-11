@@ -1,6 +1,6 @@
 export const HEALTH_HISTORY_KEY = 'no7.health.history.v1';
 export const HEALTH_HISTORY_SCHEMA = 1;
-export const HEALTH_HISTORY_LIMIT = 30;
+export const HEALTH_HISTORY_LIMIT = 1_000_000;
 
 const validDate = (value) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -32,7 +32,7 @@ export function normalizeHealthHistory(value) {
       issues: { high: count(issues.high), medium: count(issues.medium), low: count(issues.low) },
     });
   }
-  const snapshots = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)).slice(-HEALTH_HISTORY_LIMIT);
+  const snapshots = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
   return { schema: HEALTH_HISTORY_SCHEMA, snapshots };
 }
 

@@ -25,24 +25,24 @@ test('conversation archive searches case-insensitively and filters speaker', () 
   assert.equal(filterConversationLog(log, { role: 'tool' }).total, 0);
 });
 
-test('conversation archive paginates beyond 200 up to the complete 800-entry memory log', () => {
-  const many = Array.from({ length: 800 }, (_, i) => ({ role: 'user', text: `message ${i}`, ts: i + 1 }));
+test('conversation archive pages older and newer messages without a fixed history cap', () => {
+  const many = Array.from({ length: 2500 }, (_, i) => ({ role: 'user', text: `message ${i}`, ts: i + 1 }));
   const first = filterConversationLog(many, { limit: 50 });
   assert.equal(first.items.length, 50);
-  assert.equal(first.total, 800);
+  assert.equal(first.items[0].text, 'message 2499');
+  assert.equal(first.offset, 0);
+  assert.equal(first.hasPrevious, false);
   assert.equal(first.hasMore, true);
-  assert.equal(filterConversationLog(many, { limit: 200 }).items.length, 200);
-  const full = filterConversationLog(many, { limit: 800 });
-  assert.equal(full.items.length, 800);
-  assert.equal(full.hasMore, false);
-});
-
-test('conversation archive reports when source log exceeds the 800-entry display cap', () => {
-  const many = Array.from({ length: 850 }, (_, i) => ({ role: 'user', text: `message ${i}`, ts: i + 1 }));
-  const result = filterConversationLog(many, { limit: 999 });
-  assert.equal(result.items.length, 800);
-  assert.equal(result.total, 850);
-  assert.equal(result.hasMore, true);
+  const middle = filterConversationLog(many, { offset: 800, limit: 50 });
+  assert.equal(middle.items.length, 50);
+  assert.equal(middle.hasPrevious, true);
+  assert.equal(middle.hasMore, true);
+  const last = filterConversationLog(many, { offset: 2450, limit: 50 });
+  assert.equal(last.items.length, 50);
+  assert.equal(last.items.at(-1).text, 'message 0');
+  assert.equal(last.hasPrevious, true);
+  assert.equal(last.hasMore, false);
+  assert.equal(filterConversationLog(many, { offset: -50 }).offset, 0);
 });
 
 test('conversation archive date bounds include both local calendar days', () => {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  HEALTH_HISTORY_KEY, HEALTH_HISTORY_LIMIT, normalizeHealthHistory, recordHealthSnapshot,
+  HEALTH_HISTORY_KEY, normalizeHealthHistory, recordHealthSnapshot,
   readHealthHistory, writeHealthHistory, clearHealthHistory, healthTrend,
   filterHealthHistory, healthWindowSummary,
 } from '../web/src/core/health-history.js';
@@ -30,14 +30,14 @@ test('history keeps only a minimal, validated snapshot schema', () => {
   assert.equal(JSON.stringify(history).includes('private item text'), false);
 });
 
-test('a scan on the same day replaces that day and history caps at 30', () => {
+test('a scan on the same day replaces that day without pruning earlier history', () => {
   let history = { schema: 1, snapshots: [] };
   for (let day = 1; day <= 31; day++) {
     history = recordHealthSnapshot(history, report(day), Date.parse(`2026-10-${String(day).padStart(2, '0')}T12:00:00Z`));
   }
-  assert.equal(history.snapshots.length, HEALTH_HISTORY_LIMIT);
+  assert.equal(history.snapshots.length, 31);
   const repeat = recordHealthSnapshot(history, report(55), Date.parse('2026-10-31T18:00:00Z'));
-  assert.equal(repeat.snapshots.length, 30);
+  assert.equal(repeat.snapshots.length, 31);
   assert.equal(repeat.snapshots.at(-1).score, 55);
 });
 

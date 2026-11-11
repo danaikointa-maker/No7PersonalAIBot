@@ -55,6 +55,28 @@ test('logTurn keeps episodic history', () => {
   assert.equal(mem.recentLog().length, 2);
 });
 
+test('logTurn preserves all old history after passing the former 800-entry limit', () => {
+  const oldLog = Array.from({ length: 800 }, (_, i) => ({ role: 'user', text: `old ${i}`, ts: i + 1 }));
+  localStorage.setItem('no7.memory.v2', JSON.stringify({ version: 2, facts: [], log: oldLog, meta: {} }));
+  const mem = new MemoryStore();
+  mem.logTurn('assistant', 'new message');
+  assert.equal(mem.log.length, 801);
+  assert.equal(mem.log[0].text, 'old 0');
+  assert.equal(mem.exportData().log.length, 801);
+  assert.equal(JSON.parse(localStorage.getItem('no7.memory.v2')).log.length, 801);
+});
+
+test('adding facts past the former 3000-entry limit never prunes existing memories', () => {
+  const facts = Array.from({ length: 3000 }, (_, i) => ({ id: `old-${i}`, text: `old fact ${i}`, tokens: [], importance: 1, ts: i + 1 }));
+  localStorage.setItem('no7.memory.v2', JSON.stringify({ version: 2, facts, log: [], meta: {} }));
+  const mem = new MemoryStore();
+  const added = mem.addFact('new fact beyond old limit');
+  assert.ok(added);
+  assert.equal(mem.facts.length, 3001);
+  assert.equal(mem.facts[0].text, 'old fact 0');
+  assert.equal(JSON.parse(localStorage.getItem('no7.memory.v2')).facts.length, 3001);
+});
+
 test('clearAll empties facts and log', () => {
   const mem = new MemoryStore();
   mem.addFact('x y z');
@@ -121,7 +143,7 @@ test('import merges duplicates instead of doubling', () => {
   assert.equal(mem.listFacts()[0].importance, 5);
 });
 
-test('importData merges sanitized chat log by role, timestamp and full text with a hard cap', () => {
+test('importData merges sanitized chat log by role, timestamp and full text without trimming old history', () => {
   const mem = fresh();
   const entry = { role: 'user', text: 'restored question', ts: 1000, secret: 'strip' };
   const result = mem.importData({ log: [entry, { ...entry, role: 'tool' }, { role: 'assistant', text: 'answer', ts: 2000 }] });
@@ -135,8 +157,9 @@ test('importData merges sanitized chat log by role, timestamp and full text with
   assert.equal(mem.recentLog().length, 2, 'same identity does not duplicate');
   const large = Array.from({ length: 810 }, (_, i) => ({ role: 'user', text: `line ${i}`, ts: 3000 + i }));
   mem.importData({ log: large });
-  assert.equal(mem.recentLog(1000).length, 800);
+  assert.equal(mem.recentLog(1000).length, 812);
   assert.equal(mem.recentLog(1)[0].text, 'line 809');
+  assert.equal(mem.recentLog(1000)[0].text, 'restored question');
 });
 
 test('stats reports facts, pinned, log and average importance', () => {
