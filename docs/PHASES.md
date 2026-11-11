@@ -388,7 +388,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 |---|---|---|---|
 | Y1 | ตรวจสุขภาพข้อมูล | 35.1–35.4 | ✅ |
 | Y2 | ล้างข้อมูลอย่างปลอดภัย | 36.1–36.3 | ✅ |
-| Y3 | Release 2.5 | 37.1–37.3 | ⬜ |
+| Y3 | Release 2.5 | 37.1–37.3 | ✅ |
 
 ## Y1 — ตรวจสุขภาพข้อมูล
 
@@ -405,6 +405,6 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## Y3 — Release 2.5
 
-- [ ] 37.1 version 2.5.0 + CHANGELOG
-- [ ] 37.2 README + PHASES ปิดครบ
-- [ ] 37.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 37.1 version 2.5.0 + CHANGELOG
+- [x] 37.2 README (32 docs, 417 unit / 145 checks) + PHASES ปิดครบ
+- [x] 37.3 ตรวจรับรวม: check 104 files · unit 417 · browser 145 · perf · build → PR

@@ -35,6 +35,7 @@ const html = fs.readFileSync(path.join(ROOT, 'web/index.html'), 'utf8')
 
 const dom = new JSDOM(html, { url: 'http://localhost/', pretendToBeVisual: true, runScripts: 'dangerously' });
 const { window } = dom;
+window.HTMLElement.prototype.scrollIntoView = () => {};
 
 const ctxStub = new Proxy({}, {
   get: (_t, k) => {

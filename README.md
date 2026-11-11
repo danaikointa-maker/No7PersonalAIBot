@@ -1,4 +1,4 @@
-# No7 Personal AI Bot `v2.4`
+# No7 Personal AI Bot `v2.5`
 
 > ผู้ช่วย AI ส่วนตัวที่ **โค้ดชุดเดียวกันรันได้ทั้งมือถือและ PC** — พูดไทยก่อน ฟังได้ด้วยเสียง มีความจำระยะยาว
 > เรียกเครื่องมือจริง ทำงานหลายก้าวได้ ซิงก์ข้ามเครื่อง และสั่งงานอุปกรณ์ผ่าน HMAC
@@ -22,15 +22,15 @@ npm run build         # dist/ ชุดเดียวสำหรับ PWA + E
 npm run server        # companion server: static + AI proxy + tools + sync + phone-link
 npm run desktop       # เปิดเป็นแอปเดสก์ท็อป (Electron)
 npm run mobile:sync   # ซิงก์ dist/ เข้าโปรเจค Android/iOS
-npm test              # 405 unit tests
-npm run test:browser  # 140 end-to-end checks (รันแอปจริงใน jsdom)
+npm test              # 417 unit tests
+npm run test:browser  # 145 end-to-end checks (รันแอปจริงใน jsdom)
 npm run check         # syntax + structure check
 npm run perf          # performance budget (ขนาด bundle/source)
 ```
 
 ---
 
-## ทำอะไรได้ (v2.4)
+## ทำอะไรได้ (v2.5)
 
 ### 🎭 เลือกได้ทั้งหมด — 5 บทบาทในที่เดียว
 `✨ ทั้งหมด` (สลับบทบาทเองตามคำขอ) · `💛 เพื่อนคุย` · `💼 งาน` · `📅 ชีวิตประจำวัน` · `🏠 อุปกรณ์`
@@ -180,7 +180,7 @@ mobile/              ที่สำหรับ native project (Capacitor)
 server/              companion server (zero deps): static · AI proxy · tools · sync · phone-link
 devices/esp32/       reference client (no7_link.h) + คู่มือ
 tests/               unit tests + jsdom end-to-end
-docs/                เอกสาร 31 ไฟล์
+docs/                เอกสาร 32 ไฟล์
 ```
 
 ## เอกสาร

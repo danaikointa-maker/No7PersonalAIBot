@@ -1273,9 +1273,9 @@ function renderHealthCard(report) {
   </div>`;
   card.hidden = false;
   card.querySelector('#health-clean-btn')?.addEventListener('click', () => {
-    if (!lastHealth) return;
-    const { facts, notes, todos } = collectHealthData();
-    const action = applyCleanup(lastHealth.cleanup, { facts, notes, todos });
+    const data = collectHealthData();
+    const currentReport = analyzeHealth(data);
+    const action = applyCleanup(currentReport.cleanup, data);
     const count = action.removed.facts + action.removed.notes + action.removed.todos;
     if (!count) return;
     const message = `ลบเฉพาะรายการซ้ำ/ว่างที่ตรวจพบจำนวน ${count} รายการหรือไม่?\nความจำ ${action.removed.facts} · โน้ต ${action.removed.notes} · สิ่งที่ต้องทำ ${action.removed.todos}\nรายการเก่า งาน และนัดหมายจะไม่ถูกลบ`;
@@ -1295,7 +1295,7 @@ function renderHealthCard(report) {
       addMessage('bot', 'ล้างข้อมูลไม่สำเร็จ — พื้นที่จัดเก็บอาจไม่พร้อมใช้งาน');
       return;
     }
-    for (const id of lastHealth.cleanup.facts) memory.removeFact(id);
+    for (const id of currentReport.cleanup.facts) memory.removeFact(id);
     renderMemory();
     const next = analyzeHealth(collectHealthData());
     renderHealthCard(next);
@@ -1847,7 +1847,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.4.0',
+      version: window.NO7_VERSION || '2.5.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
