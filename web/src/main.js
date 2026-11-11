@@ -1945,7 +1945,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.30.0',
+      version: window.NO7_VERSION || '2.31.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -2025,14 +2025,21 @@ function renderTasks() {
     done.textContent = t.done ? '↩️' : '✅';
     done.title = t.done ? 'เปิดใหม่' : 'ทำเสร็จแล้ว';
     done.addEventListener('click', () => {
-      const res = tasks.complete(t.id, !t.done);
-      if (res.advanced) $('#task-status').textContent = `🔁 เลื่อนไปรอบถัดไป: ${formatTaskTime(res.task.due)}`;
-      renderTasks();
-      pushRemindersToServer();
+      try {
+        const res = tasks.complete(t.id, !t.done);
+        if (res.advanced) $('#task-status').textContent = `🔁 เลื่อนไปรอบถัดไป: ${formatTaskTime(res.task.due)}`;
+        renderTasks();
+        pushRemindersToServer();
+      } catch (e) {
+        $('#task-status').textContent = `⚠️ ${e.message}`;
+      }
     });
     const del = document.createElement('button');
     del.textContent = 'ลบ';
-    del.addEventListener('click', () => { tasks.remove(t.id); renderTasks(); pushRemindersToServer(); });
+    del.addEventListener('click', () => {
+      try { tasks.remove(t.id); renderTasks(); pushRemindersToServer(); }
+      catch (e) { $('#task-status').textContent = `⚠️ ${e.message}`; }
+    });
     row.append(when, title, done, del);
     box.appendChild(row);
   }
@@ -2065,10 +2072,14 @@ $('#task-filter')?.addEventListener('change', () => renderTasks());
 
 $('#task-clear-done')?.addEventListener('click', () => {
   const done = tasks.list({ done: true });
-  for (const t of done) tasks.remove(t.id);
-  $('#task-status').textContent = done.length ? `ล้าง ${done.length} งานที่เสร็จแล้ว` : 'ไม่มีงานที่เสร็จให้ล้าง';
-  renderTasks();
-  pushRemindersToServer();
+  try {
+    const removed = tasks.removeMany(done.map((task) => task.id));
+    $('#task-status').textContent = removed ? `ล้าง ${removed} งานที่เสร็จแล้ว` : 'ไม่มีงานที่เสร็จให้ล้าง';
+    renderTasks();
+    if (removed) pushRemindersToServer();
+  } catch (e) {
+    $('#task-status').textContent = `⚠️ ล้างงานไม่สำเร็จ: ${e.message}`;
+  }
 });
 
 /** เตือนเมื่อถึงเวลา — Notification + ข้อความในแชท + subtitle */
@@ -3078,8 +3089,8 @@ function applyRestore(plan) {
     plan.values.healthHistory,
     () => memory.importData({ facts: plan.values.facts, log: plan.values.log }, { merge: !replace }),
   ));
-  if (replace) tasks.clear();
-  if (plan.values.tasks?.length) tasks.merge(plan.values.tasks);
+  if (replace) tasks.replaceAll(plan.values.tasks || []);
+  else if (plan.values.tasks?.length) tasks.merge(plan.values.tasks);
   calendar.replaceAll(plan.values.events || []);
   if (plan.settings) {
     settings = saveSettings({ ...plan.settings });
