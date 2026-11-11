@@ -1482,9 +1482,13 @@ function renderDevices() {
       testBtn.disabled = true;
       try {
         const r = await testConnection(d);
-        devices.touch(d.id);
-        renderDevices();
-        devLog(`✅ ${d.name}: เชื่อมต่อได้ (v${r.health?.version || '?'})`);
+        try {
+          devices.touch(d.id);
+          renderDevices();
+          devLog(`✅ ${d.name}: เชื่อมต่อได้ (v${r.health?.version || '?'})`);
+        } catch (e) {
+          devLog(`✅ ${d.name}: เชื่อมต่อได้ แต่บันทึกสถานะอุปกรณ์ไม่สำเร็จ: ${e.message}`);
+        }
       } catch (e) { devLog(`❌ ${d.name}: ${e.message}`); }
       testBtn.disabled = false;
     });
@@ -1508,9 +1512,13 @@ function renderDevices() {
       b.addEventListener('click', async () => {
         try {
           const res = await sendCommand(d, q.id, q.args);
-          devices.touch(d.id, { lastCommand: q.id });
-          devLog(`➡️ ${d.name}: ส่ง "${q.label}" (${res?.id || 'queued'})`);
-          renderDevices();
+          try {
+            devices.touch(d.id, { lastCommand: q.id });
+            renderDevices();
+            devLog(`➡️ ${d.name}: ส่ง "${q.label}" (${res?.id || 'queued'})`);
+          } catch (e) {
+            devLog(`✅ ส่ง "${q.label}" ถึง ${d.name} แล้ว แต่บันทึกสถานะไม่สำเร็จ: ${e.message}`);
+          }
         } catch (e) { devLog(`❌ ส่งไม่สำเร็จ: ${e.message}`); }
       });
       actions.appendChild(b);
@@ -1521,8 +1529,11 @@ function renderDevices() {
     del.textContent = 'ลบ';
     del.addEventListener('click', () => {
       if (!confirm(`ลบอุปกรณ์ ${d.name}?`)) return;
-      devices.remove(d.id);
-      renderDevices();
+      try {
+        if (devices.remove(d.id)) renderDevices();
+      } catch (e) {
+        $('#dev-status').textContent = `ลบอุปกรณ์ไม่สำเร็จ: ${e.message}`;
+      }
     });
     actions.appendChild(del);
 
@@ -1956,7 +1967,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.36.0',
+      version: window.NO7_VERSION || '2.37.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -2340,9 +2351,14 @@ $('#link-hello')?.addEventListener('click', async () => {
     const caps = linkCapabilities();
     const res = await helloDevice(device, { name: device.name, kind: platform, capabilities: caps, firmware: 'no7-web/1.5' });
     const on = Object.entries(res.device?.capabilities || {}).filter(([, v]) => v).map(([k]) => k);
-    setLinkStatus(`✅ ${res.device?.name || device.name}: ${res.protocol} · ความสามารถ: ${on.join(', ') || '—'} · ${res.features?.length || 0} features`);
-    devices.touch(device.id);
-    renderDevices();
+    const summary = `✅ ${res.device?.name || device.name}: ${res.protocol} · ความสามารถ: ${on.join(', ') || '—'} · ${res.features?.length || 0} features`;
+    try {
+      devices.touch(device.id);
+      renderDevices();
+      setLinkStatus(summary);
+    } catch (e) {
+      setLinkStatus(`${summary} · แต่บันทึกสถานะในเครื่องไม่สำเร็จ: ${e.message}`);
+    }
   } catch (e) {
     setLinkStatus(`⛔ ${e.message}`);
   }

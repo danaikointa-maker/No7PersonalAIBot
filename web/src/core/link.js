@@ -24,6 +24,13 @@ export async function signRequest(secretHex, method, path, body = '') {
   return bytesToHex(new Uint8Array(sig));
 }
 
+export class DeviceStorageError extends Error {
+  constructor(message = 'บันทึกข้อมูลอุปกรณ์ลงในเครื่องไม่สำเร็จ', options = {}) {
+    super(message, options);
+    this.name = 'DeviceStorageError';
+  }
+}
+
 export class DeviceRegistry {
   constructor(storage = globalThis.localStorage) {
     this.storage = storage;
@@ -36,8 +43,13 @@ export class DeviceRegistry {
       return Array.isArray(list) ? list : [];
     } catch { return []; }
   }
-  _persist() {
-    try { this.storage?.setItem(DEVICES_KEY, JSON.stringify(this.devices)); } catch {}
+  _persist(candidate) {
+    try {
+      this.storage?.setItem(DEVICES_KEY, JSON.stringify(candidate));
+    } catch (cause) {
+      throw new DeviceStorageError('บันทึกข้อมูลอุปกรณ์ไม่สำเร็จ — พื้นที่จัดเก็บอาจเต็ม', { cause });
+    }
+    this.devices = candidate;
   }
   add({ name, baseUrl, code, secret, kind = 'server' }) {
     if (!name || !baseUrl) throw new Error('ต้องมีชื่อและที่อยู่');
@@ -55,26 +67,32 @@ export class DeviceRegistry {
       lastSeen: 0,
       lastCommand: '',
     };
-    this.devices.push(device);
-    this._persist();
-    return device;
+    this._persist([...this.devices, device]);
+    return { ...device };
   }
   remove(id) {
-    const n = this.devices.length;
-    this.devices = this.devices.filter((d) => d.id !== id);
-    this._persist();
-    return this.devices.length !== n;
+    const candidate = this.devices.filter((d) => d.id !== id);
+    if (candidate.length === this.devices.length) return false;
+    this._persist(candidate);
+    return true;
   }
-  list() { return [...this.devices]; }
-  get(id) { return this.devices.find((d) => d.id === id) || null; }
+  list() { return this.devices.map((d) => ({ ...d })); }
+  get(id) {
+    const device = this.devices.find((d) => d.id === id);
+    return device ? { ...device } : null;
+  }
   touch(id, patch = {}) {
-    const d = this.get(id);
-    if (!d) return null;
-    Object.assign(d, patch, { lastSeen: Date.now() });
-    this._persist();
-    return d;
+    const index = this.devices.findIndex((d) => d.id === id);
+    if (index < 0) return null;
+    const device = { ...this.devices[index], ...patch, lastSeen: Date.now() };
+    const candidate = this.devices.map((d, i) => i === index ? device : d);
+    this._persist(candidate);
+    return { ...device };
   }
-  clear() { this.devices = []; this._persist(); }
+  clear() {
+    if (!this.devices.length) return;
+    this._persist([]);
+  }
 }
 
 let registry = null;
