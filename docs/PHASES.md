@@ -1194,3 +1194,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 121.1 version 2.33.0 + CHANGELOG
 - [x] 121.2 README + PHASES ปิดครบ
 - [x] 121.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 39 (v2.34)
+
+เป้าหมาย: ป้องกันการทำงานบนเครื่องโดยไม่มี durable audit log เมื่อ storage เต็ม โดยบันทึก audit candidate ก่อนเปลี่ยน state หรือเรียกคำสั่งที่ผ่าน policy และให้การล้าง log แบบ atomic
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| BB1 | ทำ ControlAudit แบบ persist-before-swap | 122.1–122.3 | ⬜ |
+| BB2 | บังคับ durable audit ก่อนเรียก desktop action และแจ้ง error ใน UI | 123.1–123.3 | ⬜ |
+| BB3 | Release 2.34 | 124.1–124.3 | ⬜ |
+
+## BB1 — ทำ ControlAudit แบบ persist-before-swap
+
+- [ ] 122.1 `_save(candidate)` แจ้ง storage error และคง audit เดิมเมื่อเขียนไม่สำเร็จ
+- [ ] 122.2 record/clear เปลี่ยน state หลัง persist ผ่านเท่านั้น
+- [ ] 122.3 Unit tests จำลอง quota failure สำหรับ record/clear
+
+## BB2 — บังคับ durable audit ก่อนเรียก desktop action และแจ้ง error ใน UI
+
+- [ ] 123.1 control tool บันทึก authorized attempt ก่อนสั่งงานจริง; log failure ต้อง block action
+- [ ] 123.2 ปุ่มล้าง log แสดง error และคงรายการเดิมเมื่อ storage write ล้มเหลว
+- [ ] 123.3 Browser smoke ยืนยัน log คงเดิมเมื่อ clear เขียนไม่ได้
+
+## BB3 — Release 2.34
+
+- [ ] 124.1 version 2.34.0 + CHANGELOG
+- [ ] 124.2 README + PHASES ปิดครบ
+- [ ] 124.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
