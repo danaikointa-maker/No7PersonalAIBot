@@ -495,9 +495,8 @@ export const TOOLS = {
         audit.record({ action, target, allowed: false, reason });
         throw new Error(reason);
       }
-      const card = await runControlAction({ action, target, text, policy });
       audit.record({ action, target, allowed: true, reason: check.reason });
-      return card;
+      return runControlAction({ action, target, text, policy });
     },
   },
 

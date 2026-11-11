@@ -1956,7 +1956,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.33.0',
+      version: window.NO7_VERSION || '2.34.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -2577,8 +2577,13 @@ function readControlPolicy() {
 
 $('#control-audit-refresh')?.addEventListener('click', () => renderControl());
 $('#control-audit-clear')?.addEventListener('click', () => {
-  new ControlAudit().clear();
-  renderControl();
+  try {
+    const cleared = new ControlAudit().clear();
+    renderControl();
+    $('#settings-status').textContent = cleared ? 'ล้าง audit log แล้ว' : 'ไม่มี audit log ให้ล้าง';
+  } catch (error) {
+    $('#settings-status').textContent = `⚠️ ${error.message}`;
+  }
 });
 
 function botsBase() {

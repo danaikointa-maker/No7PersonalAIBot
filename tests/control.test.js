@@ -94,6 +94,26 @@ test('ControlAudit records, trims, rate-limits and clears', () => {
   assert.equal(audit.list().length, 0);
 });
 
+test('ControlAudit record and clear preserve the prior log on storage failure', () => {
+  const storage = {
+    value: null,
+    fail: false,
+    getItem() { return this.value; },
+    setItem(_key, value) { if (this.fail) throw new Error('quota exceeded'); this.value = value; },
+  };
+  const audit = new ControlAudit({ storage });
+  audit.record({ action: 'open_app', target: 'code', allowed: true });
+  const priorEntries = audit.entries;
+  const priorStored = storage.value;
+  storage.fail = true;
+  assert.throws(() => audit.record({ action: 'run_command', target: 'git status', allowed: true }), { name: 'ControlAuditStorageError' });
+  assert.equal(audit.entries, priorEntries);
+  assert.equal(storage.value, priorStored);
+  assert.throws(() => audit.clear(), { name: 'ControlAuditStorageError' });
+  assert.equal(audit.entries, priorEntries);
+  assert.equal(storage.value, priorStored);
+});
+
 test('runControlAction needs a desktop bridge and a permitted action', async () => {
   assert.equal(controlBridge({}), null);
   await assert.rejects(() => runControlAction({ action: 'open_app', target: 'code', policy: ON }), /เดสก์ท็อป/);
@@ -147,6 +167,26 @@ test('control_run tool works end-to-end with the desktop bridge', async () => {
   } finally {
     delete globalThis.no7;
     audit.clear();
+  }
+});
+
+test('control_run refuses desktop action when the audit log cannot be saved', async () => {
+  const originalSetItem = localStorage.setItem;
+  const calls = [];
+  globalThis.no7 = { native: { openApp: async (name) => calls.push(name) } };
+  localStorage.setItem = function (key, value) {
+    if (key === CONTROL_AUDIT_KEY) throw new Error('quota exceeded');
+    return originalSetItem.call(this, key, value);
+  };
+  try {
+    await assert.rejects(
+      () => runTool('control_run', { action: 'open_app', target: 'code' }, { settings: { controlPolicy: ON } }),
+      { name: 'ControlAuditStorageError' },
+    );
+    assert.deepEqual(calls, [], 'desktop action must not run without a durable audit entry');
+  } finally {
+    localStorage.setItem = originalSetItem;
+    delete globalThis.no7;
   }
 });
 

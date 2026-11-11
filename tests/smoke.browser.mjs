@@ -776,6 +776,23 @@ check('mcp: permission category listed', $('#perm-list').children.length === 6, 
 check('control: disabled by default', $('#set-control-enabled').checked === false);
 check('control: audit summary rendered', $('#control-audit-summary').textContent.length > 0, $('#control-audit-summary').textContent);
 check('control: allowlist fields present', !!$('#set-control-apps') && !!$('#set-control-commands'));
+const auditSeed = JSON.stringify([{ at: Date.now(), action: 'open_app', target: 'code', allowed: true, reason: 'test', source: 'smoke' }]);
+window.localStorage.setItem('no7.control.audit.v1', auditSeed);
+$('#control-audit-refresh').click();
+const auditBeforeFailedClear = window.localStorage.getItem('no7.control.audit.v1');
+const auditStoragePrototype = Object.getPrototypeOf(window.localStorage);
+const originalAuditSetItem = auditStoragePrototype.setItem;
+auditStoragePrototype.setItem = function (key, value) {
+  if (key === 'no7.control.audit.v1') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalAuditSetItem.call(this, key, value);
+};
+$('#control-audit-clear').click();
+check('control: failed clear reports error and keeps audit entries', $('#settings-status').textContent.includes('บันทึก audit log ไม่สำเร็จ') && $('#control-audit-summary').textContent.includes('บันทึกไว้ 1 ครั้ง') && window.localStorage.getItem('no7.control.audit.v1') === auditBeforeFailedClear);
+auditStoragePrototype.setItem = originalAuditSetItem;
 check('bots: status polled from server', $('#bots-status').textContent.includes('Telegram: ✅'), $('#bots-status').textContent);
 check('bots: line shown as not configured', $('#bots-status').textContent.includes('LINE: —'), $('#bots-status').textContent);
 check('mcp: transport offers stdio', [...$('#mcp-transport').options].some((o) => o.value === 'stdio'));
