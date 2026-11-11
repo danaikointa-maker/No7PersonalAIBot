@@ -197,7 +197,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 | เฟส | ชื่อ | งานย่อย | สถานะ |
 |---|---|---|---|
 | T1 | TTS พรีเมียม + แคชเสียง | 16.1–16.4 | ✅ |
-| T2 | โมเดลในเครื่อง (Ollama / LM Studio) | 17.1–17.4 | ⬜ |
+| T2 | โมเดลในเครื่อง (Ollama / LM Studio) | 17.1–17.4 | ✅ |
 | T3 | สองภาษา ไทย/อังกฤษ | 18.1–18.4 | ⬜ |
 | T4 | Performance budget + E2E | 19.1–19.4 | ⬜ |
 | T5 | Auto-update + CI 3 แพลตฟอร์ม | 20.1–20.3 | ⬜ |
@@ -212,10 +212,10 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## T2 — โมเดลในเครื่อง
 
-- 17.1 `core/local-models.js`: probe Ollama `/api/tags`, LM Studio `/v1/models`, warm-up + cache 60 วิ
-- 17.2 server proxy `/api/local-models` (เลี่ยง CORS) + `/api/local-models/warm`
-- 17.3 UI: แผง "สมองในเครื่อง" (ตรวจ/อุ่นเครื่อง/เลือกโมเดล) + ใช้โมเดลในเครื่องอัตโนมัติเมื่อออฟไลน์
-- 17.4 Tests + `docs/LOCAL_MODELS.md`
+- [x] 17.1 `core/local-models.js`: `probeLocal` (Ollama `/api/tags`, LM Studio `/v1/models`), `warmModel`, `parseModelList`, `matchModel`, `LocalModelCache` (60 วิ), `offlineChainSettings`
+- [x] 17.2 server proxy `/api/local-models` + `/api/local-models/warm` พร้อม SSRF guard (เฉพาะ loopback/RFC1918, `NO7_LOCAL_ALLOW_REMOTE=1` เพื่อเปิด)
+- [x] 17.3 UI: แผง 🧠 สมองในเครื่อง (ตรวจ/เลือก/อุ่นเครื่อง/สวิตช์ออฟไลน์) + `resolveProviderChain` ใช้โมเดลในเครื่องอัตโนมัติเมื่อออฟไลน์
+- [x] 17.4 Tests (`local-models` 10, `server.local-models` 1 integration, smoke +5) + `docs/LOCAL_MODELS.md`
 
 ## T3 — สองภาษา ไทย/อังกฤษ
 

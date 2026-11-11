@@ -91,6 +91,14 @@ window.fetch = async (url, opts = {}) => {
     return reply('สวัสดีครับ ผมชื่อ No7');
   }
   const linkReply = (obj) => ({ ok: true, json: async () => obj, text: async () => JSON.stringify(obj) });
+  if (u.includes('/api/local-models/warm')) {
+    return linkReply({ ok: true, ms: 1200, model: 'llama3.1', kind: 'ollama', baseUrl: 'http://localhost:11434' });
+  }
+  if (u.includes('/api/local-models')) {
+    const model = { id: 'llama3.1:latest', name: 'llama3.1', sizeBytes: 4_000_000_000, family: 'llama', kind: 'ollama', baseUrl: 'http://localhost:11434' };
+    const target = { kind: 'ollama', label: 'Ollama', baseUrl: 'http://localhost:11434', ok: true, latencyMs: 12, models: [model], error: '' };
+    return linkReply({ ok: true, models: [model], results: [target], best: target });
+  }
   if (u.includes('/api/oauth/device')) {
     return { ok: true, json: async () => ({ status: 200, body: JSON.stringify({ device_code: 'dc-1', user_code: 'ABCD-EFGH', verification_uri: 'https://id.example.com/device', expires_in: 600, interval: 1 }) }) };
   }
@@ -367,6 +375,25 @@ check('voice: elevenlabs reveals server fields', $('#tts-openai-fields').hidden 
 check('voice: elevenlabs voice suggestions', $('#set-ttsvoice').getAttribute('list') === 'tts-voice-list' && window.document.getElementById('tts-voice-list').children.length === 5, String(window.document.getElementById('tts-voice-list')?.children.length));
 $('#set-ttsprovider').value = 'system';
 $('#set-ttsprovider').dispatchEvent(new window.Event('change'));
+
+// local brain panel (stubbed server probe)
+$('#local-scan').click();
+await wait(120);
+check('local: models listed', /พบ 1 โมเดล/.test($('#local-status').textContent), $('#local-status').textContent.slice(0, 60));
+check('local: model row rendered', $('#local-models').textContent.includes('llama3.1'), $('#local-models').textContent.slice(0, 60));
+$('#local-models').querySelector('button')?.click();
+await wait(30);
+check('local: model chosen', /เลือก llama3.1/.test($('#local-status').textContent), $('#local-status').textContent.slice(0, 60));
+$('#set-offlinebrain').checked = true;
+$('#set-offlinebrain').dispatchEvent(new window.Event('change'));
+await wait(20);
+const offlineBrain = (() => {
+  try { return JSON.parse(window.localStorage.getItem('no7.settings.v1') || '{}').offlineBrain || {}; } catch { return {}; }
+})();
+check('local: offline brain saved', offlineBrain.enabled === true && offlineBrain.model === 'llama3.1:latest', JSON.stringify(offlineBrain).slice(0, 80));
+$('#local-warm').click();
+await wait(150);
+check('local: warm-up reported', /พร้อมใช้/.test($('#local-status').textContent), $('#local-status').textContent.slice(0, 60));
 check('voice: openai fields hidden by default', $('#tts-openai-fields').hidden === true);
 $('#set-ttsprovider').value = 'openai';
 $('#set-ttsprovider').dispatchEvent(new window.Event('change'));

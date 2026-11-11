@@ -359,6 +359,25 @@
           </div>
           <p id="settings-status" class="hint"></p>
 
+          <h3>🧠 สมองในเครื่อง (Ollama / LM Studio)</h3>
+          <p class="hint">เมื่อไม่มีเน็ต No7 จะใช้โมเดลในเครื่องแทน — ตรวจก่อนแล้วเลือกโมเดลที่ต้องการ</p>
+          <div class="grid2">
+            <label>ชนิด
+              <select id="local-kind">
+                <option value="ollama">Ollama</option>
+                <option value="lmstudio">LM Studio</option>
+              </select>
+            </label>
+            <label>Base URL <input id="local-baseurl" placeholder="http://localhost:11434" /></label>
+          </div>
+          <div class="row">
+            <button id="local-scan">🔍 ตรวจโมเดลในเครื่อง</button>
+            <button id="local-warm">🔥 อุ่นเครื่อง</button>
+            <label class="switch"><input type="checkbox" id="set-offlinebrain" /> ใช้เมื่อออฟไลน์</label>
+          </div>
+          <p id="local-status" class="hint">ยังไม่ได้ตรวจ</p>
+          <div id="local-models"></div>
+
           <h3>เสียงและการตอบ</h3>
           <label><input type="checkbox" id="set-streaming" checked /> สตรีมคำตอบ (เห็นข้อความไหลทีละคำ)</label>
           <label><input type="checkbox" id="set-speakstream" checked /> เริ่มพูดก่อนคำตอบจบ (ไวขึ้น)</label>

@@ -38,6 +38,12 @@ export const DEFAULT_SETTINGS = {
     allowCommands: [],
     maxPerMinute: 6,
   },
+  offlineBrain: {                     // สมองสำรองในเครื่องเมื่อออฟไลน์
+    enabled: false,
+    kind: 'ollama',                   // ollama | lmstudio
+    baseUrl: 'http://localhost:11434',
+    model: '',
+  },
   serverUrl: 'http://localhost:8787',   // companion server (AI proxy / tools / sync)
   syncToken: '',
 };

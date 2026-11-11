@@ -474,6 +474,7 @@ async function handleApi(req, res, url) {
         '/api/link/hello', '/api/link/eyes', '/api/link/voice', '/api/link/voice/ack', '/api/link/voice/status', '/api/tts', '/api/mcp',
         '/api/mcp/stdio', '/api/oauth/token', '/api/oauth/device', '/api/oauth/register',
         '/api/bots/status', '/api/telegram/webhook', '/api/line/webhook',
+        '/api/local-models', '/api/local-models/warm',
         '/api/reminders', '/api/reminders/due', '/api/reminders/upcoming', '/api/reminders/ack', '/api/reminders/status'],
       aiKeys: {
         gemini: !!process.env.GEMINI_API_KEY,
@@ -755,6 +756,43 @@ async function handleApi(req, res, url) {
       return json(res, 200, { status: r.status, contentType: r.headers.get('content-type') || '', body: text.slice(0, 100000) });
     } catch (e) {
       return json(res, 502, { error: e.message, status: 0, body: '' });
+    }
+  }
+
+  // ---- Local models: ตรวจ/อุ่นเครื่อง Ollama & LM Studio (จำกัดปลายทางในเครื่อง/LAN) ----
+  if (url.pathname === '/api/local-models' && req.method === 'POST') {
+    const body = await readBody(req);
+    const targets = Array.isArray(body.targets) ? body.targets.slice(0, 4) : [{ kind: 'ollama', baseUrl: body.baseUrl }, { kind: 'lmstudio' }];
+    const local = await import('../web/src/core/local-models.js');
+    const normalized = targets.map((t) => local.normalizeLocalTarget(t));
+    if (normalized.some((t) => !t.valid)) return json(res, 400, { error: 'baseUrl ไม่ถูกต้อง (http/https เท่านั้น)' });
+    const allowRemote = process.env.NO7_LOCAL_ALLOW_REMOTE === '1';
+    if (!allowRemote && normalized.some((t) => !t.private)) {
+      return json(res, 403, {
+        error: 'อนุญาตเฉพาะ localhost/127.x/10.x/192.168.x/172.16-31.x — ตั้ง NO7_LOCAL_ALLOW_REMOTE=1 ถ้าไว้ใจ',
+      });
+    }
+    const timeoutMs = Math.max(500, Math.min(Number(body.timeoutMs) || 4000, 15000));
+    const result = await local.probeLocal({ targets: normalized, timeoutMs });
+    return json(res, 200, { ok: true, ...result, serverTime: Date.now() });
+  }
+
+  if (url.pathname === '/api/local-models/warm' && req.method === 'POST') {
+    const body = await readBody(req);
+    const local = await import('../web/src/core/local-models.js');
+    const target = local.normalizeLocalTarget({ kind: body.kind, baseUrl: body.baseUrl });
+    if (!target.valid) return json(res, 400, { error: 'baseUrl ไม่ถูกต้อง' });
+    if (process.env.NO7_LOCAL_ALLOW_REMOTE !== '1' && !target.private) {
+      return json(res, 403, { error: 'อนุญาตเฉพาะเครื่องเดียวกัน/วง LAN ส่วนตัว' });
+    }
+    try {
+      const result = await local.warmModel({
+        kind: target.kind, baseUrl: target.baseUrl, model: String(body.model || ''),
+        timeoutMs: Math.max(1000, Math.min(Number(body.timeoutMs) || 120000, 300000)),
+      });
+      return json(res, 200, result);
+    } catch (e) {
+      return json(res, 502, { error: e.message });
     }
   }
 

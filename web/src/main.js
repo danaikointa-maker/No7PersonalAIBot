@@ -41,6 +41,10 @@ import { EyeAvatar } from './ui/avatar.js';
 import { renderCard, renderError } from './ui/cards.js';
 import { loadSettings, saveSettings, resetSettings, hasProviderConfigured, loadPermissions } from './core/settings.js';
 import { detectPlatform, platformLabel, isDesktopHost } from './core/platform.js';
+import {
+  LOCAL_PRESETS, probeLocal, warmModel, pickBestModel, normalizeOfflineBrain,
+  offlineChainSettings, describeLocalBrain, LocalModelCache,
+} from './core/local-models.js';
 
 /** escape ค่าที่มาจากภายนอกก่อนใส่ innerHTML */
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({
@@ -323,7 +327,7 @@ async function respond(userText) {
   memory.logTurn('user', userText);
 
   const persona = getPersona(settings.persona);
-  const chain = resolveProviderChain(settings);
+  const chain = resolveProviderChain(offlineChainSettings(settings));
   const botEl = addMessage('bot', '…');
   const cards = [];
   const splitter = new SentenceSplitter();
@@ -690,7 +694,7 @@ const MEM_FILTERS = [
 ];
 
 function llmChat(messages) {
-  return chatWithFallback(messages, resolveProviderChain(settings), { fallback });
+  return chatWithFallback(messages, resolveProviderChain(offlineChainSettings(settings)), { fallback });
 }
 
 function renderMemStats() {
@@ -1845,6 +1849,156 @@ $('#link-voice-status')?.addEventListener('click', async () => {
   }
 });
 
+/* --------------------------------------------------------- local models */
+const localCache = new LocalModelCache();
+let localModels = [];
+
+function localTarget() {
+  const kind = $('#local-kind').value || 'ollama';
+  const preset = LOCAL_PRESETS[kind];
+  return {
+    kind,
+    baseUrl: ($('#local-baseurl').value || preset.baseUrl).trim().replace(/\/$/, ''),
+  };
+}
+
+function renderLocalModels(probe = null) {
+  const box = $('#local-models');
+  if (!box) return;
+  box.innerHTML = '';
+  if (probe) {
+    for (const r of probe.results) {
+      const line = document.createElement('div');
+      line.className = 'fact';
+      line.innerHTML = `<span class="fact-text">${r.ok ? '✅' : '⛔'} ${esc(r.label)} · ${esc(r.baseUrl)}`
+        + `${r.ok ? ` · ${r.models.length} โมเดล · ${r.latencyMs} ms` : ` · ${esc(r.error)}`}</span>`;
+      box.appendChild(line);
+    }
+  }
+  if (!localModels.length) {
+    if (probe) {
+      const hint = document.createElement('p');
+      hint.className = 'hint';
+      hint.textContent = 'ไม่พบโมเดล — เปิด Ollama/LM Studio แล้วดาวน์โหลดโมเดลก่อน (เช่น `ollama pull llama3.1`)';
+      box.appendChild(hint);
+    }
+    return;
+  }
+  for (const m of localModels) {
+    const row = document.createElement('div');
+    row.className = 'fact';
+    const label = document.createElement('span');
+    label.className = 'fact-text';
+    label.textContent = `🧠 ${m.id}${m.family ? ` · ${m.family}` : ''}${m.sizeBytes ? ` · ${(m.sizeBytes / 1e9).toFixed(1)} GB` : ''}`;
+    const use = document.createElement('button');
+    use.textContent = 'ใช้โมเดลนี้';
+    use.addEventListener('click', () => {
+      $('#local-kind').value = m.kind;
+      $('#local-baseurl').value = m.baseUrl;
+      const next = saveSettings({
+        offlineBrain: { enabled: $('#set-offlinebrain').checked, kind: m.kind, baseUrl: m.baseUrl, model: m.id },
+      });
+      Object.assign(settings, next);
+      $('#local-status').textContent = `เลือก ${m.name} เป็นสมองในเครื่องแล้ว — ${describeLocalBrain(settings)}`;
+    });
+    row.append(label, use);
+    box.appendChild(row);
+  }
+}
+
+async function scanLocalModels({ force = false } = {}) {
+  const target = localTarget();
+  if (!force) {
+    const cached = localCache.get();
+    if (cached && cached.target?.baseUrl === target.baseUrl && cached.target?.kind === target.kind) {
+      localModels = cached.models;
+      renderLocalModels(cached.probe);
+      $('#local-status').textContent = `พบ ${localModels.length} โมเดล (แคช 60 วิ)`;
+      return cached;
+    }
+  }
+  $('#local-status').textContent = 'กำลังตรวจ…';
+  let result;
+  try {
+    const res = await fetch(`${String(settings.serverUrl || '').replace(/\/$/, '')}/api/local-models`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ targets: [target] }),
+    });
+    if (!res.ok) throw new Error(`server ${res.status}`);
+    result = await res.json();
+  } catch {
+    // ไม่มี server → ยิงตรง (อาจติด CORS แต่ Ollama มักอนุญาต localhost)
+    result = await probeLocal({ targets: [target] });
+  }
+  localModels = Array.isArray(result.models) ? result.models : [];
+  localCache.set({ target, probe: result, models: localModels });
+  renderLocalModels(result);
+  $('#local-status').textContent = localModels.length
+    ? `พบ ${localModels.length} โมเดล — เลือกได้เลย`
+    : `ไม่พบโมเดล${result.results?.[0]?.error ? ` (${result.results[0].error})` : ''}`;
+  return result;
+}
+
+function renderLocalBrain() {
+  const local = normalizeOfflineBrain(settings.offlineBrain);
+  $('#local-kind').value = local.kind;
+  $('#local-baseurl').value = local.baseUrl || LOCAL_PRESETS[local.kind].baseUrl;
+  $('#set-offlinebrain').checked = local.enabled;
+  $('#local-status').textContent = describeLocalBrain(settings) + (local.enabled && !local.model ? ' · ยังไม่ได้เลือกโมเดล' : '');
+}
+
+$('#local-scan')?.addEventListener('click', () => { scanLocalModels({ force: true }); });
+
+$('#local-warm')?.addEventListener('click', async () => {
+  const target = localTarget();
+  const preferred = normalizeOfflineBrain(settings.offlineBrain).model;
+  const model = pickBestModel(localModels.length ? localModels : [{ id: preferred }].filter((m) => m.id), preferred);
+  if (!model) { $('#local-status').textContent = 'ต้องเลือกโมเดลก่อน (กดตรวจโมเดล)'; return; }
+  $('#local-status').textContent = `กำลังอุ่นเครื่อง ${model}… (ครั้งแรกอาจใช้เวลา)`;
+  try {
+    let result;
+    try {
+      const res = await fetch(`${String(settings.serverUrl || '').replace(/\/$/, '')}/api/local-models/warm`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...target, model }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `server ${res.status}`);
+      result = data;
+    } catch {
+      result = await warmModel({ ...target, model });
+    }
+    $('#local-status').textContent = `🔥 ${model} พร้อมใช้ (${(result.ms / 1000).toFixed(1)} วิ)`;
+  } catch (e) {
+    $('#local-status').textContent = `อุ่นเครื่องไม่สำเร็จ: ${e.message}`;
+  }
+});
+
+$('#set-offlinebrain')?.addEventListener('change', (e) => {
+  const target = localTarget();
+  const next = saveSettings({
+    offlineBrain: {
+      enabled: e.target.checked,
+      kind: target.kind,
+      baseUrl: target.baseUrl,
+      model: normalizeOfflineBrain(settings.offlineBrain).model,
+    },
+  });
+  Object.assign(settings, next);
+  $('#local-status').textContent = describeLocalBrain(settings);
+});
+
+$('#local-kind')?.addEventListener('change', () => {
+  const preset = LOCAL_PRESETS[$('#local-kind').value] || LOCAL_PRESETS.ollama;
+  $('#local-baseurl').value = preset.baseUrl;
+  localCache.clear();
+  localModels = [];
+  renderLocalModels();
+  $('#local-status').textContent = 'เปลี่ยนชนิดแล้ว — กดตรวจโมเดล';
+});
+
 /* ------------------------------------------------------------- control UI */
 function renderControl() {
   const policy = normalizeControlPolicy(settings.controlPolicy);
@@ -2487,6 +2641,7 @@ mcp.hydrateFromCache();
 applyMcpTools();
 renderMcp();
 renderSettingsForm();
+renderLocalBrain();
 renderModeChips();
 renderToolsGrid();
 if (Array.isArray(settings.mcpServers) && settings.mcpServers.length) refreshMcp({ quiet: true });
