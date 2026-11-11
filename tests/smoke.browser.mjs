@@ -376,6 +376,19 @@ check('voice: elevenlabs voice suggestions', $('#set-ttsvoice').getAttribute('li
 $('#set-ttsprovider').value = 'system';
 $('#set-ttsprovider').dispatchEvent(new window.Event('change'));
 
+// i18n: switch the UI to English and back
+$('#set-uilang').value = 'en';
+$('#set-uilang').dispatchEvent(new window.Event('change'));
+await wait(30);
+check('i18n: nav switched to English', $('#nav button[data-view="chat"]').textContent === '💬 Chat', $('#nav button[data-view="chat"]').textContent);
+check('i18n: view title translated', $('#view-title').textContent === 'Settings', $('#view-title').textContent);
+check('i18n: html lang attribute', window.document.documentElement.getAttribute('lang') === 'en', window.document.documentElement.getAttribute('lang'));
+check('i18n: placeholder translated', $('#input').getAttribute('placeholder') === 'Type or talk to No7…', $('#input').getAttribute('placeholder'));
+$('#set-uilang').value = 'th';
+$('#set-uilang').dispatchEvent(new window.Event('change'));
+await wait(30);
+check('i18n: back to Thai', $('#nav button[data-view="chat"]').textContent === '💬 แชท' && $('#view-title').textContent === 'ตั้งค่า', $('#view-title').textContent);
+
 // local brain panel (stubbed server probe)
 $('#local-scan').click();
 await wait(120);

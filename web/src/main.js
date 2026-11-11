@@ -41,6 +41,7 @@ import { EyeAvatar } from './ui/avatar.js';
 import { renderCard, renderError } from './ui/cards.js';
 import { loadSettings, saveSettings, resetSettings, hasProviderConfigured, loadPermissions } from './core/settings.js';
 import { detectPlatform, platformLabel, isDesktopHost } from './core/platform.js';
+import { applyI18n, langOf, viewTitle, t as tr } from './core/i18n.js';
 import {
   LOCAL_PRESETS, probeLocal, warmModel, pickBestModel, normalizeOfflineBrain,
   offlineChainSettings, describeLocalBrain, LocalModelCache,
@@ -179,10 +180,13 @@ $('#platform-badge').textContent = platformLabel(platform);
 $('#device-info').textContent = `${platformLabel(platform)} · จอ ${window.innerWidth}×${window.innerHeight} · STT ${voice.sttSupported ? '✅' : '❌'} · TTS ${voice.ttsSupported ? '✅' : '❌'}`;
 
 /* -------------------------------------------------------------- navigation */
+let currentView = 'chat';
+
 function showView(name) {
+  currentView = name;
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${name}`));
   document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
-  $('#view-title').textContent = { chat: 'แชทกับ No7', tools: 'เครื่องมือ', memory: 'ความจำ', calendar: 'ตารางนัด', devices: 'อุปกรณ์', desktop: 'เดสก์ท็อป', settings: 'ตั้งค่า' }[name] || name;
+  $('#view-title').textContent = viewTitle(name, settings.uiLang);
   $('#sidebar').classList.remove('open');
   if (name === 'tools') renderToolsGrid();
   if (name === 'calendar') renderCalendar();
@@ -1134,6 +1138,7 @@ function renderSettingsForm() {
   renderCapabilities();
   renderStorage();
   $('#set-language').value = settings.language;
+  $('#set-uilang').value = langOf(settings.uiLang);
   $('#set-polite').checked = settings.polite;
   $('#set-tts').checked = settings.tts;
   $('#set-stt').checked = settings.stt;
@@ -1165,6 +1170,7 @@ function collectSettings() {
   return {
     persona: $('#set-persona').value,
     language: $('#set-language').value,
+    uiLang: $('#set-uilang').value,
     polite: $('#set-polite').checked,
     tts: $('#set-tts').checked,
     stt: $('#set-stt').checked,
@@ -1564,9 +1570,10 @@ const taskScheduler = new TaskScheduler({
   intervalMs: 30_000,
   onDue: (task) => {
     const text = `⏰ ถึงเวลา: ${task.title}`;
-    setSubtitle(text);
-    addMessage('bot', `${text}${task.notes ? `\n${task.notes}` : ''}${task.due ? `\n(${formatTaskTime(task.due)})` : ''}`);
-    try { new Notification('No7 — ถึงเวลางาน', { body: task.title }); } catch { /* ไม่ได้อนุญาตแจ้งเตือน */ }
+    const label = settings.uiLang === 'en' ? `${tr('notify.taskPrefix', { lang: 'en' })} ${task.title}` : text;
+    setSubtitle(label);
+    addMessage('bot', `${label}${task.notes ? `\n${task.notes}` : ''}${task.due ? `\n(${formatTaskTime(task.due)})` : ''}`);
+    try { new Notification(`No7 — ${tr('notify.task', { lang: settings.uiLang })}`, { body: task.title }); } catch { /* ไม่ได้อนุญาตแจ้งเตือน */ }
     renderTasks();
   },
 });
@@ -1847,6 +1854,20 @@ $('#link-voice-status')?.addEventListener('click', async () => {
   } catch (e) {
     setLinkStatus(`⛔ ${e.message}`);
   }
+});
+
+/* ------------------------------------------------------------------ i18n */
+function applyUiLang(lang) {
+  applyI18n(document, langOf(lang));
+  $('#view-title').textContent = viewTitle(currentView, settings.uiLang);
+  renderModeChips();
+  if (currentView === 'tools') renderToolsGrid(true);
+}
+
+$('#set-uilang')?.addEventListener('change', (e) => {
+  Object.assign(settings, saveSettings({ uiLang: langOf(e.target.value) }));
+  applyUiLang(settings.uiLang);
+  $('#settings-status').textContent = settings.uiLang === 'en' ? 'Interface language: English' : 'ภาษาหน้าจอ: ไทย';
 });
 
 /* --------------------------------------------------------- local models */
@@ -2619,7 +2640,7 @@ function syncOnlineState() {
   const banner = $('#offline-banner');
   if (offline) {
     banner.hidden = false;
-    banner.textContent = '⚠️ ออฟไลน์อยู่ — ความจำ/โน้ต/ปฏิทินยังใช้ได้ แต่การคุยกับ AI ต้องรอเน็ต';
+    banner.textContent = tr('status.offline', { lang: settings.uiLang });
   } else if (banner.textContent.startsWith('⚠️ ออฟไลน์')) {
     banner.hidden = true;
   }
@@ -2641,6 +2662,7 @@ mcp.hydrateFromCache();
 applyMcpTools();
 renderMcp();
 renderSettingsForm();
+applyUiLang(settings.uiLang);
 renderLocalBrain();
 renderModeChips();
 renderToolsGrid();

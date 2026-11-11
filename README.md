@@ -150,6 +150,7 @@ docs/                เอกสาร 19 ไฟล์
 | [docs/TASKS.md](docs/TASKS.md) | งาน, งานซ้ำ, เตือนตามเวลา + เตือนผ่าน server/Telegram |
 | [docs/DESKTOP.md](docs/DESKTOP.md) | หน้าต่างบนจอ + สูตรอัตโนมัติ (recipes) |
 | [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md) | สมองในเครื่อง (Ollama / LM Studio) + สลับอัตโนมัติเมื่อออฟไลน์ |
+| [docs/I18N.md](docs/I18N.md) | สองภาษา ไทย/อังกฤษ (สลับหน้าจอได้ทันที) |
 | [docs/DEVICES.md](docs/DEVICES.md) | Phone-Link protocol + ESP32 |
 | [docs/PHONE_LINK.md](docs/PHONE_LINK.md) | HMAC canonical signing + ตัวอย่าง curl |
 | [docs/BUILD.md](docs/BUILD.md) | build ทั้ง 3 แพลตฟอร์ม |

@@ -198,7 +198,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 |---|---|---|---|
 | T1 | TTS พรีเมียม + แคชเสียง | 16.1–16.4 | ✅ |
 | T2 | โมเดลในเครื่อง (Ollama / LM Studio) | 17.1–17.4 | ✅ |
-| T3 | สองภาษา ไทย/อังกฤษ | 18.1–18.4 | ⬜ |
+| T3 | สองภาษา ไทย/อังกฤษ | 18.1–18.4 | ✅ |
 | T4 | Performance budget + E2E | 19.1–19.4 | ⬜ |
 | T5 | Auto-update + CI 3 แพลตฟอร์ม | 20.1–20.3 | ⬜ |
 | T6 | Release 2.0 | 21.1–21.3 | ⬜ |
@@ -219,10 +219,10 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## T3 — สองภาษา ไทย/อังกฤษ
 
-- 18.1 `core/i18n.js`: พจนานุกรม th/en, `t()`, `applyI18n()`, `setLang()` + เก็บใน settings
-- 18.2 `data-i18n` ใน UI หลัก (เมนู, หัวข้อ, ปุ่มสำคัญ, hint) + สลับได้ทันทีไม่ต้องรีโหลด
-- 18.3 ข้อความจากระบบ (แชท/แจ้งเตือน/สถานนะ) ใช้ `t()` ตามภาษา
-- 18.4 Tests + `docs/I18N.md`
+- [x] 18.1 `core/i18n.js`: `LANGS`, `DICT` (th/en ครบเท่ากัน), `t()` (+vars/fallback), `applyI18n`, `langOf`, `detectLang`, `viewTitle` + `settings.uiLang`
+- [x] 18.2 `data-i18n`/`data-i18n-placeholder`/`data-i18n-title` ใน UI หลัก ~90 จุด + สลับทันที (ไม่รีโหลด) + `html.lang`
+- [x] 18.3 ข้อความระบบที่สำคัญ (offline banner, view title, แจ้งเตือนงาน) ใช้ `t()` ตามภาษา
+- [x] 18.4 Tests (`i18n` 6, smoke +5) + `docs/I18N.md`
 
 ## T4 — Performance budget + E2E
 
