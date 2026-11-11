@@ -2,6 +2,20 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.10.0] — 2026-11-10
+
+รอบที่สิบห้า: ส่งออกประวัติสุขภาพเป็น JSON แบบมี schema และตัดข้อมูลส่วนตัวออก
+
+### เพิ่ม
+- ปุ่ม JSON ในประวัติสุขภาพ พร้อมชื่อไฟล์วันที่และ download/clipboard fallback
+- `healthHistoryJson` สร้าง envelope `{ format, schema, exportedAt, snapshots }`; snapshots ผ่าน normalization และจำกัด 30 รายการ
+- ไม่ส่งออก field เพิ่มเติมหรือเนื้อหาความจำ/โน้ต/งาน/นัดหมาย; ไม่มี auto-export
+- Tests สำหรับ JSON schema, field privacy, ข้อมูลว่าง และ browser smoke
+
+### ตรวจรับ
+- 434 unit tests · 159 browser checks · `npm run check` 112 JS files
+- Performance/build ผ่าน; source ใหญ่สุด 149.3 KB
+
 ## [2.9.0] — 2026-11-10
 
 รอบที่สิบสี่: เลือกดูแนวโน้มสุขภาพช่วง 7 หรือ 30 วัน พร้อมสถิติช่วงที่เลือก
