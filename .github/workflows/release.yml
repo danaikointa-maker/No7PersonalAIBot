@@ -6,6 +6,10 @@ on:
     tags: ['v*']
   workflow_dispatch:
     inputs:
+      release_tag:
+        description: 'Tag ที่จะเติม release assets (เว้นว่างเพื่อใช้ ref ที่เลือก)'
+        type: string
+        required: false
       draft:
         description: 'สร้างเป็น draft release'
         type: boolean
@@ -62,7 +66,27 @@ jobs:
       - name: Build web bundle
         run: npm run build
       - name: Package desktop app
-        run: npx electron-builder ${{ matrix.target }} --publish never
+        shell: bash
+        run: |
+          set +e
+          npx electron-builder ${{ matrix.target }} --publish never 2>&1 | tee "$RUNNER_TEMP/electron-builder.log"
+          build_status=${PIPESTATUS[0]}
+          if [ "$build_status" -ne 0 ]; then
+            echo "### Sanitized packaging log (last 40 lines)" >> "$GITHUB_STEP_SUMMARY"
+            python3 - "$RUNNER_TEMP/electron-builder.log" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          lines = Path(sys.argv[1]).read_text(errors='replace').splitlines()[-40:]
+          for line in lines:
+              line = re.sub(r"https?://[^\s\"']+", '[URL redacted]', line)
+              line = re.sub(r'(?i)(api[_-]?key|token|secret|password|authorization)(\s*[:=]\s*)[^,\s]+', r'\1\2[REDACTED]', line)
+              line = line[:500]
+              print(f'::error title=Sanitized packaging log::{line.replace(chr(37), "%25").replace(chr(13), "%0D").replace(chr(10), "%0A")}')
+          PY
+            exit "$build_status"
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # macOS signing (ไม่ตั้ง = unsigned build, ใช้ได้แต่ผู้ใช้ต้องอนุญาตเอง)
@@ -95,8 +119,9 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          draft: ${{ github.event.inputs.draft == 'true' || github.event_name == 'workflow_dispatch' }}
-          name: No7 AI ${{ github.ref_name }}
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          draft: ${{ inputs.draft == true }}
+          name: No7 AI ${{ inputs.release_tag || github.ref_name }}
           generate_release_notes: true
           files: |
             artifacts/**/*.exe
