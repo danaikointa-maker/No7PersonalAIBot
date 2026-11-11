@@ -2,6 +2,11 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.33.0] — 2026-11-11
+
+- Persona create/update/delete/duplicate/restore now surface storage write failures instead of silently appearing successful. Failed operations preserve existing personas, and the editor remains open with the unsaved input available for retry.
+- Raised the per-source-file performance ceiling by 1 KiB to accommodate this error-handling UI; the built bundle remains within all existing size budgets.
+
 ## [2.32.0] — 2026-11-11
 
 - Calendar mutations now persist candidate event lists before swapping live state. Storage failures preserve existing appointments, and add/delete/import/replace operations report failure instead of silently appearing successful.

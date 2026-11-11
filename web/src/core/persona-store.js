@@ -11,7 +11,14 @@ function read() {
   } catch { return []; }
 }
 function write(list) {
-  try { localStorage.setItem(KEY, JSON.stringify(list)); return true; } catch { return false; }
+  try {
+    localStorage.setItem(KEY, JSON.stringify(list));
+    return true;
+  } catch (cause) {
+    const error = new Error('บันทึก persona ไม่สำเร็จ พื้นที่จัดเก็บอาจเต็ม — persona เดิมยังคงอยู่', { cause });
+    error.name = 'PersonaStorageError';
+    throw error;
+  }
 }
 
 export const PERSONA_LIMITS = { name: 24, desc: 90, system: 1500, greeting: 200, banned: 12, count: 100 };
@@ -54,7 +61,7 @@ export function customPersonas() {
 
 export function restoreCustomPersonas(input, selectedId = 'no7') {
   const clean = normalizeImportedPersonas(input);
-  if (!write(clean)) return 'no7';
+  write(clean);
   return [...builtinPersonas(), ...clean].some((persona) => persona.id === selectedId) ? selectedId : 'no7';
 }
 
@@ -119,8 +126,9 @@ export function updatePersona(id, patch = {}) {
 export function deletePersona(id) {
   const list = read();
   const next = list.filter((p) => p.id !== id);
+  if (next.length === list.length) return false;
   write(next);
-  return next.length !== list.length;
+  return true;
 }
 
 export function duplicatePersona(id) {
