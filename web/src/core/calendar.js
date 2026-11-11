@@ -117,8 +117,21 @@ export class CalendarStore {
     } catch { return []; }
   }
 
-  _persist() {
-    try { this.storage?.setItem(this.key, JSON.stringify(this.events)); } catch {}
+  _persist(candidate = this.events) {
+    try {
+      this.storage?.setItem(this.key, JSON.stringify(candidate));
+      return true;
+    } catch (cause) {
+      const error = new Error('บันทึกปฏิทินไม่สำเร็จ พื้นที่จัดเก็บอาจเต็ม — นัดหมายเดิมยังคงอยู่', { cause });
+      error.name = 'CalendarStorageError';
+      throw error;
+    }
+  }
+
+  _commit(candidate) {
+    this._persist(candidate);
+    this.events = candidate;
+    return true;
   }
 
   add({ title, start, end = null, allDay = false, location = '', notes = '', uid = null }) {
@@ -133,17 +146,16 @@ export class CalendarStore {
       start: ts, end: end ? (typeof end === 'number' ? end : Date.parse(end)) : null,
       allDay, location, notes, source: 'app',
     };
-    this.events.push(ev);
-    this.events.sort((a, b) => a.start - b.start);
-    this._persist();
+    const candidate = [...this.events, ev].sort((a, b) => a.start - b.start);
+    this._commit(candidate);
     return ev;
   }
 
   remove(uid) {
-    const before = this.events.length;
-    this.events = this.events.filter((e) => e.uid !== uid);
-    this._persist();
-    return this.events.length !== before;
+    const candidate = this.events.filter((event) => event.uid !== uid);
+    if (candidate.length === this.events.length) return false;
+    this._commit(candidate);
+    return true;
   }
 
   /** upcoming({days, limit}) — จาก now เป็นต้นไป */
@@ -160,15 +172,15 @@ export class CalendarStore {
   importIcs(text) {
     const parsed = parseIcs(text);
     let added = 0;
-    for (const e of parsed) {
-      if (e.start == null) continue;
-      const dup = this.events.find((x) => x.uid === e.uid || (x.title === e.title && x.start === e.start));
+    const candidate = [...this.events];
+    for (const event of parsed) {
+      if (event.start == null) continue;
+      const dup = candidate.find((existing) => existing.uid === event.uid || (existing.title === event.title && existing.start === event.start));
       if (dup) continue;
-      this.events.push(e);
+      candidate.push(event);
       added++;
     }
-    this.events.sort((a, b) => a.start - b.start);
-    this._persist();
+    if (added) this._commit(candidate.sort((a, b) => a.start - b.start));
     return { added, total: parsed.length };
   }
 
@@ -177,9 +189,9 @@ export class CalendarStore {
   toJSON() { return this.all(); }
 
   replaceAll(list = []) {
-    this.events = list.filter((e) => e && Number.isFinite(e.start));
-    this.events.sort((a, b) => a.start - b.start);
-    this._persist();
+    const candidate = list.filter((event) => event && Number.isFinite(event.start)).sort((a, b) => a.start - b.start);
+    this._commit(candidate);
+    return candidate.length;
   }
 }
 

@@ -1145,24 +1145,24 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | ช่วง | สถานะ |
 |---|---|---|---|
-| AZ1 | ทำ CalendarStore mutations แบบ persist-before-swap | 116.1–116.3 | ⬜ |
-| AZ2 | แสดง storage failure ใน UI และเก็บ input/ข้อมูลเดิม | 117.1–117.3 | ⬜ |
-| AZ3 | Release 2.32 | 118.1–118.3 | ⬜ |
+| AZ1 | ทำ CalendarStore mutations แบบ persist-before-swap | 116.1–116.3 | ✅ |
+| AZ2 | แสดง storage failure ใน UI และเก็บ input/ข้อมูลเดิม | 117.1–117.3 | ✅ |
+| AZ3 | Release 2.32 | 118.1–118.3 | ✅ |
 
 ## AZ1 — ทำ CalendarStore mutations แบบ persist-before-swap
 
-- [ ] 116.1 `_persist(candidate)` โยน error ที่อ่านรู้เรื่องเมื่อ storage write ล้มเหลว
-- [ ] 116.2 add/remove/importIcs/replaceAll คำนวณ candidate และ commit เพียงหลัง persist ผ่าน
-- [ ] 116.3 Unit tests จำลอง quota failure ทุก mutation และยืนยัน event เดิมยังอยู่
+- [x] 116.1 `_persist(candidate)` โยน error ที่อ่านรู้เรื่องเมื่อ storage write ล้มเหลว
+- [x] 116.2 add/remove/importIcs/replaceAll คำนวณ candidate และ commit เพียงหลัง persist ผ่าน
+- [x] 116.3 Unit tests จำลอง quota failure ทุก mutation และยืนยัน event เดิมยังอยู่
 
 ## AZ2 — แสดง storage failure ใน UI และเก็บ input/ข้อมูลเดิม
 
-- [ ] 117.1 ปุ่มเพิ่ม/ลบนัดแสดง error และไม่รายงาน success เมื่อ persist ล้มเหลว
-- [ ] 117.2 นำเข้า ICS แสดง failure โดยไม่เขียนหรือทับรายการเดิม
-- [ ] 117.3 Browser smoke จำลอง storage quota ระหว่างเพิ่ม/ลบนัด
+- [x] 117.1 ปุ่มเพิ่ม/ลบนัดแสดง error และไม่รายงาน success เมื่อ persist ล้มเหลว
+- [x] 117.2 นำเข้า ICS แสดง failure โดยไม่เขียนหรือทับรายการเดิม; unit test ตรวจ import rollback
+- [x] 117.3 Browser smoke จำลอง storage quota ระหว่างเพิ่ม/ลบนัด
 
 ## AZ3 — Release 2.32
 
-- [ ] 118.1 version 2.32.0 + CHANGELOG
-- [ ] 118.2 README + PHASES ปิดครบ
-- [ ] 118.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 118.1 version 2.32.0 + CHANGELOG
+- [x] 118.2 README + PHASES ปิดครบ
+- [x] 118.3 ตรวจรับรวม (check/test/browser/perf/build) + PR

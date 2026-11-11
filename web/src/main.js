@@ -1215,7 +1215,10 @@ function renderCalendar() {
     title.textContent = `${e.title}${e.location ? ` · 📍 ${e.location}` : ''}`;
     const del = document.createElement('button');
     del.textContent = 'ลบ';
-    del.addEventListener('click', () => { calendar.remove(e.uid); renderCalendar(); });
+    del.addEventListener('click', () => {
+      try { calendar.remove(e.uid); renderCalendar(); }
+      catch (error) { $('#cal-status').textContent = `⚠️ ${error.message}`; }
+    });
     row.append(when, title, del);
     box.appendChild(row);
   }
@@ -1226,11 +1229,15 @@ $('#cal-add-btn').addEventListener('click', () => {
   const title = $('#cal-title').value.trim();
   const when = $('#cal-when').value;
   if (!title || !when) { $('#cal-status').textContent = 'ต้องใส่หัวข้อและเวลา'; return; }
-  calendar.add({ title, start: new Date(when).getTime() });
-  $('#cal-title').value = '';
-  $('#cal-when').value = '';
-  $('#cal-status').textContent = 'เพิ่มนัดแล้ว ✅';
-  renderCalendar();
+  try {
+    calendar.add({ title, start: new Date(when).getTime() });
+    $('#cal-title').value = '';
+    $('#cal-when').value = '';
+    $('#cal-status').textContent = 'เพิ่มนัดแล้ว ✅';
+    renderCalendar();
+  } catch (error) {
+    $('#cal-status').textContent = `⚠️ ${error.message}`;
+  }
 });
 
 $('#cal-import-btn').addEventListener('click', () => $('#cal-import-file').click());
@@ -1241,7 +1248,7 @@ $('#cal-import-file').addEventListener('change', async (e) => {
     const res = calendar.importIcs(await file.text());
     $('#cal-status').textContent = `นำเข้า ${res.added}/${res.total} รายการ`;
     renderCalendar();
-  } catch (err) { $('#cal-status').textContent = `อ่านไฟล์ไม่สำเร็จ: ${err.message}`; }
+  } catch (err) { $('#cal-status').textContent = `นำเข้าปฏิทินไม่สำเร็จ: ${err.message}`; }
   e.target.value = '';
 });
 
@@ -1945,7 +1952,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.31.0',
+      version: window.NO7_VERSION || '2.32.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
