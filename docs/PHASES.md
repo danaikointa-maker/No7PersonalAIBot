@@ -1374,3 +1374,17 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] CB1: sync GET คืนค่าล่าสุดจาก process memory เมื่อ persistence ล้มเหลว และ startup โหลดจาก disk
 - [x] CB2: ปฏิเสธ payload ที่ไม่ใช่ object/collection ที่ผิดรูปแบบด้วย 400 โดยไม่เขียนทับ bundle เดิม
 - [x] CB3: tests, browser, check, build, perf ผ่าน และเปิด PR
+
+# รอบที่ 47 (v2.42.0) — ปิดช่องข้อมูลลับใน sync bundle
+
+เป้าหมาย: collectBundle ลบ apiKey และ syncToken ระดับบนสุดเอง แต่ยังส่ง ttsApiKey และ credentials ซ้อนใน MCP OAuth/config ไป companion server ทั้งที่มีข้อสัญญาว่าจะไม่ sync ความลับ
+
+| # | งาน | สถานะ |
+|---|---|---|
+| CC1 | ใช้ redaction กลางและ scrub secrets ใน MCP settings ซ้อน | ⬜ |
+| CC2 | ทดสอบ secret variants และคง public preferences | ⬜ |
+| CC3 | Release 2.42 + ตรวจรับ + PR | ⬜ |
+
+- [ ] CC1: bundle ไม่ส่ง API keys, tokens, client secrets หรือ Authorization headers จาก settings/MCP
+- [ ] CC2: tests ตรวจทุกตำแหน่ง secret และยืนยันว่า provider/preference ที่ไม่ลับยังอยู่
+- [ ] CC3: test/browser/check/build/perf ผ่าน และเปิด PR โดย push/pull ยังต้องเกิดจากผู้ใช้กดเอง
