@@ -1054,3 +1054,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 106.1 version 2.28.0 + CHANGELOG
 - [x] 106.2 README + PHASES ปิดครบ
 - [x] 106.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 34 (v2.29)
+
+เป้าหมาย: ทำให้การกู้คืน backup ของ memory, health summary, notes และ todos สอดคล้องกัน เมื่อ write key ใดล้มเหลวต้องคืนค่าคีย์ก่อนหน้าและไม่รายงานว่าสำเร็จ
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AW1 | เพิ่ม transaction สำหรับ notes/todos ระหว่าง restore | 107.1–107.3 | ⬜ |
+| AW2 | ผูก list transaction กับ health/memory commit | 108.1–108.3 | ⬜ |
+| AW3 | Release 2.29 | 109.1–109.3 | ⬜ |
+
+## AW1 — เพิ่ม transaction สำหรับ notes/todos ระหว่าง restore
+
+- [ ] 107.1 เก็บค่าเดิมและเขียน candidate arrays ก่อน apply callback
+- [ ] 107.2 คืน notes/todos เดิมเมื่อ key ใดเขียนไม่ได้หรือ callback ล้มเหลว
+- [ ] 107.3 Unit tests สำหรับ success, partial write failure และ rollback
+
+## AW2 — ผูก list transaction กับ health/memory commit
+
+- [ ] 108.1 restore เขียน notes/todos ก่อน health/memory และหยุดเมื่อผิดพลาด
+- [ ] 108.2 health/memory error ต้อง rollback notes/todos; status ต้องไม่แสดง success
+- [ ] 108.3 Browser smoke จำลอง todos write failure และตรวจทุก key เดิมยังอยู่
+
+## AW3 — Release 2.29
+
+- [ ] 109.1 version 2.29.0 + CHANGELOG
+- [ ] 109.2 README + PHASES ปิดครบ
+- [ ] 109.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
