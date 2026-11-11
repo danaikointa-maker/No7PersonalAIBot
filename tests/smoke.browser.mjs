@@ -969,13 +969,31 @@ check('diagnostics: settings section present', $('#diag-output').textContent.inc
 
 $('#nav button[data-view="chat"]').click();
 Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+const outboxStoragePrototype = Object.getPrototypeOf(window.localStorage);
+const originalOutboxSetItem = outboxStoragePrototype.setItem;
+outboxStoragePrototype.setItem = function (key, value) {
+  if (key === 'no7.outbox.v1') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalOutboxSetItem.call(this, key, value);
+};
+submit('ข้อความยังอยู่ในช่องพิมพ์');
+check('offline: failed enqueue preserves draft and does not claim queued', $('#input').value === 'ข้อความยังอยู่ในช่องพิมพ์' && $('#messages').textContent.includes('ข้อความยังอยู่ในช่องพิมพ์') && $('#outbox-panel').hidden === true);
+outboxStoragePrototype.setItem = originalOutboxSetItem;
 submit('ทดสอบคิวออฟไลน์');
 await wait(30);
-check('offline: message queued', $('#outbox-badge').hidden === false && $('#outbox-badge').textContent.includes('1'), $('#outbox-badge').textContent);
+check('offline: message queued and listed for review', $('#outbox-panel').hidden === false && $('#outbox-badge').textContent.includes('1') && $('#outbox-list').textContent.includes('ทดสอบคิวออฟไลน์'), $('#outbox-badge').textContent);
 Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
 window.dispatchEvent(new window.Event('online'));
 await wait(250);
 check('offline: queue flushed when back online', $('#messages').textContent.includes('ส่งข้อความที่ค้างไว้'), $('#messages').textContent.slice(-120));
+Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+submit('ลบทิ้งเมื่อผู้ใช้ยืนยัน');
+$('#outbox-list button').click();
+check('offline: user-confirmed removal clears the selected message', $('#outbox-panel').hidden === true && window.localStorage.getItem('no7.outbox.v1') === null);
+Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
 
 const memoryBeforeFailedReset = window.localStorage.getItem('no7.memory.v2');
 const settingsBeforeFailedReset = window.localStorage.getItem('no7.settings.v1');

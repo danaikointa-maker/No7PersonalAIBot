@@ -453,3 +453,9 @@ kbd {
 .metric-row span:first-child { color: var(--text, #e8e8f0); min-width: 96px; }
 pre.diag { max-height: 240px; overflow: auto; font-size: 11px; }
 #outbox-badge { margin: 0 0 6px 4px; }
+.outbox-panel { margin: 4px; padding: 8px; border: 1px solid var(--line, #334155); border-radius: 12px; background: var(--surface, #111827); }
+.outbox-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.outbox-list { display: grid; gap: 6px; max-height: 150px; overflow: auto; margin-top: 6px; }
+.outbox-row { display: flex; align-items: start; gap: 8px; padding: 6px; border-radius: 8px; background: color-mix(in srgb, var(--surface, #111827) 80%, white 8%); }
+.outbox-row span { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.outbox-row button { flex: none; }

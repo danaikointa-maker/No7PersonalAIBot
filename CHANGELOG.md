@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.38.0] — 2026-11-10
+
+- Offline messages now persist transactionally; storage errors keep the draft in the composer. The outbox no longer silently evicts messages at capacity, expires old messages, or removes items after retry exhaustion. Users can review/remove queued messages, manually retry, and see whether send or queue persistence failed.
+
 ## [2.37.0] — 2026-11-10
 
 - Device registry add/remove/clear/touch mutations now persist candidates before updating memory. Storage failures preserve paired device settings and secrets; the UI preserves add/delete state and distinguishes successful device communication from a failed metadata write.

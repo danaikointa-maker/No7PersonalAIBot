@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { withRetry, classifyError, OfflineQueue, sleep, QUEUE_KEY } from '../web/src/core/retry.js';
+import {
+  withRetry, classifyError, OfflineQueue, OfflineQueueStorageError, OfflineQueueFullError, sleep, QUEUE_KEY,
+} from '../web/src/core/retry.js';
 
 const httpError = (status, message = `HTTP ${status}`) => Object.assign(new Error(message), { status });
 
@@ -76,26 +78,28 @@ function fakeStorage() {
   };
 }
 
-test('offline queue stores, caps and persists messages', () => {
+test('offline queue enforces its capacity without evicting older messages', () => {
   const storage = fakeStorage();
   const q = new OfflineQueue({ storage, max: 3, now: () => 1000 });
-  for (let i = 0; i < 5; i++) q.enqueue(`ข้อความ ${i}`);
+  for (let i = 0; i < 3; i++) q.enqueue(`ข้อความ ${i}`);
+  const persisted = storage.getItem(QUEUE_KEY);
+  assert.throws(() => q.enqueue('ข้อความใหม่'), OfflineQueueFullError);
   assert.equal(q.size(), 3);
-  assert.deepEqual(q.list().map((i) => i.text), ['ข้อความ 2', 'ข้อความ 3', 'ข้อความ 4']);
-  assert.ok(storage.getItem(QUEUE_KEY).includes('ข้อความ 4'));
+  assert.deepEqual(q.list().map((i) => i.text), ['ข้อความ 0', 'ข้อความ 1', 'ข้อความ 2']);
+  assert.equal(storage.getItem(QUEUE_KEY), persisted);
   const again = new OfflineQueue({ storage, max: 3, now: () => 1000 });
   assert.equal(again.size(), 3);
   assert.equal(q.enqueue('   '), null);
 });
 
-test('offline queue drops expired items on load', () => {
+test('offline queue retains old messages on load instead of expiring user data', () => {
   const storage = fakeStorage();
   storage.setItem(QUEUE_KEY, JSON.stringify([
-    { id: 'old', text: 'เก่าเกินไป', at: 0 },
-    { id: 'new', text: 'ยังใช้ได้', at: 900 },
+    { id: 'old', text: 'ข้อความเก่า', at: 0 },
+    { id: 'new', text: 'ข้อความใหม่', at: 900 },
   ]));
-  const q = new OfflineQueue({ storage, now: () => 1000, ttlMs: 500 });
-  assert.deepEqual(q.list().map((i) => i.text), ['ยังใช้ได้']);
+  const q = new OfflineQueue({ storage, now: () => 1000 });
+  assert.deepEqual(q.list().map((i) => i.text), ['ข้อความเก่า', 'ข้อความใหม่']);
 });
 
 test('drain sends until failure and keeps the rest', async () => {
@@ -115,16 +119,73 @@ test('drain sends until failure and keeps the rest', async () => {
   assert.deepEqual(q.list().map((i) => i.text), ['สอง', 'สาม']);
 });
 
-test('drain clears items that failed too many times', async () => {
+test('drain keeps messages after automatic retries are exhausted until manual retry', async () => {
   const storage = fakeStorage();
   const q = new OfflineQueue({ storage, now: () => 1000 });
   const item = q.enqueue('พังตลอด');
   q.markTried(item.id);
   q.markTried(item.id);
   q.markTried(item.id);
-  const res = await q.drain(async () => { throw new Error('nope'); }, { maxTries: 3 });
+  const res = await q.drain(async () => { throw new Error('must not send yet'); }, { maxTries: 3 });
   assert.equal(res.sent, 0);
-  assert.equal(q.size(), 0);
+  assert.equal(res.exhausted, true);
+  assert.equal(res.failureStage, 'exhausted');
+  assert.equal(q.size(), 1);
+  assert.equal(JSON.parse(storage.getItem(QUEUE_KEY))[0].text, 'พังตลอด');
+  assert.equal(q.resetTries(), true);
+  assert.equal(q.list()[0].tries, 0);
+});
+
+test('offline queue mutations preserve the prior queue when storage writes fail', () => {
+  const storage = fakeStorage();
+  const q = new OfflineQueue({ storage, now: () => 1000 });
+  const item = q.enqueue('ข้อความเดิม');
+  q.enqueue('ข้อความที่สอง');
+  const persisted = storage.getItem(QUEUE_KEY);
+  const originalSetItem = storage.setItem;
+  storage.setItem = () => { throw new Error('QuotaExceededError'); };
+  assert.throws(() => q.enqueue('ข้อความใหม่'), OfflineQueueStorageError);
+  assert.throws(() => q.markTried(item.id), OfflineQueueStorageError);
+  assert.throws(() => q.remove(item.id), OfflineQueueStorageError);
+  assert.equal(q.size(), 2);
+  assert.equal(q.list()[0].tries, 0);
+  assert.equal(storage.getItem(QUEUE_KEY), persisted);
+  storage.setItem = originalSetItem;
+
+  const originalRemoveItem = storage.removeItem;
+  storage.removeItem = () => { throw new Error('QuotaExceededError'); };
+  assert.throws(() => q.clear(), OfflineQueueStorageError);
+  assert.equal(q.size(), 2);
+  assert.equal(storage.getItem(QUEUE_KEY), persisted);
+  storage.removeItem = originalRemoveItem;
+});
+
+test('drain refuses to send when recording an attempt fails', async () => {
+  const storage = fakeStorage();
+  const q = new OfflineQueue({ storage, now: () => 1000 });
+  q.enqueue('อย่าส่งก่อนบันทึก');
+  const persisted = storage.getItem(QUEUE_KEY);
+  storage.setItem = () => { throw new Error('QuotaExceededError'); };
+  let calls = 0;
+  const res = await q.drain(async () => { calls += 1; });
+  assert.equal(calls, 0);
+  assert.equal(res.failureStage, 'before-send');
+  assert.ok(res.error instanceof OfflineQueueStorageError);
+  assert.equal(q.list()[0].tries, 0);
+  assert.equal(storage.getItem(QUEUE_KEY), persisted);
+});
+
+test('drain reports when delivery succeeded but removing the item could not persist', async () => {
+  const storage = fakeStorage();
+  const q = new OfflineQueue({ storage, now: () => 1000 });
+  q.enqueue('ส่งแล้ว แต่อาจซ้ำ');
+  storage.removeItem = () => { throw new Error('QuotaExceededError'); };
+  const res = await q.drain(async () => true);
+  assert.equal(res.sent, 1, 'handler succeeded even though durable queue removal failed');
+  assert.equal(res.failureStage, 'after-send');
+  assert.ok(res.error instanceof OfflineQueueStorageError);
+  assert.equal(q.size(), 1);
+  assert.equal(q.list()[0].tries, 1);
 });
 
 test('clear empties both memory and storage', () => {
