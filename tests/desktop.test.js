@@ -15,7 +15,7 @@ globalThis.dispatchEvent = globalThis.dispatchEvent || (() => true);
 
 const {
   parseWindowList, matchWindows, normalizeRecipe, validateRecipe, parseRecipeText,
-  stringifyRecipeSteps, planRecipe, runRecipe, describeRecipe, RecipeStore, listWindows,
+  stringifyRecipeSteps, planRecipe, runRecipe, describeRecipe, RecipeStore, RecipeStorageError, listWindows,
   focusWindow, MAX_RECIPE_STEPS, RECIPE_STORE_KEY,
 } = await import('../web/src/core/desktop.js');
 const { runTool } = await import('../web/src/core/tools.js');
@@ -258,6 +258,48 @@ test('RecipeStore persists between instances and can seed samples', () => {
   assert.ok(b.find('โหมดทำงานเช้า'));
 });
 
+test('RecipeStore quota failures preserve memory and persisted recipes for every mutation', () => {
+  const values = new Map();
+  let failWrites = false;
+  let writes = 0;
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => {
+      writes += 1;
+      if (failWrites) throw new Error('QuotaExceededError');
+      values.set(key, String(value));
+    },
+  };
+  const store = new RecipeStore({ storage, now: () => 1234 });
+  const saved = store.save({ name: 'คงไว้', steps: [{ action: 'notify', text: 'เดิม' }] });
+  const persisted = values.get(RECIPE_STORE_KEY);
+  const originalWrites = writes;
+  assert.equal(store.remove('missing'), false);
+  assert.equal(writes, originalWrites, 'ลบสูตรที่ไม่มีไม่เขียนซ้ำ');
+
+  failWrites = true;
+  assert.throws(() => store.save({ name: 'คงไว้', steps: [{ action: 'wait', ms: 200 }] }), RecipeStorageError);
+  assert.throws(() => store.remove(saved.id), RecipeStorageError);
+  assert.throws(() => store.clear(), RecipeStorageError);
+  assert.equal(store.get(saved.id).steps[0].text, 'เดิม');
+  assert.equal(values.get(RECIPE_STORE_KEY), persisted);
+
+  const emptyValues = new Map();
+  let seedWrites = 0;
+  const empty = new RecipeStore({ storage: {
+    getItem: (key) => emptyValues.get(key) ?? null,
+    setItem: (key, value) => {
+      seedWrites += 1;
+      throw new Error('QuotaExceededError');
+    },
+  } });
+  assert.throws(() => empty.seedSamples(), RecipeStorageError);
+  assert.deepEqual(empty.list(), []);
+  assert.equal(seedWrites, 1);
+  assert.equal(emptyValues.get(RECIPE_STORE_KEY), undefined);
+  assert.equal(values.get(RECIPE_STORE_KEY), persisted);
+});
+
 /* ----------------------------------------------------------------- tools */
 
 test('tool desktop:list reports windows and desktop:focus focuses one', async () => {
@@ -299,6 +341,28 @@ test('tool run_recipe dry-runs, runs and can create a recipe from steps', async 
 
     await assert.rejects(() => runTool('run_recipe', { name: 'ไม่มีสูตรนี้' }, {}), /ไม่พบสูตร/);
   } finally {
+    delete globalThis.no7;
+  }
+});
+
+test('tool run_recipe does not report success or execute when a new recipe cannot be stored', async () => {
+  const originalStorage = globalThis.localStorage;
+  const writes = [];
+  globalThis.localStorage = {
+    getItem: () => null,
+    setItem: (key) => { writes.push(key); throw new Error('QuotaExceededError'); },
+  };
+  const bridge = fakeBridge();
+  globalThis.no7 = { native: bridge };
+  try {
+    await assert.rejects(
+      () => runTool('run_recipe', { name: 'เก็บไม่ได้', steps: 'notify ห้ามรัน' }, { settings: { controlPolicy: OPEN_POLICY } }),
+      RecipeStorageError,
+    );
+    assert.deepEqual(writes, [RECIPE_STORE_KEY]);
+    assert.deepEqual(bridge.calls, [], 'ต้องไม่เริ่มรันสูตรก่อนบันทึกสำเร็จ');
+  } finally {
+    globalThis.localStorage = originalStorage;
     delete globalThis.no7;
   }
 });

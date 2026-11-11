@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.36.0] — 2026-11-10
+
+- Automation recipe changes now persist candidate data before updating memory. Storage failures preserve saved recipes and are surfaced in the recipe editor; `run_recipe` refuses to proceed if a newly created recipe cannot be saved.
+
 ## [2.35.0] — 2026-11-11
 
 - OAuth token writes now persist candidate state before updating memory. Failed storage writes preserve existing access/refresh tokens, and OAuth exchange/refresh surfaces the failure instead of appearing successful.

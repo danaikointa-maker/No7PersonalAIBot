@@ -313,6 +313,13 @@ export async function runRecipe(raw = {}, {
   return { ok: true, dryRun: false, steps: results, error: '' };
 }
 
+export class RecipeStorageError extends Error {
+  constructor(message = 'บันทึกสูตรอัตโนมัติลงในเครื่องไม่สำเร็จ', options = {}) {
+    super(message, options);
+    this.name = 'RecipeStorageError';
+  }
+}
+
 /** ที่เก็บสูตรในเครื่อง (localStorage) — 20 สูตรล่าสุด */
 export class RecipeStore {
   constructor({ storage = null, key = RECIPE_STORE_KEY, max = MAX_RECIPES, now = () => Date.now() } = {}) {
@@ -332,8 +339,13 @@ export class RecipeStore {
     } catch { return []; }
   }
 
-  _save() {
-    try { this.storage?.setItem(this.key, JSON.stringify(this.items)); } catch { /* quota */ }
+  _save(candidate) {
+    try {
+      this.storage?.setItem(this.key, JSON.stringify(candidate));
+    } catch (cause) {
+      throw new RecipeStorageError('บันทึกสูตรอัตโนมัติไม่สำเร็จ — พื้นที่จัดเก็บอาจเต็ม', { cause });
+    }
+    this.items = candidate;
   }
 
   list() { return this.items.map((r) => ({ ...r })); }
@@ -360,27 +372,39 @@ export class RecipeStore {
     const exists = this.items.find((r) => r.name.toLowerCase() === recipe.name.toLowerCase());
     const id = recipe.id || exists?.id || `r${at.toString(36)}${Math.floor(Math.random() * 1000).toString(36)}`;
     const next = { ...recipe, id, updatedAt: at };
-    if (exists) this.items = this.items.map((r) => (r.id === exists.id ? next : r));
-    else this.items = [...this.items, next];
-    this.items = this.items.slice(-this.max);
-    this._save();
+    const candidate = exists
+      ? this.items.map((r) => (r.id === exists.id ? next : r))
+      : [...this.items, next];
+    this._save(candidate.slice(-this.max));
     return { ...next };
   }
 
   remove(id) {
-    const before = this.items.length;
-    this.items = this.items.filter((r) => r.id !== id);
-    this._save();
-    return this.items.length < before;
+    const candidate = this.items.filter((r) => r.id !== id);
+    if (candidate.length === this.items.length) return false;
+    this._save(candidate);
+    return true;
   }
 
-  clear() { this.items = []; this._save(); }
+  clear() {
+    if (!this.items.length) return;
+    this._save([]);
+  }
 
   /** ใส่สูตรตัวอย่าง (ไม่ทับของเดิม) */
   seedSamples() {
+    const candidate = [...this.items];
+    let changed = false;
     for (const sample of SAMPLE_RECIPES) {
-      if (!this.find(sample.name)) this.save(sample);
+      if (!candidate.some((r) => r.name.toLowerCase() === sample.name.toLowerCase())) {
+        const { ok, recipe } = validateRecipe(sample);
+        if (ok) {
+          candidate.push({ ...recipe, id: recipe.id || `r${this.now().toString(36)}${Math.floor(Math.random() * 1000).toString(36)}`, updatedAt: this.now() });
+          changed = true;
+        }
+      }
     }
+    if (changed) this._save(candidate.slice(-this.max));
     return this.list();
   }
 }
