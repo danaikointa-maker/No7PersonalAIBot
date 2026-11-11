@@ -49,6 +49,7 @@ import { applyI18n, langOf, viewTitle, t as tr } from './core/i18n.js';
 import { AgentTimeline, statusIcon } from './core/timeline.js';
 import { buildDigest, digestTool, shouldAutoDigest } from './core/digest.js';
 import { buildWeekly, weeklyTool } from './core/weekly.js';
+import { analyzeHealth, healthMarkdown, applyCleanup } from './core/health.js';
 import {
   customToolDefs, validateCustomTools, PLUGIN_EXAMPLE, PLUGIN_LIMITS,
 } from './core/custom-tools.js';
@@ -1239,6 +1240,73 @@ $('#digest-btn')?.addEventListener('click', () => {
   try { localStorage.setItem(DIGEST_KEY, String(digest.date)); } catch { /* noop */ }
 });
 $('#weekly-btn')?.addEventListener('click', () => showWeekly({ inChat: true }));
+
+let lastHealth = null;
+function collectHealthData() {
+  return {
+    facts: memory.listFacts(),
+    notes: readList('no7.notes.v1'),
+    todos: readList('no7.todos.v1'),
+    tasks: tasks.list({ done: null }),
+    events: calendar.all(),
+  };
+}
+function renderHealthCard(report) {
+  lastHealth = report;
+  const card = $('#health-card');
+  if (!card) return;
+  const fixable = report.issues.filter((entry) => entry.fixable);
+  const list = report.issues.length
+    ? report.issues.map((entry) => `<div class="digest-item health-issue"><span class="health-severity ${entry.severity}">${entry.severity.toUpperCase()}</span> ${esc(entry.detail)} <small>(${entry.count})</small></div>`).join('')
+    : '<p class="hint">ข้อมูลอยู่ในสภาพดี — ไม่มีปัญหาที่พบ</p>';
+  const cleanupRows = [
+    ['ความจำซ้ำ', report.cleanup.facts.length],
+    ['โน้ตว่าง', report.cleanup.notes.length],
+    ['รายการซ้ำ/ว่าง', report.cleanup.todos.length],
+  ].filter(([, count]) => count > 0).map(([name, count]) => `<div class="digest-item">· ${name}: ${count}</div>`).join('');
+  card.innerHTML = `<div class="digest-card health-card">
+    <strong>🩺 สุขภาพข้อมูล: ${report.score}/100 · ${report.grade} (${report.gradeLabel})</strong>
+    <div class="health-issues">${list}</div>
+    ${report.suggestions.length ? `<div><strong>คำแนะนำ</strong>${report.suggestions.map((s) => `<div class="digest-item">· ${esc(s)}</div>`).join('')}</div>` : ''}
+    ${cleanupRows ? `<div class="health-cleanup"><strong>รายการที่ล้างได้อย่างปลอดภัย</strong>${cleanupRows}</div>` : ''}
+    <div class="digest-actions"><button id="health-clean-btn" ${fixable.length ? '' : 'disabled'}>🧹 ล้างรายการซ้ำ/ว่าง</button></div>
+  </div>`;
+  card.hidden = false;
+  card.querySelector('#health-clean-btn')?.addEventListener('click', () => {
+    const data = collectHealthData();
+    const currentReport = analyzeHealth(data);
+    const action = applyCleanup(currentReport.cleanup, data);
+    const count = action.removed.facts + action.removed.notes + action.removed.todos;
+    if (!count) return;
+    const message = `ลบเฉพาะรายการซ้ำ/ว่างที่ตรวจพบจำนวน ${count} รายการหรือไม่?\nความจำ ${action.removed.facts} · โน้ต ${action.removed.notes} · สิ่งที่ต้องทำ ${action.removed.todos}\nรายการเก่า งาน และนัดหมายจะไม่ถูกลบ`;
+    if (!window.confirm(message)) return;
+    const oldNotes = localStorage.getItem('no7.notes.v1');
+    const oldTodos = localStorage.getItem('no7.todos.v1');
+    try {
+      localStorage.setItem('no7.notes.v1', JSON.stringify(action.notes));
+      localStorage.setItem('no7.todos.v1', JSON.stringify(action.todos));
+    } catch {
+      try {
+        if (oldNotes == null) localStorage.removeItem('no7.notes.v1');
+        else localStorage.setItem('no7.notes.v1', oldNotes);
+        if (oldTodos == null) localStorage.removeItem('no7.todos.v1');
+        else localStorage.setItem('no7.todos.v1', oldTodos);
+      } catch { /* best-effort rollback when quota/storage is unavailable */ }
+      addMessage('bot', 'ล้างข้อมูลไม่สำเร็จ — พื้นที่จัดเก็บอาจไม่พร้อมใช้งาน');
+      return;
+    }
+    for (const id of currentReport.cleanup.facts) memory.removeFact(id);
+    renderMemory();
+    const next = analyzeHealth(collectHealthData());
+    renderHealthCard(next);
+    addMessage('bot', `🧹 ล้างข้อมูลเรียบร้อย: ${count} รายการ (ความจำ ${action.removed.facts}, โน้ต ${action.removed.notes}, สิ่งที่ต้องทำ ${action.removed.todos})`);
+  });
+}
+$('#health-btn')?.addEventListener('click', () => {
+  const report = analyzeHealth(collectHealthData());
+  renderHealthCard(report);
+  addMessage('bot', healthMarkdown(report, langOf(settings.uiLang)));
+});
 $('#set-digest-auto')?.addEventListener('change', (e) => {
   Object.assign(settings, saveSettings({ digestAuto: e.target.checked }));
   $('#settings-status').textContent = e.target.checked
@@ -1779,7 +1847,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.4.0',
+      version: window.NO7_VERSION || '2.5.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
