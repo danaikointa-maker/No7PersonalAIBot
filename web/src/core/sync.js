@@ -5,6 +5,7 @@ export const SYNC_VERSION = 1;
 
 /** เก็บเฉพาะข้อมูลที่ย้ายข้ามเครื่องได้ (ตัด API key ออกเสมอ) */
 import { TaskStore } from './tasks.js';
+import { mergeSyncBundle } from './sync-merge.js';
 
 export function collectBundle({ memory, personas = [], calendar = [], tasks = null, settings = {} }) {
   const safeSettings = { ...settings };
@@ -56,15 +57,54 @@ export async function pullBundle(serverUrl, token) {
  * รวมข้อมูลจากอีกเครื่องเข้ามาแบบ additive
  * @returns {{facts:number, personas:number, events:number, tasks:number}}
  */
-export function mergeBundle(bundle, { memory, createPersona, getPersona, listPersonas, calendar }) {
-  const out = { facts: 0, personas: 0, events: 0, tasks: 0 };
+export function mergeBundle(bundle, { memory, createPersona, getPersona, listPersonas, calendar, strategy = 'newest' }) {
+  const out = { facts: 0, personas: 0, events: 0, tasks: 0, conflicts: [], report: null };
   if (!bundle) return out;
 
-  if (bundle.memory?.facts?.length && memory) {
-    const res = memory.importData({ facts: bundle.memory.facts }, { merge: true });
-    out.facts = res.added;
+  const taskStore = new TaskStore();
+  const local = {
+    facts: memory?.listFacts?.() || [],
+    notes: safeJson('no7.notes.v1', []),
+    todos: safeJson('no7.todos.v1', []),
+    tasks: taskStore.list({ done: null }),
+    events: calendar?.all?.() || [],
+  };
+  const remote = {
+    facts: bundle.memory?.facts || [],
+    notes: bundle.notes || [],
+    todos: bundle.todos || [],
+    tasks: bundle.tasks || [],
+    events: bundle.calendar || [],
+  };
+
+  const merged = mergeSyncBundle(local, remote, { strategy });
+  out.report = merged;
+  out.conflicts = merged.conflicts;
+
+  // facts: เขียนกลับผ่าน memory (merge ตามข้อความ — ไม่สร้างซ้ำ)
+  if (merged.data.facts.length && memory?.importData) {
+    memory.importData({ facts: merged.data.facts }, { merge: true });
+    out.facts = merged.collections.facts.added + merged.collections.facts.updated;
   }
 
+  // notes/todos: เขียนชุดที่รวมแล้วทับ (คีย์มี ts → เป็นการต่อท้าย)
+  try {
+    if (merged.data.notes.length) globalThis.localStorage?.setItem('no7.notes.v1', JSON.stringify(merged.data.notes));
+    if (merged.data.todos.length) globalThis.localStorage?.setItem('no7.todos.v1', JSON.stringify(merged.data.todos));
+  } catch { /* พื้นที่เต็ม */ }
+
+  // tasks: ใช้ TaskStore.merge (จัดการ tombstone ให้แล้ว)
+  if (merged.data.tasks.length) {
+    out.tasks = taskStore.merge(merged.data.tasks).changed;
+  }
+
+  // events: เขียนชุดที่รวมแล้ว
+  if (calendar?.replaceAll && merged.data.events.length) {
+    calendar.replaceAll(merged.data.events);
+    out.events = merged.collections.events.added + merged.collections.events.updated;
+  }
+
+  // personas: additive เดิม
   const known = (listPersonas?.() || (getPersona ? [getPersona('no7')] : [])) || [];
   for (const p of bundle.personas || []) {
     if (!p?.system || !p?.name) continue;
@@ -72,32 +112,6 @@ export function mergeBundle(bundle, { memory, createPersona, getPersona, listPer
     if (exists) continue;
     const created = createPersona({ ...p, name: `${p.name}`.slice(0, 24) });
     if (created) { out.personas++; known.push(created); }
-  }
-
-  if (calendar?.replaceAll) {
-    const existing = new Set(calendar.all().map((e) => e.uid));
-    const merged = calendar.all();
-    for (const e of bundle.calendar || []) {
-      if (!e?.start || existing.has(e.uid)) continue;
-      merged.push(e);
-      out.events++;
-    }
-    calendar.replaceAll(merged);
-  }
-
-  // todo/note: รวมแบบไม่ซ้ำ
-  for (const [key, field] of [['no7.todos.v1', 'text'], ['no7.notes.v1', 'text']]) {
-    const local = safeJson(key, []);
-    const incoming = bundle[key === 'no7.todos.v1' ? 'todos' : 'notes'] || [];
-    const seen = new Set(local.map((x) => `${x[field]}|${x.ts}`));
-    const add = incoming.filter((x) => x?.[field] && !seen.has(`${x[field]}|${x.ts}`));
-    if (add.length) {
-      try { globalThis.localStorage?.setItem(key, JSON.stringify([...local, ...add])); } catch {}
-    }
-  }
-
-  if (Array.isArray(bundle.tasks) && bundle.tasks.length) {
-    out.tasks = new TaskStore().merge(bundle.tasks).changed;
   }
 
   return out;

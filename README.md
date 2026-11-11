@@ -1,4 +1,4 @@
-# No7 Personal AI Bot `v2.3`
+# No7 Personal AI Bot `v2.4`
 
 > ผู้ช่วย AI ส่วนตัวที่ **โค้ดชุดเดียวกันรันได้ทั้งมือถือและ PC** — พูดไทยก่อน ฟังได้ด้วยเสียง มีความจำระยะยาว
 > เรียกเครื่องมือจริง ทำงานหลายก้าวได้ ซิงก์ข้ามเครื่อง และสั่งงานอุปกรณ์ผ่าน HMAC
@@ -22,15 +22,15 @@ npm run build         # dist/ ชุดเดียวสำหรับ PWA + E
 npm run server        # companion server: static + AI proxy + tools + sync + phone-link
 npm run desktop       # เปิดเป็นแอปเดสก์ท็อป (Electron)
 npm run mobile:sync   # ซิงก์ dist/ เข้าโปรเจค Android/iOS
-npm test              # 377 unit tests
-npm run test:browser  # 133 end-to-end checks (รันแอปจริงใน jsdom)
+npm test              # 405 unit tests
+npm run test:browser  # 140 end-to-end checks (รันแอปจริงใน jsdom)
 npm run check         # syntax + structure check
 npm run perf          # performance budget (ขนาด bundle/source)
 ```
 
 ---
 
-## ทำอะไรได้ (v2.3)
+## ทำอะไรได้ (v2.4)
 
 ### 🎭 เลือกได้ทั้งหมด — 5 บทบาทในที่เดียว
 `✨ ทั้งหมด` (สลับบทบาทเองตามคำขอ) · `💛 เพื่อนคุย` · `💼 งาน` · `📅 ชีวิตประจำวัน` · `🏠 อุปกรณ์`
@@ -74,7 +74,7 @@ npm run perf          # performance budget (ขนาด bundle/source)
 
 ### ✅ งาน + เตือนข้ามเครื่อง
 - เพิ่มงานด้วยเสียง/ข้อความ ("เตือนส่งรายงานพรุ่งนี้ 9 โมง"), priority 0–3, เตือนตามเวลา
-- ซิงก์ข้ามเครื่องแบบ last-write-wins + tombstone (การลบตามไปทุกเครื่อง)
+- ซิงก์ข้ามเครื่องแบบ conflict-aware (newest / prefer-local / prefer-remote / keep-both) + รายงานความขัดแย้ง + tombstone (การลบตามไปทุกเครื่อง)
 - `parseDue` เข้าใจ ISO, `+30m`, `+2h`, `วันนี้ 18:00`, `พรุ่งนี้ 09:30`
 
 ### 🧩 ผลลัพธ์ทยอยขึ้นระหว่างทำงาน
@@ -150,6 +150,8 @@ npm run perf          # performance budget (ขนาด bundle/source)
 ### 🔗 อุปกรณ์ + 🔄 ซิงก์
 - Phone-Link: สั่งงาน PC/ESP32 ผ่าน HMAC-SHA256 (`/api/link/*`), มี ESP32 reference client ให้
 - ซิงก์มือถือ ↔ PC ผ่าน server ของคุณเอง (`/api/sync`, token) — ไม่มีคลาวด์ ไม่มีบัญชี
+- เลือกกลยุทธ์เมื่อข้อมูลชนกัน + ดูรายงาน "เพิ่ม/อัปเดต/คงเดิม/ชนกัน" (ดู [docs/SYNC.md](docs/SYNC.md))
+- ส่งออกสรุปวันนี้/รายงานสัปดาห์เป็น Markdown หรือ CSV (BOM พร้อม Excel ไทย) — [docs/REPORTS.md](docs/REPORTS.md)
 - **งาน + เตือนข้ามเครื่อง**: เพิ่มงานด้วยเสียง/ข้อความ, เตือนตามเวลา, ซิงก์แบบ last-write-wins (tombstone สำหรับการลบ)
 - **งานซ้ำ + เตือนแม้ปิดแอป**: `daily/weekdays/weekly/monthly/hourly`, server tick ส่ง Telegram, ปิดงานแล้วเลื่อนรอบถัดไปเอง
 
@@ -177,7 +179,7 @@ mobile/              ที่สำหรับ native project (Capacitor)
 server/              companion server (zero deps): static · AI proxy · tools · sync · phone-link
 devices/esp32/       reference client (no7_link.h) + คู่มือ
 tests/               unit tests + jsdom end-to-end
-docs/                เอกสาร 29 ไฟล์
+docs/                เอกสาร 31 ไฟล์
 ```
 
 ## เอกสาร
@@ -204,6 +206,8 @@ docs/                เอกสาร 29 ไฟล์
 | [docs/DEVICES.md](docs/DEVICES.md) | Phone-Link protocol + ESP32 |
 | [docs/PHONE_LINK.md](docs/PHONE_LINK.md) | HMAC canonical signing + ตัวอย่าง curl |
 | [docs/WEEKLY.md](docs/WEEKLY.md) | รายงานรายสัปดาห์ + ข้อเสนอโฟกัส |
+| [docs/SYNC.md](docs/SYNC.md) | ซิงก์ conflict-aware: กลยุทธ์, คีย์, รายงานความขัดแย้ง |
+| [docs/REPORTS.md](docs/REPORTS.md) | ส่งออกสรุปวันนี้/รายงานสัปดาห์เป็น Markdown หรือ CSV |
 | [docs/SEARCH.md](docs/SEARCH.md) | command palette ⌘K + การให้คะแนน/ไฮไลต์ |
 | [docs/BACKUP.md](docs/BACKUP.md) | สำรอง/กู้คืน schema 2 (dry-run, merge/replace) |
 | [docs/AGENT.md](docs/AGENT.md) | agent loop, event, timeline, การหยุดกลางทาง |

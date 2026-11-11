@@ -3,6 +3,10 @@ import { StateMachine, STATES } from './core/state.js';
 import { allPersonas, customPersonas, getPersona, createPersona, updatePersona, deletePersona, duplicatePersona, personaVoice } from './core/persona-store.js';
 import { getCalendar, formatWhen } from './core/calendar.js';
 import { collectBundle, pushBundle, pullBundle, mergeBundle } from './core/sync.js';
+import { SYNC_STRATEGIES, summarizeSync, describeConflicts } from './core/sync-merge.js';
+import {
+  weeklyCsv, digestCsv, reportMarkdown, datedFilename, downloadText,
+} from './core/report-export.js';
 import {
   getDeviceRegistry, sendCommand, deviceStatus, testConnection, QUICK_COMMANDS,
   helloDevice, sendEyes, getEyes, voiceStatus, linkCapabilities,
@@ -1023,7 +1027,57 @@ digestToolDef = digestTool({
   lang: () => langOf(settings.uiLang),
 });
 
+let lastDigest = null;
+let lastWeekly = null;
+
+function exportBar(kind) {
+  return `<div class="digest-actions">
+    <button data-export="${kind}-md">⬇️ Markdown</button>
+    <button data-export="${kind}-csv">⬇️ CSV</button>
+  </div>`;
+}
+
+async function deliverReport(filename, text, type) {
+  const label = filename.replace(/^no7-/, '').replace(/-\d{4}-\d{2}-\d{2}/, '');
+  if (downloadText(filename, text, { type })) return true;
+  try {
+    await navigator.clipboard.writeText(text);
+    $('#settings-status').textContent = `📋 คัดลอก ${label} ไปคลิปบอร์ดแล้ว (เบราว์เซอร์นี้ไม่รองรับดาวน์โหลด)`;
+    return true;
+  } catch {
+    $('#settings-status').textContent = 'ดาวน์โหลดไม่สำเร็จ — เบราว์เซอร์นี้ไม่รองรับ';
+    return false;
+  }
+}
+
+function exportDigest(format) {
+  if (!lastDigest) return Promise.resolve(false);
+  const now = Date.now();
+  const lang = langOf(settings.uiLang);
+  return format === 'csv'
+    ? deliverReport(datedFilename('no7-digest', 'csv', now), digestCsv(lastDigest), 'text/csv;charset=utf-8')
+    : deliverReport(datedFilename('no7-digest', 'md', now), reportMarkdown(lastDigest, { kind: 'digest', lang, now }), 'text/markdown;charset=utf-8');
+}
+
+function exportWeekly(format) {
+  if (!lastWeekly) return Promise.resolve(false);
+  const now = Date.now();
+  const lang = langOf(settings.uiLang);
+  return format === 'csv'
+    ? deliverReport(datedFilename('no7-weekly', 'csv', now), weeklyCsv(lastWeekly), 'text/csv;charset=utf-8')
+    : deliverReport(datedFilename('no7-weekly', 'md', now), reportMarkdown(lastWeekly, { kind: 'weekly', lang, now }), 'text/markdown;charset=utf-8');
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target instanceof Element ? e.target.closest('[data-export]') : null;
+  if (!btn) return;
+  const [kind, format] = String(btn.dataset.export).split('-');
+  if (kind === 'weekly') exportWeekly(format);
+  else if (kind === 'digest') exportDigest(format);
+});
+
 function renderDigestCard(digest, target = null) {
+  lastDigest = digest;
   const box = $('#digest-card');
   const html = `<div class="digest-card">
     <strong>${esc(digest.headline)}</strong>
@@ -1032,6 +1086,7 @@ function renderDigestCard(digest, target = null) {
       ${sec.items.map((it) => `<div class="digest-item">· ${esc(it.label)}${it.meta ? ` <small>${esc(it.meta)}</small>` : ''}</div>`).join('')}
       ${sec.more ? `<div class="digest-item">· …อีก ${sec.more}</div>` : ''}
     </div>`).join('') || `<p class="hint">${settings.uiLang === 'en' ? 'Nothing pending today.' : 'วันนี้ไม่มีอะไรค้าง 🎉'}</p>`}
+    ${exportBar('digest')}
   </div>`;
   if (box) {
     box.innerHTML = html;
@@ -1083,6 +1138,7 @@ weeklyToolDef = weeklyTool({
 });
 
 function renderWeeklyCard(weekly, target = null) {
+  lastWeekly = weekly;
   const box = $('#weekly-card');
   const html = `<div class="digest-card weekly-card">
     <strong>${esc(`${weekly.range.label} · ${weekly.headline}`)}</strong>
@@ -1090,6 +1146,7 @@ function renderWeeklyCard(weekly, target = null) {
       <div class="digest-sec-head">${sec.emoji} ${esc(sec.title)}</div>
       ${sec.items.map((it) => `<div class="digest-item">· ${esc(it.label)}${it.meta ? ` <small>${esc(it.meta)}</small>` : ''}</div>`).join('')}
     </div>`).join('') || `<p class="hint">${esc(tr('weekly.empty', { lang: settings.uiLang }))}</p>`}
+    ${exportBar('weekly')}
   </div>`;
   if (box) { box.innerHTML = html; box.hidden = false; }
   if (target) {
@@ -1379,6 +1436,11 @@ function renderSettingsForm() {
   $('#set-costmode').value = settings.costMode || 'mixed';
   $('#set-serverurl').value = settings.serverUrl || '';
   $('#set-synctoken').value = settings.syncToken || '';
+  const syncStrategySel = $('#set-syncstrategy');
+  if (syncStrategySel) {
+    syncStrategySel.innerHTML = SYNC_STRATEGIES.map((id) => `<option value="${id}">${SYNC_STRATEGY_LABELS[id] || id}</option>`).join('');
+    syncStrategySel.value = SYNC_STRATEGIES.includes(settings.syncStrategy) ? settings.syncStrategy : 'newest';
+  }
   renderPermList();
 
   const ttsSel = $('#set-ttsprovider');
@@ -1479,6 +1541,7 @@ function collectSettings() {
     voicePitch: Number($('#set-pitch').value) || 1,
     voiceName: $('#set-voice').value,
     serverUrl: $('#set-serverurl').value.trim() || 'http://localhost:8787',
+    syncStrategy: $('#set-syncstrategy')?.value || 'newest',
     syncToken: $('#set-synctoken').value.trim(),
   };
 }
@@ -1716,7 +1779,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.3.0',
+      version: window.NO7_VERSION || '2.4.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -2695,6 +2758,34 @@ $('#sync-test-btn').addEventListener('click', async () => {
   }
 });
 
+const SYNC_STRATEGY_LABELS = {
+  newest: 'ล่าสุดชนะ',
+  'prefer-local': 'เก็บของเครื่องนี้',
+  'prefer-remote': 'รับของอีกเครื่อง',
+  'keep-both': 'เก็บทั้งสอง',
+};
+
+const fmtTime = (ms) => {
+  if (!ms) return '—';
+  try { return new Date(ms).toLocaleString(); } catch { return '—'; }
+};
+
+function renderSyncReport(report) {
+  const box = $('#sync-report');
+  if (!box) return;
+  if (!report) { box.hidden = true; box.innerHTML = ''; return; }
+  const conflicts = report.conflicts || [];
+  const rows = conflicts.map((c) => {
+    const d = describeConflicts([c])[0];
+    return `<tr><td>${d.label}</td><td>${d.key}</td><td>${d.local}</td><td>${d.remote}</td><td>${d.winner}</td></tr>`;
+  }).join('');
+  box.hidden = false;
+  box.innerHTML = `
+    <p class="hint">${esc(summarizeSync(report, settings.uiLang || 'th'))}</p>
+    ${conflicts.length ? `<table class="sync-conflicts"><thead><tr><th>ชุด</th><th>รายการ</th><th>เครื่องนี้</th><th>อีกเครื่อง</th><th>ผล</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+    <p class="hint">กลยุทธ์: ${SYNC_STRATEGY_LABELS[report.strategy] || report.strategy}${conflicts.length ? ` · ตรวจเมื่อ ${fmtTime(Date.now())}` : ''}</p>`;
+}
+
 function bundleNow() {
   return collectBundle({
     memory,
@@ -2715,7 +2806,11 @@ $('#sync-push-btn').addEventListener('click', async () => {
 });
 
 $('#sync-pull-btn').addEventListener('click', async () => {
-  settings = saveSettings({ serverUrl: $('#set-serverurl').value.trim(), syncToken: $('#set-synctoken').value.trim() });
+  settings = saveSettings({
+    serverUrl: $('#set-serverurl').value.trim(),
+    syncToken: $('#set-synctoken').value.trim(),
+    syncStrategy: $('#set-syncstrategy')?.value || settings.syncStrategy || 'newest',
+  });
   $('#sync-status').textContent = 'กำลังดาวน์โหลด…';
   try {
     const bundle = await pullBundle(settings.serverUrl, settings.syncToken);
@@ -2726,9 +2821,16 @@ $('#sync-pull-btn').addEventListener('click', async () => {
       getPersona,
       listPersonas: allPersonas,
       calendar,
+      strategy: settings.syncStrategy || 'newest',
     });
     renderMemory(); renderCalendar(); renderPersonaList(); renderSettingsForm();
-    $('#sync-status').textContent = `✅ ผสานแล้ว: ความจำ +${res.facts} · persona +${res.personas} · นัด +${res.events} · งาน ${res.tasks || 0}`;
+    const conflicts = res.conflicts?.length || 0;
+    $('#sync-status').textContent = `✅ ผสานแล้ว: ความจำ +${res.facts} · persona +${res.personas} · นัด +${res.events} · งาน ${res.tasks || 0}`
+      + (conflicts ? ` · ชนกัน ${conflicts} รายการ (ดูรายละเอียดด้านล่าง)` : '');
+    renderSyncReport(res.report);
+    if (conflicts) {
+      addMessage('bot', `🔄 ซิงก์พบข้อมูลชนกัน ${conflicts} รายการ — ${summarizeSync(res.report, settings.uiLang || 'th')}\nดูรายละเอียดใน ⚙️ ตั้งค่า → ซิงก์ข้ามเครื่อง`);
+    }
     renderTasks();
     pushRemindersToServer();
   } catch (e) { $('#sync-status').textContent = `❌ ${e.message}`; }

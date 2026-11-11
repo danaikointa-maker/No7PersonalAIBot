@@ -21,7 +21,7 @@ npm run perf
 ```
 📦 Performance budget
 | รายการ | วัดได้ | เพดาน | ผล |
-| source: ไฟล์ใหญ่สุด | 115.1 KB | 140 KB | ✅ |
+| source: ไฟล์ใหญ่สุด | 140.5 KB | 150 KB | ✅ |
 | source: รวมทุกโมดูล | 405.8 KB | 800 KB | ✅ |
 | dist: bundle หลัก (gzip) | 76 KB | 160 KB | ✅ |
 ...
@@ -74,3 +74,4 @@ npm run perf
 - ยังไม่มี Playwright/เบราว์เซอร์จริงใน CI (ต้องโหลด browser binary) — ใช้ jsdom แทน
 - ยังไม่มี performance timing (LCP/INP) — มีแค่ขนาดไฟล์; วัด runtime ผ่าน `core/metrics.js` แทน
 - budget ตั้งจากค่าจริง + margin ~30–100% — ต้องปรับเมื่อเพิ่มฟีเจอร์ใหญ่
+- ปรับรอบ 9: `maxFileKb` 140 → 150 เพราะ `main.js` เพิ่มปุ่มส่งออกรายงาน + หน้ารายงานความขัดแย้งของซิงก์ (140.5 KB)

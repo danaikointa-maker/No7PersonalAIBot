@@ -49,6 +49,7 @@ export const DEFAULT_SETTINGS = {
   },
   serverUrl: 'http://localhost:8787',   // companion server (AI proxy / tools / sync)
   syncToken: '',
+  syncStrategy: 'newest',              // newest | prefer-local | prefer-remote | keep-both
 };
 
 const KEY = 'no7.settings.v1';

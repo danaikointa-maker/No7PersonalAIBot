@@ -468,12 +468,21 @@
           <p class="hint">ใช้ companion server ของคุณเอง (npm run server) — ไม่มีคลาวด์ ไม่มีบัญชี</p>
           <label>ที่อยู่ server <input id="set-serverurl" placeholder="http://192.168.1.10:8787" /></label>
           <label>Sync token <input id="set-synctoken" type="password" placeholder="NO7_SYNC_TOKEN ของ server" /></label>
+          <label>เมื่อข้อมูลชนกัน
+            <select id="set-syncstrategy">
+              <option value="newest">เอาของที่แก้ล่าสุด (แนะนำ)</option>
+              <option value="prefer-local">เก็บของเครื่องนี้เสมอ</option>
+              <option value="prefer-remote">รับของอีกเครื่องเสมอ</option>
+              <option value="keep-both">เก็บทั้งสองเวอร์ชัน</option>
+            </select>
+          </label>
           <div class="row">
             <button id="sync-push-btn">⬆️ อัปโหลดจากเครื่องนี้</button>
             <button id="sync-pull-btn">⬇️ ดึง + ผสาน</button>
             <button id="sync-test-btn">ทดสอบเชื่อมต่อ</button>
           </div>
           <p id="sync-status" class="hint"></p>
+          <div id="sync-report" hidden></div>
 
           <h3>📱 ความสามารถของอุปกรณ์นี้</h3>
           <p class="hint">ตรวจจาก API จริงของเครื่อง — ปุ่มที่ใช้ไม่ได้จะบอกเหตุผล</p>

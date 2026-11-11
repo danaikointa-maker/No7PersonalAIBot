@@ -2,6 +2,33 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.4.0] — 2026-11-10
+
+รอบที่เก้า: ซิงก์ข้ามเครื่องที่ "รู้ว่าชนกัน" และส่งออกรายงานออกไปใช้ต่อได้
+
+### เพิ่ม
+**X1 — ซิงก์แบบ conflict-aware**
+- `core/sync-merge.js`: `mergeRecordSets` + `mergeSyncBundle` รองรับ 4 กลยุทธ์
+  `newest` (ค่าเริ่มต้น) / `prefer-local` / `prefer-remote` / `keep-both`
+- คีย์ต่อชุด: facts=ข้อความ, notes/todos=เวลา+ข้อความ, tasks=`id`, events=`uid`
+  และ `recordTime` (ts/updatedAt/at/createdAt; events ใช้ `start`) ใช้ตัดสินฝั่งที่แก้ล่าสุด
+- รายงานผล `{data, collections, conflicts, totals}` + `summarizeSync` (ไทย/อังกฤษ) +
+  `describeConflicts` + `deviceId()` (เก็บใน `no7.device.id`)
+- หน้าตั้งค่า: เลือกกลยุทธ์ + ตารางความขัดแย้ง (`#sync-report`) + ประกาศในแชทเมื่อชนกัน
+- `mergeBundle` เปลี่ยนไปใช้ตัวรวมใหม่ (personas ยัง additive) — `TaskStore.merge` ยังกัน tombstone
+- `docs/SYNC.md`
+
+**X2 — ส่งออกรายงาน (Markdown / CSV)**
+- `core/report-export.js`: `escapeCsv` (กัน formula injection), `toCsv`, `weeklyCsv`, `digestCsv`,
+  `reportMarkdown`, `dateStamp`, `datedFilename`, `downloadText`
+- ปุ่ม ⬇️ Markdown / ⬇️ CSV บนการ์ดสรุปวันนี้และรายงานสัปดาห์ — ชื่อไฟล์มีวันที่, CSV มี BOM
+  สำหรับ Excel ไทย; ถ้าเบราว์เซอร์โหลดไฟล์ไม่ได้จะคัดลอกไปคลิปบอร์ดแทน
+- `docs/REPORTS.md`
+
+### เปลี่ยน
+- `perf-budget.json`: `source.maxFileKb` 140 → 150 KB (main.js 140.5 KB หลังเพิ่มปุ่มส่งออก/รายงานซิงก์)
+- เอกสารรวม 31 ไฟล์
+
 ## [2.3.0] — 2026-11-10
 
 รอบที่แปด: งานหลายเครื่องมือเห็นผลระหว่างทาง (ไม่ต้องรอคำตอบจบ) และมองภาพรวมสัปดาห์เพื่อวางแผนต่อ

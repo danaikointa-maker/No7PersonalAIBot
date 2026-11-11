@@ -117,5 +117,5 @@ test('mergeBundle adds facts, personas and events without duplicating', () => {
 test('mergeBundle tolerates an empty bundle', () => {
   const memory = new MemoryStore();
   const res = mergeBundle(null, { memory });
-  assert.deepEqual(res, { facts: 0, personas: 0, events: 0, tasks: 0 });
+  assert.deepEqual(res, { facts: 0, personas: 0, events: 0, tasks: 0, conflicts: [], report: null });
 });
