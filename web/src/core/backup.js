@@ -28,21 +28,62 @@ export const COLLECTIONS = {
 };
 
 export const SECRET_PLACEHOLDER = '';
+const isSecretName = (name) => {
+  const key = String(name).toLowerCase().replace(/[^a-z0-9]/g, '');
+  return SETTINGS_SECRET_KEYS.some((item) => key === item.toLowerCase())
+    || ['apikey', 'accesskey', 'secret', 'secretkey', 'password', 'token', 'tokens', 'devicecode', 'codeverifier', 'authorization', 'cookie', 'credential', 'signature', 'privatekey']
+      .some((suffix) => key.endsWith(suffix));
+};
 
-/** ตัดความลับออกจาก settings (และ apiKey ใน MCP servers) */
+function redactUrl(value) {
+  try {
+    const url = new URL(value);
+    url.username = '';
+    url.password = '';
+    for (const key of url.searchParams.keys()) if (isSecretName(key)) url.searchParams.set(key, SECRET_PLACEHOLDER);
+    return url.toString();
+  } catch { return value; }
+}
+
+function redactNested(value, name = '') {
+  if (Array.isArray(value)) return value.map((item) => redactNested(item));
+  if (typeof value === 'string' && /url$/i.test(name)) return redactUrl(value);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+    key, isSecretName(key) ? SECRET_PLACEHOLDER : redactNested(item, key),
+  ]));
+}
+
+/** Recursively remove secret-like settings, including MCP OAuth credentials and auth headers. */
 export function redactSettings(settings = {}) {
-  const out = { ...settings };
-  for (const key of SETTINGS_SECRET_KEYS) if (key in out) out[key] = SECRET_PLACEHOLDER;
-  if (Array.isArray(out.mcpServers)) {
-    out.mcpServers = out.mcpServers.map((s) => ({ ...s, apiKey: SECRET_PLACEHOLDER }));
-  }
-  return out;
+  return redactNested(settings);
+}
+
+function urlContainsSecret(value) {
+  try {
+    const url = new URL(value);
+    return !!(url.username || url.password)
+      || [...url.searchParams].some(([key, item]) => isSecretName(key) && item !== '');
+  } catch { return false; }
+}
+function containsSecret(value, name = '') {
+  if (typeof value === 'string' && /url$/i.test(name)) return urlContainsSecret(value);
+  if (Array.isArray(value)) return value.some((item) => containsSecret(item));
+  if (!value || typeof value !== 'object') return false;
+  return Object.entries(value).some(([key, item]) => (
+    (isSecretName(key) && item !== '' && item != null && containsSecretValue(item))
+    || containsSecret(item, key)
+  ));
+}
+function containsSecretValue(value) {
+  if (Array.isArray(value)) return value.some(containsSecretValue);
+  if (value && typeof value === 'object') return Object.values(value).some(containsSecretValue);
+  return value !== '' && value != null;
 }
 
 /** มีความลับติดอยู่ในชุดข้อมูลไหม (ใช้เตือนตอนนำเข้า/ส่งออก) */
 export function hasSecrets(settings = {}) {
-  if (SETTINGS_SECRET_KEYS.some((k) => String(settings[k] || '').length > 0)) return true;
-  return (settings.mcpServers || []).some((s) => String(s?.apiKey || '').length > 0);
+  return containsSecret(settings);
 }
 
 function checksumOf(payload) {
@@ -55,6 +96,32 @@ export function backupByteSize(input) {
     const text = typeof input === 'string' ? input : JSON.stringify(input);
     return typeof text === 'string' ? new TextEncoder().encode(text).byteLength : Infinity;
   } catch { return Infinity; }
+}
+
+function settingIdentity(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
+  if (value.id || value.name) return String(value.id || value.name);
+  return typeof value.url === 'string' ? redactUrl(value.url) : '';
+}
+
+/** Restore locally-held secret values only for the corresponding matching settings entries. */
+function preserveLocalSecrets(incoming, local, name = '') {
+  if (typeof incoming === 'string' && /url$/i.test(name) && typeof local === 'string' && redactUrl(local) === incoming) return local;
+  if (Array.isArray(incoming)) {
+    const old = Array.isArray(local) ? local : [];
+    const byIdentity = new Map(old.map((item) => [settingIdentity(item), item]).filter(([id]) => id));
+    return incoming.map((item, index) => {
+      const id = settingIdentity(item);
+      return preserveLocalSecrets(item, id ? byIdentity.get(id) : old[index], name);
+    });
+  }
+  if (!incoming || typeof incoming !== 'object') return incoming;
+  const previous = local && typeof local === 'object' && !Array.isArray(local) ? local : {};
+  return Object.fromEntries(Object.entries(incoming).map(([key, item]) => {
+    const oldValue = previous[key];
+    if (isSecretName(key) && !containsSecretValue(item) && containsSecretValue(oldValue)) return [key, oldValue];
+    return [key, preserveLocalSecrets(item, oldValue, key)];
+  }));
 }
 
 export function normalizeBackupLog(input, limit = Infinity) {
@@ -285,6 +352,7 @@ export function planRestore(backup = {}, local = {}, { mode = 'merge' } = {}) {
     ? (mode === 'merge' ? { ...localSettings, ...incomingSettings } : { ...incomingSettings })
     : null;
   if (nextSettings) {
+    nextSettings = preserveLocalSecrets(nextSettings, localSettings);
     const blanked = SETTINGS_SECRET_KEYS.filter((key) => !String(incomingSettings[key] || '').length);
     const preserved = [];
     for (const key of SETTINGS_SECRET_KEYS) {
@@ -294,18 +362,9 @@ export function planRestore(backup = {}, local = {}, { mode = 'merge' } = {}) {
       }
     }
     if (Array.isArray(incomingSettings.mcpServers)) {
-      const localServers = new Map((Array.isArray(localSettings.mcpServers) ? localSettings.mcpServers : [])
-        .filter((server) => server && typeof server === 'object')
-        .map((server) => [String(server.id || server.name || server.url || ''), server]));
-      nextSettings.mcpServers = incomingSettings.mcpServers.map((server) => {
-        if (!server || typeof server !== 'object') return server;
-        const localServer = localServers.get(String(server.id || server.name || server.url || ''));
-        if (!String(server.apiKey || '').length && String(localServer?.apiKey || '').length) {
-          preserved.push(`MCP:${server.id || server.name || server.url}`);
-          return { ...server, apiKey: localServer.apiKey };
-        }
-        return server;
-      });
+      const localServers = Array.isArray(localSettings.mcpServers) ? localSettings.mcpServers : [];
+      nextSettings.mcpServers = preserveLocalSecrets(incomingSettings.mcpServers, localServers);
+      if (JSON.stringify(nextSettings.mcpServers) !== JSON.stringify(incomingSettings.mcpServers)) preserved.push('MCP credentials');
     }
     if (blanked.length) warnings.push(`คีย์ว่าง/ไม่มีในไฟล์: ${blanked.join(', ')}; จะเก็บค่าปัจจุบันของเครื่องไว้ถ้ามี`);
     if (preserved.length) warnings.push('รักษา credentials ที่มีอยู่ในเครื่องนี้ไว้ (ไม่ได้นำ secrets จากไฟล์ที่ว่างมาทับ)');

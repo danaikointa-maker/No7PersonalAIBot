@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.42.0] — 2026-11-10
+
+- Sync bundles now reuse recursive settings redaction: API keys, tokens, OAuth client secrets, credentials in authorization headers, and sensitive URL credentials/query parameters are blanked before upload. Public preferences remain intact, and confirmed backup restore preserves matching credentials already stored locally.
+
 ## [2.41.0] — 2026-11-10
 
 - Companion-server sync and reminder JSON files now use atomic temp-file replacement. Sync PUT validates collection shapes and rejects malformed bundles without replacing valid data; when disk persistence fails, the process retains and serves the latest sync bundle from memory (`persisted: false`).

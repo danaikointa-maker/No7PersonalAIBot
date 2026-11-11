@@ -79,10 +79,25 @@ test('collectBundle strips secrets', () => {
     memory: mem,
     personas: customPersonas(),
     calendar: [],
-    settings: { apiKey: 'SECRET', syncToken: 'TOK', provider: 'pollinations' },
+    settings: {
+      apiKey: 'SECRET', ttsApiKey: 'TTS_SECRET', syncToken: 'TOK_SECRET', provider: 'pollinations',
+      mcpServers: [{
+        id: 'mcp-1', apiKey: 'MCP_SECRET',
+        oauth: { clientId: 'public-client-id', clientSecret: 'OAUTH_SECRET', registrationAccessToken: 'REG_SECRET' },
+        headers: { Authorization: 'Bearer HEADER_SECRET', 'X-Api-Key': 'HEADER_KEY' },
+      }],
+    },
   });
-  assert.equal(bundle.settings.apiKey, undefined);
-  assert.equal(bundle.settings.syncToken, undefined);
+  assert.equal(bundle.settings.apiKey, '');
+  assert.equal(bundle.settings.ttsApiKey, '');
+  assert.equal(bundle.settings.syncToken, '');
+  assert.equal(bundle.settings.mcpServers[0].apiKey, '');
+  assert.equal(bundle.settings.mcpServers[0].oauth.clientId, 'public-client-id');
+  assert.equal(bundle.settings.mcpServers[0].oauth.clientSecret, '');
+  assert.equal(bundle.settings.mcpServers[0].oauth.registrationAccessToken, '');
+  assert.equal(bundle.settings.mcpServers[0].headers.Authorization, '');
+  assert.equal(bundle.settings.mcpServers[0].headers['X-Api-Key'], '');
+  assert.equal(JSON.stringify(bundle.settings).includes('SECRET'), false);
   assert.equal(bundle.settings.provider, 'pollinations');
   assert.equal(bundle.memory.facts.length, 1);
 });

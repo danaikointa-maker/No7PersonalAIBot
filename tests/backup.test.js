@@ -30,6 +30,28 @@ test('redactSettings removes every secret and keeps the rest', () => {
   assert.equal(hasSecrets({ language: 'th', mcpServers: [] }), false);
 });
 
+test('redactSettings recursively removes OAuth tokens and sensitive headers but keeps public config', () => {
+  const config = {
+    mcpServers: [{
+      apiKey: 'server-key',
+      oauth: { tokenUrl: 'https://user:pass@example.test/token?client_secret=url-secret&scope=read', clientSecret: 'client-secret', refreshToken: 'refresh' },
+      headers: { Authorization: 'Bearer access', 'X-API-Key': 'header-key', 'X-Trace-Id': 'trace-1' },
+    }],
+  };
+  const out = redactSettings(config);
+  assert.equal(out.mcpServers[0].apiKey, '');
+  assert.equal(out.mcpServers[0].oauth.clientSecret, '');
+  assert.equal(out.mcpServers[0].oauth.refreshToken, '');
+  assert.equal(out.mcpServers[0].oauth.tokenUrl, 'https://example.test/token?client_secret=&scope=read');
+  assert.equal(out.mcpServers[0].headers.Authorization, '');
+  assert.equal(out.mcpServers[0].headers['X-API-Key'], '');
+  assert.equal(out.mcpServers[0].headers['X-Trace-Id'], 'trace-1');
+  assert.equal(hasSecrets(config), true);
+  assert.equal(hasSecrets(out), false);
+  assert.equal(hasSecrets({ serverUrl: 'https://user:pass@example.test/?access_token=abc' }), true);
+  assert.equal(hasSecrets(redactSettings({ serverUrl: 'https://user:pass@example.test/?access_token=abc' })), false);
+});
+
 test('createBackup produces a checksummed schema-2 payload without secrets', () => {
   const b = createBackup(state, { now: Date.parse('2026-11-10T00:00:00Z'), version: '2.2.0' });
   assert.equal(b.app, BACKUP_APP);
@@ -249,18 +271,33 @@ test('planRestore replace mode clears existing data', () => {
 });
 
 test('redacted restore keeps current provider and matched MCP credentials in merge and replace', () => {
-  const redacted = createBackup({ settings: { language: 'en', apiKey: '', ttsApiKey: '', syncToken: '', mcpServers: [{ id: 'm1', name: 'One', apiKey: '' }] } });
-  const local = { settings: { language: 'th', apiKey: 'local-api', ttsApiKey: 'local-tts', syncToken: 'local-sync', mcpServers: [{ id: 'm1', name: 'One', apiKey: 'local-mcp' }] } };
+  const redacted = createBackup({ settings: { language: 'en', apiKey: '', ttsApiKey: '', syncToken: '', mcpServers: [{
+    id: 'm1', name: 'One', apiKey: '', url: 'https://user:pw@mcp.test/?api_key=url-key',
+    oauth: { tokenUrl: 'https://user:pw@auth.test/token?client_secret=url-secret', clientSecret: '', refreshToken: '' },
+    headers: { Authorization: '' },
+  }, { url: 'https://url-user:url-pass@other-mcp.test/?token=', oauth: { clientSecret: '' } }] } });
+  const local = { settings: { language: 'th', apiKey: 'local-api', ttsApiKey: 'local-tts', syncToken: 'local-sync', mcpServers: [{
+    id: 'm1', name: 'One', apiKey: 'local-mcp', url: 'https://user:pw@mcp.test/?api_key=url-key',
+    oauth: { tokenUrl: 'https://user:pw@auth.test/token?client_secret=url-secret', clientSecret: 'local-oauth-secret', refreshToken: 'local-refresh' },
+    headers: { Authorization: 'Bearer local-header' },
+  }, { url: 'https://url-user:url-pass@other-mcp.test/?token=', oauth: { clientSecret: 'url-matched-secret' } }] } };
   const merged = planRestore(redacted, local, { mode: 'merge' });
   assert.equal(merged.settings.language, 'en');
   assert.equal(merged.settings.apiKey, 'local-api');
   assert.equal(merged.settings.ttsApiKey, 'local-tts');
   assert.equal(merged.settings.syncToken, 'local-sync');
   assert.equal(merged.settings.mcpServers[0].apiKey, 'local-mcp');
+  assert.equal(merged.settings.mcpServers[0].oauth.clientSecret, 'local-oauth-secret');
+  assert.equal(merged.settings.mcpServers[0].oauth.refreshToken, 'local-refresh');
+  assert.equal(merged.settings.mcpServers[0].headers.Authorization, 'Bearer local-header');
+  assert.equal(merged.settings.mcpServers[0].oauth.tokenUrl, 'https://user:pw@auth.test/token?client_secret=url-secret');
+  assert.equal(merged.settings.mcpServers[1].oauth.clientSecret, 'url-matched-secret');
   assert.ok(merged.warnings.some((warning) => /credentials/.test(warning)));
   const replaced = planRestore(redacted, local, { mode: 'replace' });
   assert.equal(replaced.settings.apiKey, 'local-api');
   assert.equal(replaced.settings.mcpServers[0].apiKey, 'local-mcp');
+  assert.equal(replaced.settings.mcpServers[0].oauth.clientSecret, 'local-oauth-secret');
+  assert.equal(replaced.settings.mcpServers[0].headers.Authorization, 'Bearer local-header');
   const explicit = createBackup({ settings: { apiKey: 'file-api', mcpServers: [{ id: 'm1', apiKey: 'file-mcp' }] } }, { includeSecrets: true });
   const included = planRestore(explicit, local);
   assert.equal(included.settings.apiKey, 'file-api');
