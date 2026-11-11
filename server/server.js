@@ -19,6 +19,7 @@ import {
 } from './bots.js';
 import { normalizeTask, nextOccurrence, mergeTaskLists } from '../web/src/core/tasks.js';
 import { fileURLToPath } from 'node:url';
+import { writeJsonAtomically } from './atomic-json.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -53,15 +54,35 @@ const SYNC_DIR = DATA_DIR;
 const SYNC_FILE = path.join(SYNC_DIR, 'sync.json');
 const SYNC_TOKEN = process.env.NO7_SYNC_TOKEN || '';
 
+let syncMemory = null;
 function readSync() {
-  try { return JSON.parse(fs.readFileSync(SYNC_FILE, 'utf8')); } catch { return null; }
+  if (syncMemory) return syncMemory;
+  try {
+    const saved = JSON.parse(fs.readFileSync(SYNC_FILE, 'utf8'));
+    if (isSyncBundle(saved)) syncMemory = saved;
+  } catch { /* not created or unreadable */ }
+  return syncMemory;
 }
 function writeSync(data) {
-  try {
-    fs.mkdirSync(SYNC_DIR, { recursive: true });
-    fs.writeFileSync(SYNC_FILE, JSON.stringify(data, null, 2));
-    return true;
-  } catch { return false; }
+  const persisted = writeJsonAtomically(SYNC_FILE, data);
+  // Keep the current process useful even when the disk is read-only/full.
+  syncMemory = data;
+  return persisted;
+}
+function isRecord(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+function isSyncBundle(value) {
+  if (!isRecord(value)) return false;
+  const fields = ['version', 'updatedAt', 'memory', 'personas', 'calendar', 'settings', 'todos', 'notes', 'reminders', 'tasks'];
+  if (!fields.some((key) => key in value)) return false;
+  for (const key of ['personas', 'calendar', 'tasks', 'notes', 'todos', 'reminders']) {
+    if (key in value && !Array.isArray(value[key])) return false;
+  }
+  if ('settings' in value && !isRecord(value.settings)) return false;
+  if ('memory' in value && (!isRecord(value.memory)
+    || ('facts' in value.memory && !Array.isArray(value.memory.facts)))) return false;
+  return true;
 }
 /* ---------------- Reminders pushed by the server ----------------
  * ไคลเอนต์ PUT งานที่มีเวลามาที่นี่ → server ตรวจทุก TICK และ
@@ -81,11 +102,7 @@ function readReminders() {
 }
 
 function writeReminders(data) {
-  try {
-    fs.mkdirSync(SYNC_DIR, { recursive: true });
-    fs.writeFileSync(REMINDER_FILE, JSON.stringify(data, null, 2));
-    return true;
-  } catch { return false; }
+  return writeJsonAtomically(REMINDER_FILE, data);
 }
 
 let reminderState = readReminders();
@@ -1077,7 +1094,11 @@ async function handleApi(req, res, url) {
       return json(res, 200, data);
     }
     if (req.method === 'PUT') {
-      const body = await readBody(req, 5_000_000);
+      let body;
+      try { body = await readBody(req, 5_000_000); } catch (error) {
+        return json(res, 400, { error: error.message });
+      }
+      if (!isSyncBundle(body)) return json(res, 400, { error: 'รูปแบบ sync bundle ไม่ถูกต้อง' });
       const saved = writeSync({ ...body, serverAt: new Date().toISOString() });
       return json(res, 200, { ok: true, persisted: saved, updatedAt: body.updatedAt || null });
     }

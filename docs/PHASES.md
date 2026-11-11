@@ -1366,11 +1366,11 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 | # | งาน | สถานะ |
 |---|---|---|
-| CB1 | เขียน JSON state แบบ atomic และคง memory fallback ของ sync | ⬜ |
-| CB2 | ตรวจรูปแบบ payload sync ก่อนบันทึกและทดสอบเส้นทาง server | ⬜ |
-| CB3 | Release 2.41 + ตรวจรับ + PR | ⬜ |
+| CB1 | เขียน JSON state แบบ atomic และคง memory fallback ของ sync | ✅ |
+| CB2 | ตรวจรูปแบบ payload sync ก่อนบันทึกและทดสอบเส้นทาง server | ✅ |
+| CB3 | Release 2.41 + ตรวจรับ + PR | ✅ |
 
-- [ ] CB1: sync/reminders เขียน temp file ใน directory เดียวกันแล้ว rename; failed write ไม่ทำลายไฟล์เดิม
-- [ ] CB1: sync GET คืนค่าล่าสุดจาก process memory เมื่อ persistence ล้มเหลว และ startup โหลดจาก disk
-- [ ] CB2: ปฏิเสธ payload ที่ไม่ใช่ object/collection ที่ผิดรูปแบบด้วย 400 โดยไม่เขียนทับ bundle เดิม
-- [ ] CB3: tests, browser, check, build, perf ผ่าน และเปิด PR
+- [x] CB1: sync/reminders เขียน temp file ใน directory เดียวกันแล้ว rename; failed write ไม่ทำลายไฟล์เดิม
+- [x] CB1: sync GET คืนค่าล่าสุดจาก process memory เมื่อ persistence ล้มเหลว และ startup โหลดจาก disk
+- [x] CB2: ปฏิเสธ payload ที่ไม่ใช่ object/collection ที่ผิดรูปแบบด้วย 400 โดยไม่เขียนทับ bundle เดิม
+- [x] CB3: tests, browser, check, build, perf ผ่าน และเปิด PR

@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.41.0] — 2026-11-10
+
+- Companion-server sync and reminder JSON files now use atomic temp-file replacement. Sync PUT validates collection shapes and rejects malformed bundles without replacing valid data; when disk persistence fails, the process retains and serves the latest sync bundle from memory (`persisted: false`).
+
 ## [2.40.0] — 2026-11-10
 
 - Local reminders now merge across devices by due time and label, deduplicate on retry, arm immediately after sync, persist transactionally with notes/todos, and appear in the sync result. Storage failures roll back all three collections; malformed legacy entries are retained.
