@@ -2,6 +2,19 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.18.0] — 2026-11-10
+
+รอบที่ยี่สิบสาม: ขยายการเข้าถึง conversation archive ให้ครบ log ในเครื่อง
+
+### เปลี่ยน
+- archive โหลดเพิ่มครั้งละ 50 ได้ครบสูงสุด 800 ข้อความ (เท่ากับ memory log cap) จากเดิม 200
+- เมื่อข้อมูลผิดปกติเกิน 800 แสดงจำนวนที่แสดงและซ่อนปุ่มเมื่อถึงขีดจำกัด
+- เพิ่ม browser smoke ยืนยัน HTML ในข้อความไม่ถูก execute และ search/filter ไม่เขียน storage
+
+### ตรวจรับ
+- 456 unit tests · 170 browser checks · `npm run check` 118 JS files
+- Performance/build ผ่าน; source ใหญ่สุด 149.9 KB; main gzip 108.2 KB
+
 ## [2.17.0] — 2026-11-10
 
 รอบที่ยี่สิบสอง: เพิ่มหน้าอ่าน/ค้นหา conversation archive ที่เก็บในเครื่อง

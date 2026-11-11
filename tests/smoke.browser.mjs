@@ -297,7 +297,7 @@ const backupPayload = {
     settings: { language: 'th', uiLang: 'th', apiKey: '', ttsApiKey: '', syncToken: '' },
     facts: [{ id: 'imp-1', text: 'ความจำจากการนำเข้า', ts: Date.now(), importance: 2 }],
     log: [], notes: [{ text: 'โน้ตจากไฟล์สำรอง', ts: Date.now() }], todos: [], tasks: [], events: [],
-    log: [{ role: 'user', text: 'ข้อความสำรองทดสอบ', ts: 5000, extra: 'strip' }, { role: 'assistant', text: 'คำตอบสำรองทดสอบ', ts: 6000 }, { role: 'tool', text: 'invalid role', ts: 7000 }],
+    log: [{ role: 'user', text: 'ข้อความสำรองทดสอบ', ts: 5000, extra: 'strip' }, { role: 'assistant', text: 'คำตอบสำรองทดสอบ', ts: 6000 }, { role: 'user', text: '<img src=x onerror=alert(1)>', ts: 7000 }, { role: 'tool', text: 'invalid role', ts: 8000 }],
     healthHistory: [{ date: new Date().toISOString().slice(0, 10), score: 41, grade: 'D', issues: { high: 1, medium: 2, low: 3 }, privateText: 'must stay private' }],
     personas: [{ id: 'p-smoketest1', name: 'จากไฟล์สำรอง', system: 'ตัวตนที่นำเข้ามา', desc: 'persona custom', gender: 'neutral', createdAt: Date.now(), updatedAt: Date.now(), extra: 'strip' }],
   },
@@ -317,6 +317,15 @@ const restoredCustomPersonas = JSON.parse(window.localStorage.getItem('no7.perso
 check('backup: custom persona restored and unknown fields stripped', restoredCustomPersonas.some((p) => p.id === 'p-smoketest1' && p.name === 'จากไฟล์สำรอง') && !JSON.stringify(restoredCustomPersonas).includes('strip'));
 $('#nav button[data-view="memory"]').click();
 check('memory archive: restored chat log is searchable and local', $('#chat-archive').textContent.includes('ข้อความสำรองทดสอบ') && !$('#chat-archive').textContent.includes('invalid role'));
+check('memory archive: message HTML is rendered as text', !$('#chat-archive').querySelector('img') && $('#chat-archive').textContent.includes('<img src=x onerror=alert(1)>'));
+const archiveStorageBeforeSearch = window.localStorage.getItem('no7.memory.v2');
+$('#chat-archive [data-archive-query]').value = 'สำรอง';
+$('#chat-archive [data-archive-query]').dispatchEvent(new window.Event('input', { bubbles: true }));
+$('#chat-archive [data-archive-role]').value = 'assistant';
+$('#chat-archive [data-archive-role]').dispatchEvent(new window.Event('change', { bubbles: true }));
+check('memory archive: search/filter do not write memory storage', window.localStorage.getItem('no7.memory.v2') === archiveStorageBeforeSearch);
+$('#chat-archive [data-archive-query]').value = '';
+$('#chat-archive [data-archive-query]').dispatchEvent(new window.Event('input', { bubbles: true }));
 $('#mem-query').value = 'นำเข้า';
 $('#mem-search-btn').click();
 check('backup: imported fact searchable', $('#mem-results').textContent.includes('ความจำจากการนำเข้า'), $('#mem-results').textContent.slice(0, 60));

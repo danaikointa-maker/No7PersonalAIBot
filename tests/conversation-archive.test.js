@@ -25,11 +25,22 @@ test('conversation archive searches case-insensitively and filters speaker', () 
   assert.equal(filterConversationLog(log, { role: 'tool' }).total, 0);
 });
 
-test('conversation archive caps page size and reports more records', () => {
-  const many = Array.from({ length: 65 }, (_, i) => ({ role: 'user', text: `message ${i}`, ts: i + 1 }));
-  const result = filterConversationLog(many, { limit: 50 });
-  assert.equal(result.items.length, 50);
-  assert.equal(result.total, 65);
+test('conversation archive paginates beyond 200 up to the complete 800-entry memory log', () => {
+  const many = Array.from({ length: 800 }, (_, i) => ({ role: 'user', text: `message ${i}`, ts: i + 1 }));
+  const first = filterConversationLog(many, { limit: 50 });
+  assert.equal(first.items.length, 50);
+  assert.equal(first.total, 800);
+  assert.equal(first.hasMore, true);
+  assert.equal(filterConversationLog(many, { limit: 200 }).items.length, 200);
+  const full = filterConversationLog(many, { limit: 800 });
+  assert.equal(full.items.length, 800);
+  assert.equal(full.hasMore, false);
+});
+
+test('conversation archive reports when source log exceeds the 800-entry display cap', () => {
+  const many = Array.from({ length: 850 }, (_, i) => ({ role: 'user', text: `message ${i}`, ts: i + 1 }));
+  const result = filterConversationLog(many, { limit: 999 });
+  assert.equal(result.items.length, 800);
+  assert.equal(result.total, 850);
   assert.equal(result.hasMore, true);
-  assert.equal(filterConversationLog(many, { limit: 500 }).items.length, 65);
 });

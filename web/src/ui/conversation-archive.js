@@ -8,7 +8,7 @@ export function filterConversationLog(log, { query = '', role = 'all', limit = 5
     .filter((item) => (role === 'all' || item.role === role)
       && (!normalizedQuery || item.text.toLocaleLowerCase().includes(normalizedQuery)))
     .sort((a, b) => b.ts - a.ts);
-  const size = Math.max(1, Math.min(200, Math.trunc(Number(limit) || 50)));
+  const size = Math.max(1, Math.min(800, Math.trunc(Number(limit) || 50)));
   return { items: rows.slice(0, size), total: rows.length, hasMore: rows.length > size };
 }
 
@@ -29,8 +29,8 @@ export function mountConversationArchive(root, getLog, getLang = () => 'th') {
   function render() {
     const english = String(getLang()).toLowerCase().startsWith('en');
     const text = english
-      ? { title: '💬 Conversation archive', privacy: 'Stored on this device only. Search does not send messages to AI or the network.', search: 'Search saved messages…', all: 'All speakers', user: 'You', assistant: 'No7', empty: 'No matching saved messages.', shown: (count, total) => `Showing ${count} of ${total}`, more: 'Load 50 more' }
-      : { title: '💬 ประวัติบทสนทนา', privacy: 'เก็บในเครื่องนี้เท่านั้น การค้นหาไม่ส่งข้อความให้ AI หรือเครือข่าย', search: 'ค้นหาข้อความที่บันทึก…', all: 'ทุกคน', user: 'ผู้ใช้', assistant: 'No7', empty: 'ไม่พบข้อความที่ตรงกัน', shown: (count, total) => `แสดง ${count} จาก ${total} ข้อความ`, more: 'โหลดเพิ่ม 50 ข้อความ' };
+      ? { title: '💬 Conversation archive', privacy: 'Stored on this device only. Search does not send messages to AI or the network.', search: 'Search saved messages…', all: 'All speakers', user: 'You', assistant: 'No7', empty: 'No matching saved messages.', shown: (count, total) => `Showing ${count} of ${total}`, capped: (count, total) => `Showing latest ${count} of ${total}; memory stores up to 800 messages.`, more: 'Load 50 more' }
+      : { title: '💬 ประวัติบทสนทนา', privacy: 'เก็บในเครื่องนี้เท่านั้น การค้นหาไม่ส่งข้อความให้ AI หรือเครือข่าย', search: 'ค้นหาข้อความที่บันทึก…', all: 'ทุกคน', user: 'ผู้ใช้', assistant: 'No7', empty: 'ไม่พบข้อความที่ตรงกัน', shown: (count, total) => `แสดง ${count} จาก ${total} ข้อความ`, capped: (count, total) => `แสดง ${count} จาก ${total} ข้อความ (ความจำเก็บได้สูงสุด 800 ข้อความ)`, more: 'โหลดเพิ่ม 50 ข้อความ' };
     root.setAttribute('aria-label', text.title);
     root.querySelector('[data-archive-title]').textContent = text.title;
     root.querySelector('[data-archive-privacy]').textContent = text.privacy;
@@ -41,7 +41,8 @@ export function mountConversationArchive(root, getLog, getLang = () => 'th') {
     role.options[1].textContent = text.user;
     role.options[2].textContent = text.assistant;
     const result = filterConversationLog(getLog(), { query: query.value, role: role.value, limit });
-    status.textContent = result.total ? text.shown(result.items.length, result.total) : text.empty;
+    const capped = result.hasMore && limit >= 800;
+    status.textContent = result.total ? (capped ? text.capped(result.items.length, result.total) : text.shown(result.items.length, result.total)) : text.empty;
     list.replaceChildren();
     for (const item of result.items) {
       const row = document.createElement('article');
@@ -60,12 +61,12 @@ export function mountConversationArchive(root, getLog, getLang = () => 'th') {
       row.append(header, body);
       list.appendChild(row);
     }
-    more.hidden = !result.hasMore;
+    more.hidden = !result.hasMore || limit >= 800;
     more.textContent = text.more;
   }
   query.addEventListener('input', () => { limit = 50; render(); });
   role.addEventListener('change', () => { limit = 50; render(); });
-  more.addEventListener('click', () => { limit = Math.min(200, limit + 50); render(); });
+  more.addEventListener('click', () => { limit = Math.min(800, limit + 50); render(); });
   render();
   return render;
 }
