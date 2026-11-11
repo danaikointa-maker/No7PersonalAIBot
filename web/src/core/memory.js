@@ -311,6 +311,30 @@ export class MemoryStore {
       this.addFact(text, { importance: raw.importance || 1, pinned: !!raw.pinned, source: raw.source || 'import' });
       if (this.facts.length > before) result.added++; else result.merged++;
     }
+    const byLogId = new Map();
+    for (const raw of (merge ? this.log : []).slice(-MAX_LOG)) {
+      if (!raw || !['user', 'assistant'].includes(raw.role) || typeof raw.text !== 'string' || !raw.text.trim()) continue;
+      const ts = Number(raw.ts);
+      if (!Number.isFinite(ts) || ts <= 0) continue;
+      const item = { role: raw.role, text: raw.text.slice(0, 2000), ts: Math.trunc(ts) };
+      byLogId.set(JSON.stringify([item.role, item.ts, item.text]), item);
+    }
+    result.logAdded = 0;
+    result.logSkipped = 0;
+    for (const raw of Array.isArray(payload?.log) ? payload.log.slice(-MAX_LOG * 2) : []) {
+      if (!raw || !['user', 'assistant'].includes(raw.role) || typeof raw.text !== 'string' || !raw.text.trim()) {
+        result.logSkipped++;
+        continue;
+      }
+      const ts = Number(raw.ts);
+      if (!Number.isFinite(ts) || ts <= 0) { result.logSkipped++; continue; }
+      const item = { role: raw.role, text: raw.text.slice(0, 2000), ts: Math.trunc(ts) };
+      const id = JSON.stringify([item.role, item.ts, item.text]);
+      if (byLogId.has(id)) continue;
+      byLogId.set(id, item);
+      result.logAdded++;
+    }
+    this.log = [...byLogId.values()].sort((a, b) => a.ts - b.ts).slice(-MAX_LOG);
     this._persist();
     return result;
   }

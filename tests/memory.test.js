@@ -121,6 +121,24 @@ test('import merges duplicates instead of doubling', () => {
   assert.equal(mem.listFacts()[0].importance, 5);
 });
 
+test('importData merges sanitized chat log by role, timestamp and full text with a hard cap', () => {
+  const mem = fresh();
+  const entry = { role: 'user', text: 'restored question', ts: 1000, secret: 'strip' };
+  const result = mem.importData({ log: [entry, { ...entry, role: 'tool' }, { role: 'assistant', text: 'answer', ts: 2000 }] });
+  assert.equal(result.logAdded, 2);
+  assert.equal(result.logSkipped, 1);
+  assert.deepEqual(mem.recentLog(), [
+    { role: 'user', text: 'restored question', ts: 1000 },
+    { role: 'assistant', text: 'answer', ts: 2000 },
+  ]);
+  mem.importData({ log: [entry] });
+  assert.equal(mem.recentLog().length, 2, 'same identity does not duplicate');
+  const large = Array.from({ length: 810 }, (_, i) => ({ role: 'user', text: `line ${i}`, ts: 3000 + i }));
+  mem.importData({ log: large });
+  assert.equal(mem.recentLog(1000).length, 800);
+  assert.equal(mem.recentLog(1)[0].text, 'line 809');
+});
+
 test('stats reports facts, pinned, log and average importance', () => {
   const mem = fresh();
   mem.addFact('a b c', 2);

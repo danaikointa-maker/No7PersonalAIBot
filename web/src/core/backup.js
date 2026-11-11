@@ -16,7 +16,7 @@ export const SETTINGS_SECRET_KEYS = ['apiKey', 'ttsApiKey', 'syncToken'];
 /** คอลเลกชันที่สำรอง + คีย์หลัก/เวลาสำหรับ merge */
 export const COLLECTIONS = {
   facts: { label: 'ความจำ', key: (f) => f.id || f.text, ts: (f) => Number(f.ts) || 0 },
-  log: { label: 'บันทึกบทสนทนา', key: (l) => `${l.role}:${l.ts}:${String(l.text).slice(0, 24)}`, ts: (l) => Number(l.ts) || 0 },
+  log: { label: 'บันทึกบทสนทนา', key: (l) => JSON.stringify([l.role, l.ts, l.text]), ts: (l) => Number(l.ts) || 0 },
   notes: { label: 'โน้ต', key: (n) => `${n.ts}:${n.text}`, ts: (n) => Number(n.ts) || 0 },
   todos: { label: 'รายการ', key: (t) => `${t.ts || t.createdAt}:${t.text || t.title}`, ts: (t) => Number(t.ts || t.createdAt) || 0 },
   tasks: { label: 'งาน', key: (t) => t.id || t.title, ts: (t) => Date.parse(t.updatedAt || t.createdAt || '') || 0 },
@@ -48,6 +48,20 @@ function checksumOf(payload) {
   return fnvHash(body);
 }
 
+export function normalizeBackupLog(input, limit = 800) {
+  if (!Array.isArray(input)) return [];
+  const unique = new Map();
+  for (const raw of input.slice(-Math.max(limit * 2, 500))) {
+    if (!raw || typeof raw !== 'object' || !['user', 'assistant'].includes(raw.role)) continue;
+    if (typeof raw.text !== 'string' || !raw.text.trim()) continue;
+    const ts = Number(raw.ts);
+    if (!Number.isFinite(ts) || ts <= 0) continue;
+    const item = { role: raw.role, text: raw.text.slice(0, 2000), ts: Math.trunc(ts) };
+    unique.set(JSON.stringify([item.role, item.ts, item.text]), item);
+  }
+  return [...unique.values()].sort((a, b) => a.ts - b.ts).slice(-limit);
+}
+
 /**
  * สร้างไฟล์สำรอง
  * @param {{settings?:object, facts?:object[], log?:object[], notes?:object[], todos?:object[], tasks?:object[], events?:object[], personas?:object[], healthHistory?:object[]}} state
@@ -58,7 +72,7 @@ export function createBackup(state = {}, { now = Date.now(), includeSecrets = fa
   const data = {
     settings,
     facts: state.facts || [],
-    log: (state.log || []).slice(-500),
+    log: normalizeBackupLog(state.log, 500),
     notes: state.notes || [],
     todos: state.todos || [],
     tasks: state.tasks || [],
@@ -214,10 +228,11 @@ export function planRestore(backup = {}, local = {}, { mode = 'merge' } = {}) {
   for (const [key, meta] of Object.entries(COLLECTIONS)) {
     const rawIncoming = Array.isArray(data[key]) ? data[key] : [];
     const rawExisting = Array.isArray(local[key]) ? local[key] : [];
-    const sanitize = (items) => key === 'healthHistory'
+    const sanitize = (items, logLimit = 800) => key === 'healthHistory'
       ? normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: items }).snapshots
-      : key === 'personas' ? normalizeImportedPersonas(items) : items;
-    const incoming = sanitize(rawIncoming);
+      : key === 'personas' ? normalizeImportedPersonas(items)
+        : key === 'log' ? normalizeBackupLog(items, logLimit) : items;
+    const incoming = sanitize(rawIncoming, 500);
     const existing = sanitize(rawExisting);
     if (mode === 'replace') {
       values[key] = incoming;

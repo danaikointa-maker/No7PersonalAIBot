@@ -57,7 +57,7 @@
 
 | ฟังก์ชัน | หน้าที่ |
 |---|---|
-| `createBackup(state, {includeSecrets, version})` | สร้าง payload + counts + checksum |
+| `createBackup(state, {includeSecrets, version})` | สร้าง payload + counts + checksum; log ถูก normalize และจำกัด 500 |
 | `redactSettings` / `hasSecrets` | ตัด/ตรวจความลับ |
 | `validateBackup(input)` | รับ string/object → `{ok, errors, warnings, backup, migrated}` |
 | `migrateBackup(input)` | รองรับ export รุ่นเก่า (ก่อนมี `app/schema`) |
@@ -68,7 +68,7 @@
 
 ## 5) ข้อจำกัด
 
-- `log` (ประวัติแชท) ถูกเขียนลงไฟล์ แต่การนำเข้าใช้เฉพาะ `facts` — ประวัติแชทไม่ถูกกู้
+- `log` สำรอง 500 ข้อความล่าสุดและ restore เข้า memory store (สูงสุด 800); รับเฉพาะ role `user`/`assistant`, text ≤ 2,000 ตัวอักษร และ timestamp ที่ใช้ได้; ฟิลด์ metadata อื่นถูกทิ้ง
 - ไฟล์สำรองไม่รวม: ปลั๊กอินที่ผู้ใช้เพิ่ม (อยู่ใน settings → รวมแล้ว), ข้อมูลใน server/Telegram
 - `personas` รวมเฉพาะ Persona Studio ที่ผู้ใช้สร้างเอง; built-in ถูกป้องกันไม่ให้เขียนทับ และจำกัด 100 รายการพร้อม sanitize ฟิลด์ก่อน merge
 - `healthHistory` เป็นข้อมูลสรุปในเครื่องเท่านั้น; ไม่มีการอัปโหลดอัตโนมัติและรวมในไฟล์เฉพาะเมื่อผู้ใช้กดส่งออกข้อมูล

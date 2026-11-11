@@ -2,6 +2,20 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.14.0] — 2026-11-10
+
+รอบที่สิบเก้า: กู้คืน chat log จากไฟล์สำรองได้หลังยืนยัน พร้อม normalize ข้อมูล
+
+### เพิ่ม
+- สำรอง 500 ข้อความล่าสุด; restore merge/replace เข้า local memory log สูงสุด 800 รายการ
+- รับเฉพาะ role `user`/`assistant`, text สูงสุด 2,000 ตัวอักษร และ timestamp ถูกต้อง; ตัด metadata อื่นออก
+- merge ด้วย role + timestamp + ข้อความเต็ม เรียงตามเวลา และกันรายการซ้ำ
+- memory JSON import รองรับ chat log ด้วย พร้อมแสดงจำนวนที่เพิ่ม; full restore แสดงจำนวน log ในผลลัพธ์
+
+### ตรวจรับ
+- 449 unit tests · 165 browser checks · `npm run check` 116 JS files
+- Performance/build ผ่าน; source ใหญ่สุด 149.9 KB; main gzip 106.1 KB
+
 ## [2.13.0] — 2026-11-10
 
 รอบที่สิบแปด: รวม custom personas ในไฟล์สำรอง/กู้คืนข้อมูลทั้งแอปอย่างปลอดภัย
