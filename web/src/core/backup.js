@@ -6,6 +6,7 @@
 //   • กู้คืนได้ 2 แบบ: merge (รวม, last-write-wins) หรือ replace (แทนที่ทั้งหมด)
 //   • ไฟล์ export รุ่นเก่า (ก่อนมี schema) ยังนำเข้าได้ (migrate ให้)
 import { fnvHash } from './memory.js';
+import { HEALTH_HISTORY_SCHEMA, normalizeHealthHistory } from './health-history.js';
 
 export const BACKUP_APP = 'no7-personal-ai';
 export const BACKUP_SCHEMA = 2;
@@ -20,6 +21,7 @@ export const COLLECTIONS = {
   tasks: { label: 'งาน', key: (t) => t.id || t.title, ts: (t) => Date.parse(t.updatedAt || t.createdAt || '') || 0 },
   events: { label: 'นัดหมาย', key: (e) => e.uid || `${e.start}:${e.title}`, ts: (e) => Number(e.start) || 0 },
   personas: { label: 'persona', key: (p) => p.id, ts: (p) => Number(p.updatedAt || p.createdAt) || 0 },
+  healthHistory: { label: 'ประวัติสุขภาพ', key: (item) => item.date, ts: (item) => Date.parse(`${item.date}T00:00:00Z`) || 0 },
 };
 
 export const SECRET_PLACEHOLDER = '';
@@ -47,7 +49,7 @@ function checksumOf(payload) {
 
 /**
  * สร้างไฟล์สำรอง
- * @param {{settings?:object, facts?:object[], log?:object[], notes?:object[], todos?:object[], tasks?:object[], events?:object[], personas?:object[]}} state
+ * @param {{settings?:object, facts?:object[], log?:object[], notes?:object[], todos?:object[], tasks?:object[], events?:object[], personas?:object[], healthHistory?:object[]}} state
  * @param {{now?:number, includeSecrets?:boolean, version?:string}} [opts]
  */
 export function createBackup(state = {}, { now = Date.now(), includeSecrets = false, version = '' } = {}) {
@@ -61,6 +63,7 @@ export function createBackup(state = {}, { now = Date.now(), includeSecrets = fa
     tasks: state.tasks || [],
     events: state.events || [],
     personas: state.personas || [],
+    healthHistory: normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: state.healthHistory || [] }).snapshots,
   };
   const counts = Object.fromEntries(Object.keys(COLLECTIONS).map((k) => [k, Array.isArray(data[k]) ? data[k].length : 0]));
   const payload = {
@@ -208,15 +211,23 @@ export function planRestore(backup = {}, local = {}, { mode = 'merge' } = {}) {
   if (!['merge', 'replace'].includes(mode)) mode = 'merge';
 
   for (const [key, meta] of Object.entries(COLLECTIONS)) {
-    const incoming = Array.isArray(data[key]) ? data[key] : [];
-    const existing = Array.isArray(local[key]) ? local[key] : [];
+    const rawIncoming = Array.isArray(data[key]) ? data[key] : [];
+    const rawExisting = Array.isArray(local[key]) ? local[key] : [];
+    const incoming = key === 'healthHistory'
+      ? normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: rawIncoming }).snapshots
+      : rawIncoming;
+    const existing = key === 'healthHistory'
+      ? normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: rawExisting }).snapshots
+      : rawExisting;
     if (mode === 'replace') {
       values[key] = incoming;
       actions.push({ key, label: meta.label, mode, incoming: incoming.length, existing: existing.length, added: incoming.length, updated: 0, removed: existing.length, total: incoming.length });
       continue;
     }
     const merged = mergeRecords(existing, incoming, meta);
-    values[key] = merged.list;
+    values[key] = key === 'healthHistory'
+      ? normalizeHealthHistory({ schema: HEALTH_HISTORY_SCHEMA, snapshots: merged.list }).snapshots
+      : merged.list;
     actions.push({
       key, label: meta.label, mode,
       incoming: incoming.length,
@@ -225,7 +236,8 @@ export function planRestore(backup = {}, local = {}, { mode = 'merge' } = {}) {
       updated: merged.updated,
       kept: merged.kept,
       removed: 0,
-      total: merged.list.length,
+      trimmed: key === 'healthHistory' ? Math.max(0, merged.list.length - values[key].length) : 0,
+      total: values[key].length,
     });
   }
 
@@ -260,7 +272,7 @@ export function describePlan(plan) {
     if (!a.incoming && !a.existing) continue;
     lines.push(plan.mode === 'replace'
       ? `• ${a.label}: ${a.existing} → ${a.total}`
-      : `• ${a.label}: เพิ่ม ${a.added} · อัปเดต ${a.updated} · คงเดิม ${a.kept ?? 0} (รวม ${a.total})`);
+      : `• ${a.label}: เพิ่ม ${a.added} · อัปเดต ${a.updated} · คงเดิม ${a.kept ?? 0}${a.trimmed ? ` · ตัดเก่าสุด ${a.trimmed}` : ''} (รวม ${a.total})`);
   }
   lines.push(`รวม: +${plan.totals.added} ใหม่ · ${plan.totals.updated} อัปเดต${plan.totals.removed ? ` · ลบ ${plan.totals.removed}` : ''}`);
   return lines.join('\n');

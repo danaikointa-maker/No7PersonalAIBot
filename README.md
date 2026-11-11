@@ -1,4 +1,4 @@
-# No7 Personal AI Bot `v2.11`
+# No7 Personal AI Bot `v2.12`
 
 > ผู้ช่วย AI ส่วนตัวที่ **โค้ดชุดเดียวกันรันได้ทั้งมือถือและ PC** — พูดไทยก่อน ฟังได้ด้วยเสียง มีความจำระยะยาว
 > เรียกเครื่องมือจริง ทำงานหลายก้าวได้ ซิงก์ข้ามเครื่อง และสั่งงานอุปกรณ์ผ่าน HMAC
@@ -22,15 +22,15 @@ npm run build         # dist/ ชุดเดียวสำหรับ PWA + E
 npm run server        # companion server: static + AI proxy + tools + sync + phone-link
 npm run desktop       # เปิดเป็นแอปเดสก์ท็อป (Electron)
 npm run mobile:sync   # ซิงก์ dist/ เข้าโปรเจค Android/iOS
-npm test              # 439 unit tests
-npm run test:browser  # 161 end-to-end checks (รันแอปจริงใน jsdom)
+npm test              # 442 unit tests
+npm run test:browser  # 163 end-to-end checks (รันแอปจริงใน jsdom)
 npm run check         # syntax + structure check
 npm run perf          # performance budget (ขนาด bundle/source)
 ```
 
 ---
 
-## ทำอะไรได้ (v2.11)
+## ทำอะไรได้ (v2.12)
 
 ### 🎭 เลือกได้ทั้งหมด — 5 บทบาทในที่เดียว
 `✨ ทั้งหมด` (สลับบทบาทเองตามคำขอ) · `💛 เพื่อนคุย` · `💼 งาน` · `📅 ชีวิตประจำวัน` · `🏠 อุปกรณ์`
@@ -90,7 +90,7 @@ npm run perf          # performance budget (ขนาด bundle/source)
 - ↑↓/Enter/Esc, ไฮไลตคำค้น, เลือกแล้วไปถูกที่ (เช่น ค้นความจำ → เปิดหน้าความจำพร้อมคำค้น)
 
 ### 💾 สำรอง/กู้คืนที่ตรวจสอบได้
-- ไฟล์สำรอง schema 2 + checksum, **ตัด API key/token ออกเป็นค่าเริ่มต้น**
+- ไฟล์สำรอง schema 2 + checksum รวมประวัติสุขภาพแบบ summary-only; **ตัด API key/token ออกเป็นค่าเริ่มต้น**
 - นำเข้าแบบ dry-run: บอกก่อนว่าจะเพิ่ม/อัปเดตกี่รายการ แล้ว merge แบบ last-write-wins
 
 ### 🧭 เห็นทุกขั้น — และหยุดได้จริง

@@ -39,7 +39,20 @@ test('createBackup produces a checksummed schema-2 payload without secrets', () 
   assert.equal(b.includeSecrets, false);
   assert.equal(b.data.settings.apiKey, '');
   assert.ok(b.checksum);
-  assert.deepEqual(b.counts, { facts: 1, log: 1, notes: 1, todos: 1, tasks: 1, events: 1, personas: 1 });
+  assert.deepEqual(b.counts, { facts: 1, log: 1, notes: 1, todos: 1, tasks: 1, events: 1, personas: 1, healthHistory: 0 });
+});
+
+test('full backups include only normalized health-history summaries and cap at 30', () => {
+  const snapshots = Array.from({ length: 31 }, (_, i) => {
+    const date = new Date(Date.UTC(2026, 0, i + 1)).toISOString().slice(0, 10);
+    return { date, score: 80, grade: 'B', issues: { high: 1, medium: 2, low: 3 }, privateText: 'health detail' };
+  });
+  const b = createBackup({ healthHistory: snapshots });
+  assert.equal(b.data.healthHistory.length, 30);
+  assert.equal(b.data.healthHistory[0].date, '2026-01-02');
+  assert.equal(JSON.stringify(b.data.healthHistory).includes('privateText'), false);
+  assert.equal(JSON.stringify(b.data.healthHistory).includes('health detail'), false);
+  assert.equal(b.counts.healthHistory, 30);
 });
 
 test('includeSecrets keeps keys but marks the file', () => {
@@ -185,6 +198,35 @@ test('planRestore falls back to merge for unknown modes and warns about settings
   const noSettings = planRestore({ data: { facts: [] } }, {});
   assert.equal(noSettings.settings, null);
   assert.ok(noSettings.warnings.some((w) => /ไม่มี settings/.test(w)));
+});
+
+test('planRestore merges health history by day, incoming wins, and trims to 30', () => {
+  const dates = Array.from({ length: 30 }, (_, i) => ({
+    date: new Date(Date.UTC(2026, 0, i + 1)).toISOString().slice(0, 10),
+    score: 70, grade: 'C', issues: { high: 1, medium: 0, low: 0 },
+  }));
+  const backup = createBackup({ healthHistory: [
+    { ...dates[4], score: 95, privateNote: 'do not restore' },
+    { date: '2026-02-01', score: 88, grade: 'B', issues: { high: 0, medium: 0, low: 1 }, extra: 'drop' },
+  ] });
+  const plan = planRestore(backup, { healthHistory: dates });
+  const action = plan.actions.find((item) => item.key === 'healthHistory');
+  assert.equal(action.updated, 1);
+  assert.equal(action.added, 1);
+  assert.equal(action.trimmed, 1);
+  assert.equal(plan.values.healthHistory.length, 30);
+  assert.equal(plan.values.healthHistory.find((item) => item.date === dates[4].date).score, 95);
+  assert.equal(plan.values.healthHistory[0].date, '2026-01-02');
+  assert.equal(JSON.stringify(plan.values.healthHistory).includes('do not restore'), false);
+  assert.match(describePlan(plan), /ตัดเก่าสุด 1/);
+});
+
+test('planRestore replace sanitizes health history; old backups default it to empty', () => {
+  const backup = { data: { healthHistory: [{ date: '2026-02-01', score: 91, grade: 'A', issues: {}, detail: 'private' }] } };
+  const plan = planRestore(backup, { healthHistory: [{ date: '2026-01-01', score: 50 }] }, { mode: 'replace' });
+  assert.deepEqual(plan.values.healthHistory, [{ date: '2026-02-01', score: 91, grade: 'A', issues: { high: 0, medium: 0, low: 0 } }]);
+  const older = planRestore({ data: { facts: [] } }, { healthHistory: [{ date: '2026-01-01', score: 50 }] });
+  assert.deepEqual(older.values.healthHistory, [{ date: '2026-01-01', score: 50, grade: 'D', issues: { high: 0, medium: 0, low: 0 } }]);
 });
 
 test('describePlan summarises both modes', () => {

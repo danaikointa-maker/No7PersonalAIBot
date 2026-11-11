@@ -1945,7 +1945,7 @@ async function renderDiagnostics() {
   const report = buildDiagnosticsReport({
     app: {
       name: 'No7 Personal AI',
-      version: window.NO7_VERSION || '2.11.0',
+      version: window.NO7_VERSION || '2.12.0',
       platform: platformLabel(platform),
       userAgent: navigator.userAgent,
     },
@@ -3051,6 +3051,7 @@ function collectBackupState() {
     tasks: tasks.list({ done: null }),
     events: calendar.all(),
     personas: [],
+    healthHistory: readHealthHistory().snapshots,
   };
 }
 
@@ -3065,7 +3066,7 @@ $('#export-btn').addEventListener('click', () => {
     includeSecrets: false,
     version: window.NO7_VERSION || '',
   });
-  setBackupStatus(`⬇️ สำรองข้อมูลแล้ว (schema ${BACKUP_SCHEMA} · ${backup.counts.facts} ความจำ · ${backup.counts.tasks} งาน) — ไม่มีคีย์/โทเคนติดไป`);
+  setBackupStatus(`⬇️ สำรองข้อมูลแล้ว (schema ${BACKUP_SCHEMA} · ${backup.counts.facts} ความจำ · ${backup.counts.tasks} งาน · ${backup.counts.healthHistory} ประวัติสุขภาพ) — ไม่มีคีย์/โทเคนติดไป`);
   try {
     downloadJson(backup, `no7-backup-${new Date().toISOString().slice(0, 10)}.json`);
   } catch (err) {
@@ -3082,6 +3083,7 @@ function applyRestore(plan) {
     localStorage.setItem('no7.notes.v1', JSON.stringify(plan.values.notes || []));
     localStorage.setItem('no7.todos.v1', JSON.stringify(plan.values.todos || []));
   } catch { /* พื้นที่เต็ม */ }
+  if (Array.isArray(plan.values.healthHistory)) writeHealthHistory({ schema: 1, snapshots: plan.values.healthHistory });
   if (replace) tasks.clear();
   if (plan.values.tasks?.length) tasks.merge(plan.values.tasks);
   calendar.replaceAll(plan.values.events || []);
@@ -3110,6 +3112,7 @@ function restoreFromText(text) {
     todos: readList('no7.todos.v1'),
     tasks: tasks.list({ done: null }),
     events: calendar.all(),
+    healthHistory: readHealthHistory().snapshots,
   }, { mode: 'merge' });
 
   const lines = [
