@@ -327,7 +327,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 | เฟส | ชื่อ | งานย่อย | สถานะ |
 |---|---|---|---|
 | W1 | ผลเครื่องมือแบบ progressive | 29.1–29.4 | ✅ |
-| W2 | รายงานรายสัปดาห์ | 30.1–30.4 | ⬜ |
+| W2 | รายงานรายสัปดาห์ | 30.1–30.4 | ✅ |
 | W3 | Release 2.3 | 31.1–31.3 | ⬜ |
 
 ## W1 — ผลเครื่องมือแบบ progressive (partial UI)
@@ -339,10 +339,10 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## W2 — รายงานรายสัปดาห์ (weekly review)
 
-- 30.1 `core/weekly.js`: `buildWeekly({tasks, events, facts, metrics, now})` → งานเสร็จ/สร้างใหม่/เกินกำหนด, นัดหมาย, ความจำใหม่, การใช้เครื่องมือ, ข้อเสนอโฟกัส
-- 30.2 tool `weekly` (dynamic, risk 0) + ปุ่ม "📆 รายงานสัปดาห์" + การ์ด/markdown
-- 30.3 กำหนดช่วง 7 วันตามเวลาเครื่อง + เทียบสัปดาห์ก่อน (delta)
-- 30.4 Tests + smoke + `docs/WEEKLY.md`
+- [x] 30.1 `core/weekly.js`: `buildWeekly` (ปิดได้/เพิ่มใหม่/เกินกำหนด/สัปดาห์หน้า/นัดหมาย/ความจำใหม่/เครื่องมือ+failure rate) + `focus` + sections + markdown
+- [x] 30.2 tool `weekly` (dynamic, risk 0) + ปุ่ม "📆 รายงานสัปดาห์" + `#weekly-card` + โพสต์ในแชท
+- [x] 30.3 `startOfWeek`/`weekRange` (จันทร์ 00:00, half-open) + เทียบสัปดาห์ก่อน (`deltaCompleted`)
+- [x] 30.4 `tests/weekly.test.js` (9) + smoke +4 (133 checks) + `docs/WEEKLY.md`
 
 ## W3 — Release 2.3
 

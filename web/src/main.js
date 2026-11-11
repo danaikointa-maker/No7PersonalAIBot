@@ -44,6 +44,7 @@ import { detectPlatform, platformLabel, isDesktopHost } from './core/platform.js
 import { applyI18n, langOf, viewTitle, t as tr } from './core/i18n.js';
 import { AgentTimeline, statusIcon } from './core/timeline.js';
 import { buildDigest, digestTool, shouldAutoDigest } from './core/digest.js';
+import { buildWeekly, weeklyTool } from './core/weekly.js';
 import {
   customToolDefs, validateCustomTools, PLUGIN_EXAMPLE, PLUGIN_LIMITS,
 } from './core/custom-tools.js';
@@ -72,9 +73,15 @@ const mcp = new McpRegistry({
 /** เครื่องมือ dynamic ทั้งหมด: MCP + ปลั๊กอิน HTTP + digest (ลงทะเบียนที่เดียว) */
 let pluginToolDefs = {};
 let digestToolDef = null;
+let weeklyToolDef = null;
 
 function refreshDynamicTools() {
-  const defs = { ...mcp.toolDefs(), ...pluginToolDefs, digest: digestToolDef };
+  const defs = {
+    ...mcp.toolDefs(),
+    ...pluginToolDefs,
+    digest: digestToolDef,
+    weekly: weeklyToolDef,
+  };
   registerDynamicTools(defs);
   return Object.keys(defs).length;
 }
@@ -1067,6 +1074,50 @@ function maybeAutoDigest() {
   return digest;
 }
 
+weeklyToolDef = weeklyTool({
+  tasks: { list: (opts = {}) => tasks.list(opts) },
+  calendar: { list: () => calendar.all() },
+  memory: { list: () => memory.listFacts({ sort: 'recent' }) },
+  samples: () => metrics.entries(),
+  lang: () => langOf(settings.uiLang),
+});
+
+function renderWeeklyCard(weekly, target = null) {
+  const box = $('#weekly-card');
+  const html = `<div class="digest-card weekly-card">
+    <strong>${esc(`${weekly.range.label} · ${weekly.headline}`)}</strong>
+    ${weekly.sections.map((sec) => `<div class="digest-sec">
+      <div class="digest-sec-head">${sec.emoji} ${esc(sec.title)}</div>
+      ${sec.items.map((it) => `<div class="digest-item">· ${esc(it.label)}${it.meta ? ` <small>${esc(it.meta)}</small>` : ''}</div>`).join('')}
+    </div>`).join('') || `<p class="hint">${esc(tr('weekly.empty', { lang: settings.uiLang }))}</p>`}
+  </div>`;
+  if (box) { box.innerHTML = html; box.hidden = false; }
+  if (target) {
+    const plain = [`${tr('weekly.title', { lang: settings.uiLang })} — ${weekly.range.label}`, weekly.headline]
+      .concat(weekly.sections.flatMap((sec) => [
+        `${sec.emoji} ${sec.title}`,
+        ...sec.items.map((it) => `  · ${it.label}${it.meta ? ` (${it.meta})` : ''}`),
+      ])).join('\n');
+    addMessage('bot', plain).classList.add('digest');
+  }
+  return html;
+}
+
+function showWeekly({ inChat = true } = {}) {
+  const weekly = buildWeekly({
+    tasks: tasks.list({ done: null, sort: 'priority' }),
+    events: calendar.all(),
+    facts: memory.listFacts({ sort: 'recent' }),
+    samples: metrics.entries(),
+    now: Date.now(),
+    weekStart: 1,
+    lang: langOf(settings.uiLang),
+  });
+  renderWeeklyCard(weekly, inChat ? {} : null);
+  setSubtitle(weekly.headline);
+  return weekly;
+}
+
 /* ---------------------------------------------------------------- calendar */
 const calendar = getCalendar();
 
@@ -1130,6 +1181,7 @@ $('#digest-btn')?.addEventListener('click', () => {
   const digest = showDigest({ inChat: true });
   try { localStorage.setItem(DIGEST_KEY, String(digest.date)); } catch { /* noop */ }
 });
+$('#weekly-btn')?.addEventListener('click', () => showWeekly({ inChat: true }));
 $('#set-digest-auto')?.addEventListener('change', (e) => {
   Object.assign(settings, saveSettings({ digestAuto: e.target.checked }));
   $('#settings-status').textContent = e.target.checked
