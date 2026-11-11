@@ -263,6 +263,25 @@ const stillOpen = [...$('#task-list').querySelectorAll('.fact')].some((r) => r.t
 check('journey: recurring task stays open', stillOpen, $('#task-list').textContent.slice(0, 60));
 $('#task-repeat').value = '';
 
+// HTTP tool plugins
+$('#nav button[data-view="tools"]').click();
+$('#plugin-example').click();
+await wait(10);
+$('#plugin-validate').click();
+check('plugins: example validates', $('#plugin-status').textContent.includes('ผ่านทั้งหมด 2'), $('#plugin-status').textContent);
+$('#plugin-save').click();
+await wait(20);
+check('plugins: saved to settings', (JSON.parse(window.localStorage.getItem('no7.settings.v1') || '{}').customPlugins || []).length === 2);
+check('plugins: listed in panel', $('#plugin-list').textContent.includes('เกร็ดแมว'), $('#plugin-list').textContent.slice(0, 60));
+check('plugins: tools grid grows', $('#tools-grid').children.length === 31, String($('#tools-grid').children.length));
+$('#plugin-json').value = '[{"id":"bad","label":"ไม่ดี","url":"http://insecure.example.com/x"}]';
+$('#plugin-save').click();
+check('plugins: http url rejected', $('#plugin-status').textContent.includes('❌'), $('#plugin-status').textContent.slice(0, 60));
+$('#plugin-json').value = '[]';
+$('#plugin-save').click();
+await wait(10);
+check('plugins: cleared back to 29 tools', $('#tools-grid').children.length === 29, String($('#tools-grid').children.length));
+
 // daily digest
 $('#digest-btn').click();
 await wait(30);

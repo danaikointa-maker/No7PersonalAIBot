@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS = {
   language: 'th',
   uiLang: 'th',           // ภาษาของหน้าจอ: th | en (ไม่กระทบภาษาที่ AI ตอบ)
   digestAuto: false,      // สรุปประจำวันอัตโนมัติ (ครั้งแรกของวัน หลัง 07:00)
+  customPlugins: [],      // ปลั๊กอินเครื่องมือ HTTP (JSON ที่ผ่านการตรวจแล้ว)
   polite: true,
   tts: true,
   stt: true,

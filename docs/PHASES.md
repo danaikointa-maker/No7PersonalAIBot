@@ -254,7 +254,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 |---|---|---|---|
 | U1 | Timeline + ยกเลิกกลางทาง | 22.1–22.4 | ✅ |
 | U2 | สรุปประจำวัน (digest) | 23.1–23.4 | ✅ |
-| U3 | ปลั๊กอินเครื่องมือ HTTP | 24.1–24.4 | ⬜ |
+| U3 | ปลั๊กอินเครื่องมือ HTTP | 24.1–24.4 | ✅ |
 | U4 | Release 2.1 | 25.1–25.3 | ⬜ |
 
 ## U1 — Timeline + ยกเลิกกลางทาง
@@ -273,10 +273,10 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## U3 — ปลั๊กอินเครื่องมือ HTTP
 
-- 24.1 `core/custom-tools.js`: `normalizeCustomTool` (id/ชื่อ/คำอธิบาย/วิธี/URL template/header/params), `renderTemplate`, `validateCustomTools`, `buildHttpTool`, `customToolDefs`
-- 24.2 ความปลอดภัย: https เท่านั้น (ยกเว้น `allowInsecure`), บล็อก host วงในเว้นแต่เปิด, timeout 10 วิ, จำกัดขนาด response, ไม่รับ `body` ที่ผู้ใช้ไม่ได้ประกาศ
-- 24.3 UI หน้าเครื่องมือ: ช่อง JSON + ตรวจสอบ/บันทึก + รายการที่ใช้ได้ (ผสานกับ MCP ผ่าน `refreshDynamicTools()`)
-- 24.4 Tests + smoke + `docs/PLUGINS.md`
+- [x] 24.1 `core/custom-tools.js`: `normalizeCustomTool`, `renderTemplate`, `fillArgs`, `validateCustomTools`, `buildHttpTool`, `customToolDefs`, `PLUGIN_EXAMPLE`
+- [x] 24.2 ความปลอดภัย: https (ยกเว้น `allowInsecure`), บล็อก host วงใน (`allowPrivate`), timeout 10 วิ, ตัด response 64 KB, `assertSafeUrl` ตรวจซ้ำตอนยิงจริง, ส่งเฉพาะ declared params
+- [x] 24.3 UI หน้าเครื่องมือ: `#plugin-json` + ตัวอย่าง/ตรวจสอบ/บันทึก + รายการที่ใช้ได้ (ผสาน MCP+digest ผ่าน `refreshDynamicTools()`)
+- [x] 24.4 `tests/custom-tools.test.js` (13) + smoke +6 (111 checks) + `docs/PLUGINS.md`
 
 ## U4 — Release 2.1
 

@@ -45,6 +45,9 @@ import { applyI18n, langOf, viewTitle, t as tr } from './core/i18n.js';
 import { AgentTimeline, statusIcon } from './core/timeline.js';
 import { buildDigest, digestTool, shouldAutoDigest } from './core/digest.js';
 import {
+  customToolDefs, validateCustomTools, PLUGIN_EXAMPLE, PLUGIN_LIMITS,
+} from './core/custom-tools.js';
+import {
   LOCAL_PRESETS, probeLocal, warmModel, pickBestModel, normalizeOfflineBrain,
   offlineChainSettings, describeLocalBrain, LocalModelCache,
 } from './core/local-models.js';
@@ -913,6 +916,61 @@ function downloadJson(data, filename) {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+/* ------------------------------------------------------- HTTP tool plugins */
+/** โหลดปลั๊กอินที่บันทึกไว้ → dynamic tool defs (คีย์ plugin__<id>) */
+function loadPlugins({ apply = true } = {}) {
+  const res = customToolDefs(settings.customPlugins || []);
+  pluginToolDefs = res.defs;
+  if (apply) refreshDynamicTools();
+  return res;
+}
+
+function renderPlugins() {
+  const list = $('#plugin-list');
+  if (!list) return;
+  const { tools, errors } = validateCustomTools(settings.customPlugins || []);
+  const names = tools.map((t) => `${t.emoji} ${t.label} <small>(${t.method} ${new URL(t.url).host} · risk ${t.risk})</small>`);
+  list.innerHTML = names.length
+    ? names.map((n) => `<div>• ${n}</div>`).join('')
+    : `<span>${tr('plugins.status', { lang: settings.uiLang })}</span>`;
+  if (errors.length) list.innerHTML += `<div class="hint">⚠️ ${esc(errors.join(' · '))}</div>`;
+  const box = $('#plugin-json');
+  if (box && !box.value) box.value = (settings.customPlugins || []).length ? JSON.stringify(settings.customPlugins, null, 2) : '';
+}
+
+function setPluginStatus(text) {
+  const el = $('#plugin-status');
+  if (el) el.textContent = text;
+}
+
+$('#plugin-example')?.addEventListener('click', () => {
+  const box = $('#plugin-json');
+  if (box) box.value = JSON.stringify(PLUGIN_EXAMPLE, null, 2);
+  setPluginStatus('ใส่ตัวอย่างแล้ว — กด “ตรวจสอบ” เพื่อเช็กก่อนบันทึก');
+});
+
+$('#plugin-validate')?.addEventListener('click', () => {
+  const { ok, tools, errors } = validateCustomTools($('#plugin-json')?.value || '');
+  setPluginStatus(ok
+    ? `✅ ผ่านทั้งหมด ${tools.length}/${PLUGIN_LIMITS.maxTools} เครื่องมือ`
+    : `❌ ${errors.slice(0, 3).join(' · ')}`);
+  return ok;
+});
+
+$('#plugin-save')?.addEventListener('click', () => {
+  const { ok, tools, errors } = validateCustomTools($('#plugin-json')?.value || '');
+  if (!ok) {
+    setPluginStatus(`❌ บันทึกไม่ได้: ${errors.slice(0, 2).join(' · ')}`);
+    return;
+  }
+  Object.assign(settings, saveSettings({ customPlugins: tools }));
+  pluginToolDefs = Object.fromEntries(Object.entries(customToolDefs(tools).defs));
+  refreshDynamicTools();
+  renderPlugins();
+  renderToolsGrid(true);
+  setPluginStatus(`✅ ใช้ ${tools.length} ปลั๊กอินแล้ว (เรียกได้ทั้ง AI และกดทดลองในหน้าเครื่องมือ)`);
+});
 
 /* ------------------------------------------------------------------ digest */
 const DIGEST_KEY = 'no7.digest.last';
