@@ -51,7 +51,9 @@ test('desktop packaging icons exist in the formats referenced by the build confi
   for (const platform of ['mac', 'win', 'linux']) {
     assert.ok(fs.existsSync(iconPath(platform)), `ไม่พบไฟล์ไอคอน ${build[platform].icon}`);
   }
-  assert.equal(fs.readFileSync(iconPath('mac')).toString('ascii', 0, 4), 'icns');
+  const macPng = fs.readFileSync(iconPath('mac'));
+  assert.equal(macPng.toString('hex', 0, 8), '89504e470d0a1a0a');
+  assert.ok(macPng.readUInt32BE(16) >= 512 && macPng.readUInt32BE(20) >= 512, 'macOS PNG ต้องมีความละเอียดอย่างน้อย 512×512');
   assert.equal(fs.readFileSync(iconPath('win')).readUInt16LE(2), 1);
   assert.equal(fs.readFileSync(iconPath('linux')).toString('ascii', 1, 4), 'PNG');
 });
