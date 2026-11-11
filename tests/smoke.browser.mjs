@@ -686,6 +686,38 @@ check('devices: added to registry', $('#dev-list').textContent.includes('PC ท�
 $('#dev-list').querySelector('.dev-actions button')?.click();
 await wait(150);
 check('devices: failure logged, no crash', $('#dev-log').hidden === false, $('#dev-log').textContent.slice(0, 80));
+const devicesBeforeQuotaFailure = window.localStorage.getItem('no7.devices.v1');
+const deviceStoragePrototype = Object.getPrototypeOf(window.localStorage);
+const originalDeviceSetItem = deviceStoragePrototype.setItem;
+deviceStoragePrototype.setItem = function (key, value) {
+  if (key === 'no7.devices.v1') {
+    const error = new Error('QuotaExceededError');
+    error.name = 'QuotaExceededError';
+    throw error;
+  }
+  return originalDeviceSetItem.call(this, key, value);
+};
+$('#dev-name').value = 'อุปกรณ์ยังไม่บันทึก';
+$('#dev-url').value = 'http://192.168.1.2:8787';
+$('#dev-code').value = '654321';
+$('#dev-secret').value = 'b'.repeat(64);
+$('#dev-add').click();
+check('devices: failed add keeps form and existing registry', $('#dev-status').textContent.includes('เพิ่มไม่สำเร็จ') && $('#dev-name').value === 'อุปกรณ์ยังไม่บันทึก' && $('#dev-secret').value === 'b'.repeat(64) && $('#dev-list').textContent.includes('PC ทดสอบ') && !$('#dev-list').textContent.includes('อุปกรณ์ยังไม่บันทึก') && window.localStorage.getItem('no7.devices.v1') === devicesBeforeQuotaFailure);
+$('#dev-list .device .danger')?.click();
+check('devices: failed remove keeps device and storage', $('#dev-status').textContent.includes('ลบอุปกรณ์ไม่สำเร็จ') && $('#dev-list').textContent.includes('PC ทดสอบ') && window.localStorage.getItem('no7.devices.v1') === devicesBeforeQuotaFailure);
+$('#link-hello').click();
+await wait(60);
+check('devices: successful hello reports metadata storage failure accurately', $('#link-status').textContent.includes('no7-link/1') && $('#link-status').textContent.includes('บันทึกสถานะในเครื่องไม่สำเร็จ') && window.localStorage.getItem('no7.devices.v1') === devicesBeforeQuotaFailure);
+const originalDeviceFetch = window.fetch;
+window.fetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ version: 'smoke' }) });
+$('#dev-list .device .dev-actions button')?.click();
+await wait(30);
+check('devices: successful test distinguishes metadata storage failure', $('#dev-log').textContent.includes('เชื่อมต่อได้ แต่บันทึกสถานะอุปกรณ์ไม่สำเร็จ') && window.localStorage.getItem('no7.devices.v1') === devicesBeforeQuotaFailure);
+$('#dev-list .device .dev-actions button:nth-of-type(3)')?.click();
+await wait(30);
+check('devices: sent command is not mislabeled after metadata storage failure', $('#dev-log').textContent.includes('ส่ง "👋 ทักทาย" ถึง PC ทดสอบ แล้ว แต่บันทึกสถานะไม่สำเร็จ') && window.localStorage.getItem('no7.devices.v1') === devicesBeforeQuotaFailure);
+window.fetch = originalDeviceFetch;
+deviceStoragePrototype.setItem = originalDeviceSetItem;
 
 // phone-link ครบวงจร: hello / eyes / voice status
 $('#link-hello').click();

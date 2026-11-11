@@ -2,6 +2,11 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.37.0] — 2026-11-10
+
+- Device registry add/remove/clear/touch mutations now persist candidates before updating memory. Storage failures preserve paired device settings and secrets; the UI preserves add/delete state and distinguishes successful device communication from a failed metadata write.
+- Raised the per-source-file budget by 1 KiB for device-registry error handling; the production bundle remains within all existing size budgets.
+
 ## [2.36.0] — 2026-11-10
 
 - Automation recipe changes now persist candidate data before updating memory. Storage failures preserve saved recipes and are surfaced in the recipe editor; `run_recipe` refuses to proceed if a newly created recipe cannot be saved.

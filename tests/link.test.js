@@ -7,7 +7,7 @@ globalThis.localStorage = (() => {
 })();
 
 const {
-  signRequest, canonical, hexToBytes, bytesToHex, DeviceRegistry,
+  signRequest, canonical, hexToBytes, bytesToHex, DeviceRegistry, DeviceStorageError,
   sendCommand, testConnection, deviceStatus, QUICK_COMMANDS,
   encodeBase64, decodeBase64, linkCapabilities, helloDevice, sendEyes, getEyes,
   sendVoiceChunk, pullVoice, voiceStatus, ackVoice,
@@ -62,6 +62,44 @@ test('registry touch updates lastSeen', () => {
   const after = reg.touch(d.id, { lastCommand: 'ping' });
   assert.ok(after.lastSeen >= before);
   assert.equal(after.lastCommand, 'ping');
+});
+
+test('registry quota failures preserve paired device secrets and metadata in storage and memory', () => {
+  const values = new Map();
+  let failWrites = false;
+  let writes = 0;
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => {
+      writes += 1;
+      if (failWrites) throw new Error('QuotaExceededError');
+      values.set(key, String(value));
+    },
+  };
+  const reg = new DeviceRegistry(storage);
+  const original = reg.add({ name: 'Local PC', baseUrl: 'http://device', code: '123', secret: SECRET });
+  reg.get(original.id).secret = 'not persisted';
+  reg.list()[0].name = 'unpersisted mutation';
+  assert.equal(reg.get(original.id).secret, SECRET, 'returned device views cannot mutate registry memory');
+  const persisted = values.get('no7.devices.v1');
+  const beforeWrites = writes;
+  assert.equal(reg.remove('missing'), false);
+  assert.equal(writes, beforeWrites, 'ลบอุปกรณ์ที่ไม่มีไม่เขียนซ้ำ');
+
+  failWrites = true;
+  assert.throws(() => reg.add({ name: 'Second', baseUrl: 'http://second', code: '456', secret: SECRET }), DeviceStorageError);
+  assert.throws(() => reg.remove(original.id), DeviceStorageError);
+  assert.throws(() => reg.touch(original.id, { lastCommand: 'dangerous' }), DeviceStorageError);
+  assert.throws(() => reg.clear(), DeviceStorageError);
+  assert.equal(reg.list().length, 1);
+  assert.equal(reg.get(original.id).secret, SECRET);
+  assert.equal(reg.get(original.id).lastCommand, '');
+  assert.equal(values.get('no7.devices.v1'), persisted);
+
+  failWrites = false;
+  reg.clear();
+  assert.deepEqual(reg.list(), []);
+  assert.deepEqual(JSON.parse(values.get('no7.devices.v1')), []);
 });
 
 test('sendCommand signs and posts, and errors surface server messages', async () => {
