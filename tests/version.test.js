@@ -44,6 +44,16 @@ test('package metadata has an author email for Debian package metadata', () => {
   assert.match(author.email, /^[^\s@]+@[^\s@]+\.[^\s@]+$/);
 });
 
+test('desktop packaging icons exist in the formats referenced by the build config', () => {
+  const build = JSON.parse(read('package.json')).build;
+  for (const icon of [build.mac.icon, build.win.icon, build.linux.icon]) {
+    assert.ok(fs.existsSync(path.join(ROOT, icon)), `ไม่พบไฟล์ไอคอน ${icon}`);
+  }
+  assert.equal(fs.readFileSync(path.join(ROOT, build.mac.icon)).toString('ascii', 0, 4), 'icns');
+  assert.equal(fs.readFileSync(path.join(ROOT, build.win.icon)).readUInt16LE(2), 1);
+  assert.equal(fs.readFileSync(path.join(ROOT, build.linux.icon)).toString('ascii', 1, 4), 'PNG');
+});
+
 test('release workflow triggers on version tags and builds all 3 platforms', () => {
   const rel = read('.github/workflows/release.yml');
   assert.match(rel, /tags: \['v\*'\]/);

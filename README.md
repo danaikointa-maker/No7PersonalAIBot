@@ -22,13 +22,19 @@ npm run build         # dist/ ชุดเดียวสำหรับ PWA + E
 npm run server        # companion server: static + AI proxy + tools + sync + phone-link
 npm run desktop       # เปิดเป็นแอปเดสก์ท็อป (Electron)
 npm run mobile:sync   # ซิงก์ dist/ เข้าโปรเจค Android/iOS
-npm test              # 476 unit tests
-npm run test:browser  # 188 end-to-end checks (รันแอปจริงใน jsdom)
+npm test              # 507 unit tests
+npm run test:browser  # 205 end-to-end checks (รันแอปจริงใน jsdom)
 npm run check         # syntax + structure check
 npm run perf          # performance budget (ขนาด bundle/source)
 ```
 
 ---
+
+## รุ่น 2.42.0: ปกป้องความลับเมื่อซิงก์และสำรองข้อมูล
+
+- ก่อนสร้างชุดข้อมูลซิงก์ ระบบลบค่า API key, token, OAuth client secret, Authorization/cookie header และข้อมูลรับรองใน URL แบบซ้อนทุกระดับออก โดยยังเก็บค่ากำหนดทั่วไปที่ไม่ใช่ความลับไว้
+- การส่งชุดซิงก์ไปยัง companion server ยังเริ่มจากผู้ใช้เท่านั้น ไม่มีการอัปโหลดข้อมูลสุขภาพหรือข้อมูลส่วนตัวโดยอัตโนมัติ
+- ไฟล์สำรองจะไม่รวม secrets เป็นค่าเริ่มต้น; เมื่อนำไฟล์ที่ถูกปกปิด secrets กลับมาใช้ ระบบจะรักษา credentials ของเครื่องนี้สำหรับรายการตั้งค่าที่จับคู่กัน แทนการเขียนค่าว่างทับ
 
 ## ทำอะไรได้ (v2.42)
 
