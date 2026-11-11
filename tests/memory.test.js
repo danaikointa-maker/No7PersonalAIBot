@@ -12,7 +12,7 @@ globalThis.localStorage = (() => {
   };
 })();
 
-const { MemoryStore, tokenize } = await import('../web/src/core/memory.js');
+const { MemoryStore, tokenize, validateMemoryImportPayload } = await import('../web/src/core/memory.js');
 
 test('tokenize produces Thai bigrams and english words', () => {
   const t = tokenize('ฉันชอบกาแฟดำ dark coffee');
@@ -132,6 +132,22 @@ test('export → import round-trips facts', () => {
   assert.equal(res.added, 2);
   assert.equal(b.listFacts().length, 2);
   assert.ok(b.search('แมว').length > 0);
+});
+
+test('memory import validator accepts current/legacy collections and rejects unsupported schemas', () => {
+  assert.equal(validateMemoryImportPayload({ kind: 'no7-memory', version: 2, facts: [], log: [] }).valid, true);
+  assert.equal(validateMemoryImportPayload({ facts: [{ text: 'legacy export' }] }).valid, true);
+  assert.equal(validateMemoryImportPayload({ log: [] }).valid, true);
+  for (const invalid of [
+    null,
+    [],
+    {},
+    { kind: 'no7-backup', version: 2, facts: [], log: [] },
+    { kind: 'no7-memory', version: 3, facts: [], log: [] },
+    { kind: 'no7-memory', version: 0, facts: [] },
+    { kind: 'no7-memory', facts: 'not an array' },
+    { facts: [], log: {} },
+  ]) assert.equal(validateMemoryImportPayload(invalid).valid, false, JSON.stringify(invalid));
 });
 
 test('import merges duplicates instead of doubling', () => {

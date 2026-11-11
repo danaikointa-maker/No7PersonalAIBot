@@ -6,6 +6,21 @@ const KEY = 'no7.memory.v2';
 const LEGACY_FACTS = 'no7.memory.facts.v1';
 const LEGACY_LOG = 'no7.memory.log.v1';
 const DAY = 24 * 60 * 60 * 1000;
+const MEMORY_IMPORT_VERSION = 2;
+
+export function validateMemoryImportPayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return { valid: false, reason: 'root' };
+  if (payload.kind !== undefined && payload.kind !== 'no7-memory') return { valid: false, reason: 'kind' };
+  if (payload.version !== undefined && (!Number.isInteger(payload.version) || payload.version < 1 || payload.version > MEMORY_IMPORT_VERSION)) {
+    return { valid: false, reason: 'version' };
+  }
+  const hasFacts = Object.hasOwn(payload, 'facts');
+  const hasLog = Object.hasOwn(payload, 'log');
+  if (hasFacts && !Array.isArray(payload.facts)) return { valid: false, reason: 'facts' };
+  if (hasLog && !Array.isArray(payload.log)) return { valid: false, reason: 'log' };
+  if (!hasFacts && !hasLog) return { valid: false, reason: 'collections' };
+  return { valid: true, reason: '' };
+}
 
 function loadRaw(key, fallback) {
   try {
