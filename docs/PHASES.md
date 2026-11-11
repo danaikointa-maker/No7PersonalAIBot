@@ -349,3 +349,33 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 31.1 version 2.3.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics) + CHANGELOG 2.3.0
 - [x] 31.2 README v2.3 (progressive cards, weekly review, 30 tools, 377 unit / 133 checks, 29 docs) + PHASES ปิดครบ
 - [x] 31.3 ตรวจรับรวม: check 98 ไฟล์ · unit 377 · browser 133 · build · perf → PR
+
+# รอบที่ 9 (v2.4)
+
+รอบนี้เน้น "ข้อมูลที่ย้ายเครื่องแล้วไม่ทับกันหาย" และ "เอารายงานออกไปใช้ต่อได้"
+
+| # | งาน | ช่วง | สถานะ |
+| --- | --- | --- | --- |
+| X1 | ซิงก์แบบ conflict-aware | 32.1–32.4 | ⬜ |
+| X2 | ส่งออกรายงาน (MD/CSV) | 33.1–33.4 | ⬜ |
+| X3 | Release 2.4 | 34.1–34.3 | ⬜ |
+
+## X1 — ซิงก์แบบ conflict-aware
+
+- 32.1 `core/sync-merge.js`: `mergeRecordSets` (newest / prefer-local / prefer-remote / keep-both) + `deviceId()` + report ความขัดแย้ง
+- 32.2 `mergeSyncBundle` สำหรับ facts/notes/todos/tasks/events → `{data, report}` (แทน merge แบบ additive)
+- 32.3 UI: เลือกกลยุทธ์ในหน้าซิงก์ + แสดงผล "เพิ่ม/อัปเดต/ชนกัน" + `docs/SYNC.md`
+- 32.4 Tests + smoke
+
+## X2 — ส่งออกรายงาน (MD/CSV)
+
+- 33.1 `core/report-export.js`: `toCsv`, `weeklyCsv`, `digestCsv`, `reportMarkdown` (escape CSV ถูกต้อง)
+- 33.2 UI: ปุ่ม ⬇️ Markdown / ⬇️ CSV บนการ์ดสรุปวันนี้และรายงานสัปดาห์
+- 33.3 ชื่อไฟล์มีวันที่ + BOM สำหรับ Excel (ภาษาไทย)
+- 33.4 Tests + smoke + `docs/REPORTS.md`
+
+## X3 — Release 2.4
+
+- 34.1 version 2.4.0 + CHANGELOG
+- 34.2 README + PHASES ปิดครบ
+- 34.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
