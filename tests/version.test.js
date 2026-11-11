@@ -41,7 +41,7 @@ test('CHANGELOG and README describe the current version', () => {
 test('release workflow triggers on version tags and builds all 3 platforms', () => {
   const rel = read('.github/workflows/release.yml');
   assert.match(rel, /tags: \['v\*'\]/);
-  for (const runner of ['ubuntu-22.04', 'macos-latest', 'windows-latest']) {
+  for (const runner of ['ubuntu-22.04', 'macos-15-intel', 'windows-latest']) {
     assert.ok(rel.includes(runner), `ขาด ${runner}`);
   }
   assert.match(rel, /npm run perf/);
@@ -49,6 +49,6 @@ test('release workflow triggers on version tags and builds all 3 platforms', () 
   assert.match(rel, /release_tag/);
   assert.match(rel, /tag_name: \$\{\{ inputs\.release_tag \|\| github\.ref_name \}\}/);
   assert.match(rel, /Sanitized packaging log/);
-  assert.match(rel, /apt-get install -y libfuse2/);
+  assert.match(rel, /--linux deb/);
   assert.match(rel, /CSC_IDENTITY_AUTO_DISCOVERY/);
 });
