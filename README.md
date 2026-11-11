@@ -1,4 +1,4 @@
-# No7 Personal AI Bot `v2.0`
+# No7 Personal AI Bot `v2.1`
 
 > ผู้ช่วย AI ส่วนตัวที่ **โค้ดชุดเดียวกันรันได้ทั้งมือถือและ PC** — พูดไทยก่อน ฟังได้ด้วยเสียง มีความจำระยะยาว
 > เรียกเครื่องมือจริง ทำงานหลายก้าวได้ ซิงก์ข้ามเครื่อง และสั่งงานอุปกรณ์ผ่าน HMAC
@@ -22,15 +22,15 @@ npm run build         # dist/ ชุดเดียวสำหรับ PWA + E
 npm run server        # companion server: static + AI proxy + tools + sync + phone-link
 npm run desktop       # เปิดเป็นแอปเดสก์ท็อป (Electron)
 npm run mobile:sync   # ซิงก์ dist/ เข้าโปรเจค Android/iOS
-npm test              # 301 unit tests
-npm run test:browser  # 97 end-to-end checks (รันแอปจริงใน jsdom)
+npm test              # 341 unit tests
+npm run test:browser  # 111 end-to-end checks (รันแอปจริงใน jsdom)
 npm run check         # syntax + structure check
 npm run perf          # performance budget (ขนาด bundle/source)
 ```
 
 ---
 
-## ทำอะไรได้ (v2.0)
+## ทำอะไรได้ (v2.1)
 
 ### 🎭 เลือกได้ทั้งหมด — 5 บทบาทในที่เดียว
 `✨ ทั้งหมด` (สลับบทบาทเองตามคำขอ) · `💛 เพื่อนคุย` · `💼 งาน` · `📅 ชีวิตประจำวัน` · `🏠 อุปกรณ์`
@@ -77,6 +77,18 @@ npm run perf          # performance budget (ขนาด bundle/source)
 - ซิงก์ข้ามเครื่องแบบ last-write-wins + tombstone (การลบตามไปทุกเครื่อง)
 - `parseDue` เข้าใจ ISO, `+30m`, `+2h`, `วันนี้ 18:00`, `พรุ่งนี้ 09:30`
 
+### 🧭 เห็นทุกขั้น — และหยุดได้จริง
+- แผง timeline สด ๆ บอกว่า No7 กำลังคิดขั้นไหน เรียกเครื่องมืออะไร เสร็จแล้วหรือยัง (พร้อม ms)
+- ปุ่ม ⏹ / `Esc` = ยกเลิกงานกลางทาง + หยุดเสียงทันที (ไม่เรียกเครื่องมือเพิ่มหลังสั่งหยุด)
+
+### 🌅 สรุปประจำวัน
+- รวมงานเกินกำหนด/ครบวันนี้/นัดหมาย/งานถัดไป/ความจำใหม่ ในการ์ดเดียว หรือ Ask No7 ก็ได้ (tool `digest`)
+- เปิด "สรุปอัตโนมัติทุกเช้า" ให้ขึ้นเองครั้งแรกของวันหลัง 07:00
+
+### 🧩 ปลั๊กอินเครื่องมือของตัวเอง
+- ประกาศเครื่องมือ HTTP ด้วย JSON (GET/POST, `{{param}}`, headers, body) → ใช้ได้ทันทีทั้งกับ AI และกดทดลอง
+- ปลอดภัยตั้งแต่ต้น: https เท่านั้น, บล็อก localhost/วง LAN, timeout 10 วิ, จำกัด 64 KB, risk ≥ 1 ต้องยืนยัน
+
 ### 🧠⚡ สมองในเครื่อง (ออฟไลน์ได้จริง)
 - ต่อ **Ollama** หรือ **LM Studio** ที่เครื่องตัวเอง (LAN) — สแกนรุ่นที่มี ตรวจว่าพร้อม แล้วเลือกตัวที่เหมาะ
 - ตั้ง chain อัตโนมัติ: ออนไลน์ใช้คลาวด์ → เน็ตหลุดสลับเป็นรุ่นในเครื่องทันที (โหมด `private`, ไม่มีคีย์)
@@ -105,7 +117,7 @@ npm run perf          # performance budget (ขนาด bundle/source)
 - จัดการพื้นที่เก็บข้อมูล + ขอ persistent storage + ล้างข้อมูลเป็นกลุ่ม
 - เมนู/ปุ่มใหญ่/ปุ่มลัดคีย์บอร์ด (`Ctrl/Cmd+K`, `Ctrl/Cmd+M`, `Esc`, `Ctrl/Cmd+Enter`)
 
-### 🧰 28 tools (ไม่ต้องใช้คีย์)
+### 🧰 29 tools (28 เดิม + `digest`) — ไม่ต้องใช้คีย์
 | หมวด | tools |
 |---|---|
 | 📖 อ่าน | `weather` `air` `crypto` `fx` `gold` `wiki` `news` `calc` `rss_read` `summarize_url` |
@@ -114,6 +126,7 @@ npm run perf          # performance budget (ขนาด bundle/source)
 | ⚡ ทำงานในเครื่อง | `timer` `reminder` `clipboard_copy` `open_url` `task` |
 | ✉️ ร่างข้อความ | `compose_message` (อีเมล/SMS/LINE — คุณกดส่งเอง) |
 | 🎛️ ควบคุม | `open_app` `control_run` `desktop` `run_recipe` `device_command` `system_info` |
+| 🌅 สรุป | `digest` (dynamic) — ปลั๊กอินผู้ใช้กลายเป็น `plugin__<id>` เพิ่มได้เอง |
 
 ### 🎭 Persona Studio
 สร้าง/แก้/ทำสำเนา/ลบ persona เอง — ตัวตน, คำทักทาย, หัวข้อต้องห้าม, คำลงท้าย, สไตล์เสียง
@@ -138,6 +151,7 @@ web/                 ชุด UI + core ที่ทุกแพลตฟอร
   src/core/          state · memory · consolidate · tools · agent · permissions · modes
                      · ai-providers (stream/fallback) · voice · stream · wake · bargein · tts
                      · local-models · i18n · oauth · desktop · tasks
+                     · timeline · digest · custom-tools
                      · mcp · retry · metrics · diagnostics · capabilities · storage
                      · calendar · net · sync · link · prompt · settings · platform
   src/ui/            avatar (14 emotions) · cards
@@ -147,7 +161,7 @@ mobile/              ที่สำหรับ native project (Capacitor)
 server/              companion server (zero deps): static · AI proxy · tools · sync · phone-link
 devices/esp32/       reference client (no7_link.h) + คู่มือ
 tests/               unit tests + jsdom end-to-end
-docs/                เอกสาร 19 ไฟล์
+docs/                เอกสาร 25 ไฟล์
 ```
 
 ## เอกสาร
@@ -173,6 +187,9 @@ docs/                เอกสาร 19 ไฟล์
 | [docs/I18N.md](docs/I18N.md) | สองภาษา ไทย/อังกฤษ (สลับหน้าจอได้ทันที) |
 | [docs/DEVICES.md](docs/DEVICES.md) | Phone-Link protocol + ESP32 |
 | [docs/PHONE_LINK.md](docs/PHONE_LINK.md) | HMAC canonical signing + ตัวอย่าง curl |
+| [docs/AGENT.md](docs/AGENT.md) | agent loop, event, timeline, การหยุดกลางทาง |
+| [docs/DIGEST.md](docs/DIGEST.md) | สรุปประจำวัน + การแจ้งเตือนอัตโนมัติ |
+| [docs/PLUGINS.md](docs/PLUGINS.md) | ปลั๊กอินเครื่องมือ HTTP (JSON) + ความปลอดภัย |
 | [docs/QUALITY.md](docs/QUALITY.md) | performance budget + E2E + integration tests |
 | [docs/BUILD.md](docs/BUILD.md) | build ทั้ง 3 แพลตฟอร์ม + release/auto-update |
 | [docs/CONCEPT.md](docs/CONCEPT.md) | คอนเซ็บผู้ใช้ → สเปก |

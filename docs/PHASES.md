@@ -255,7 +255,7 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 | U1 | Timeline + ยกเลิกกลางทาง | 22.1–22.4 | ✅ |
 | U2 | สรุปประจำวัน (digest) | 23.1–23.4 | ✅ |
 | U3 | ปลั๊กอินเครื่องมือ HTTP | 24.1–24.4 | ✅ |
-| U4 | Release 2.1 | 25.1–25.3 | ⬜ |
+| U4 | Release 2.1 | 25.1–25.3 | ✅ |
 
 ## U1 — Timeline + ยกเลิกกลางทาง
 
@@ -280,6 +280,6 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 
 ## U4 — Release 2.1
 
-- 25.1 version 2.1.0 + CHANGELOG
-- 25.2 README + PHASES ปิดครบ
-- 25.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+- [x] 25.1 version 2.1.0 (`package.json`, lock, `MCP_CLIENT_INFO`, diagnostics) + CHANGELOG 2.1.0
+- [x] 25.2 README v2.1 (timeline, digest, plugins, 341 unit / 111 checks, 29 tools) + docs table + PHASES ปิดครบ
+- [x] 25.3 ตรวจรับรวม: check 92 ไฟล์ · unit 341 · browser 111 · build · perf (83.5 KB gzip) → PR

@@ -2,6 +2,43 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.1.0] — 2026-11-10
+
+รอบที่หก: "ทำงานหลายขั้น" กลายเป็นสิ่งที่มองเห็นและหยุดได้, No7 สรุปวันให้ทุกเช้า,
+และผู้ใช้ต่อยอดเครื่องมือของตัวเองได้ด้วยปลั๊กอิน HTTP โดยไม่ต้องแตะโค้ด
+
+### เพิ่ม
+**U1 — Timeline + หยุดกลางทาง**
+- `core/timeline.js`: `AgentTimeline` แปลง event เป็นขั้นตอน (running/ok/error/denied/cancelled)
+  + `summary()`, `headline()`, `toRows()`, `toMarkdown()`
+- `core/agent.js`: `cancel()` ตรวจธง 3 จุด (ก่อนรอบใหม่ / หลังได้คำตอบ / หลังกล่องยืนยัน)
+  → event `cancelled` และผลลัพธ์ `{ cancelled: true }` พร้อมสรุปสิ่งที่ทำไปแล้ว
+- UI: แผง `#run-timeline` เห็นทุกขั้นสด ๆ, ปุ่ม ⏹ และ `Esc` เรียก `stopAll()` (ยกเลิกงาน + หยุดเสียง)
+- `docs/AGENT.md`
+
+**U2 — สรุปประจำวัน**
+- `core/digest.js`: `buildDigest` จัดกลุ่มเกินกำหนด/วันนี้/นัดหมาย/48 ชม./งานถัดไป/ความจำใหม่/ไม่มีกำหนด
+  + `digestMarkdown` + `toMs` (รับ ISO string จาก TaskStore) + `shouldAutoDigest`
+- tool `digest` (dynamic, risk 0) ให้ AI ตอบ "วันนี้มีอะไรต้องทำ" ได้เอง
+- UI: ปุ่ม 🌅 สรุปวันนี้ + การ์ด + โพสต์ในแชท + สรุปอัตโนมัติครั้งแรกของวันหลัง 07:00 (opt-in)
+- `docs/DIGEST.md`
+
+**U3 — ปลั๊กอินเครื่องมือ HTTP**
+- `core/custom-tools.js`: JSON-defined tools (`plugin__<id>`), `renderTemplate` (ไม่มี eval),
+  `fillArgs` (เฉพาะพารามิเตอร์ที่ประกาศ), `buildHttpTool` (fetch inject ได้)
+- ความปลอดภัย: https เท่านั้น, บล็อก localhost/วง LAN, `assertSafeUrl` ตรวจซ้ำตอนยิงจริง,
+  timeout 10 วิ, ตัด response 64 KB, risk ≥ 1 ต้องยืนยัน
+- UI: ช่อง JSON + ตัวอย่าง/ตรวจสอบ/บันทึก + รายการ + ลงทะเบียนผ่าน `refreshDynamicTools()`
+- `docs/PLUGINS.md`
+
+### เปลี่ยน
+- เครื่องมือในหน้าเครื่องมือ = 29 (28 เดิม + `digest`) และเพิ่มตามปลั๊กอินที่เปิด
+- `tools-note` แสดงตัวหารจาก `allToolIds()` (รวม dynamic)
+
+### แก้
+- digest ต้องแปลง `due` ที่เป็น ISO string ก่อนเปรียบเทียบเวลา (เดิมงานหายจากสรุป)
+- digest tool สร้างด้วย closure แทน getter เพื่อไม่ให้แตะ `tasks` ก่อนประกาศ (TDZ)
+
 ## [2.0.0] — 2026-11-10
 
 รอบที่ห้า: ยกระดับจาก "ผู้ช่วยที่ใช้ได้" → "ผู้ช่วยที่ไว้ใจได้ทุกวัน" — เสียงพรีเมียม, สมองในเครื่อง
