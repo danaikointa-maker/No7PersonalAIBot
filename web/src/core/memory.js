@@ -113,6 +113,19 @@ export class MemoryStore {
     }
   }
 
+  _cloneFacts() {
+    return this.facts.map((fact) => ({ ...fact, tokens: Array.isArray(fact.tokens) ? [...fact.tokens] : tokenize(fact.text) }));
+  }
+
+  _commitState({ facts = this.facts, log = this.log, meta = this.meta } = {}) {
+    if (!saveRaw(KEY, { version: 2, facts, log, meta })) return false;
+    this.facts = facts;
+    this.log = log;
+    this.meta = meta;
+    this._buildIndex();
+    return true;
+  }
+
   /** Add or merge a fact. opts: {importance, source, pinned} */
   addFact(text, importanceOrOpts = 1, legacySource) {
     const opts = typeof importanceOrOpts === 'object' && importanceOrOpts !== null
@@ -121,15 +134,13 @@ export class MemoryStore {
     const clean = String(text || '').trim();
     if (!clean) return null;
     const tokens = tokenize(clean);
-
-    for (const f of this.facts) {
-      if (jaccard(tokens, f.tokens) >= 0.75) {
-        f.importance = Math.max(f.importance, opts.importance ?? 1);
-        if (opts.pinned) f.pinned = true;
-        f.ts = Date.now();
-        this._persist();
-        return f;
-      }
+    const facts = this._cloneFacts();
+    const existing = facts.find((fact) => jaccard(tokens, fact.tokens) >= 0.75);
+    if (existing) {
+      existing.importance = Math.max(existing.importance, opts.importance ?? 1);
+      if (opts.pinned) existing.pinned = true;
+      existing.ts = Date.now();
+      return this._commitState({ facts }) ? existing : null;
     }
     const fact = {
       id: id(), text: clean, tokens,
@@ -137,14 +148,13 @@ export class MemoryStore {
       ts: Date.now(), created: Date.now(),
       pinned: !!opts.pinned, used: 0, source: opts.source || 'user',
     };
-    this.facts.push(fact);
-    this._buildIndex();
-    this._persist();
-    return fact;
+    facts.push(fact);
+    return this._commitState({ facts }) ? fact : null;
   }
 
   updateFact(factId, patch = {}) {
-    const f = this.facts.find((x) => x.id === factId);
+    const facts = this._cloneFacts();
+    const f = facts.find((item) => item.id === factId);
     if (!f) return null;
     if (typeof patch.text === 'string' && patch.text.trim()) {
       f.text = patch.text.trim();
@@ -153,41 +163,37 @@ export class MemoryStore {
     if (patch.importance != null) f.importance = Math.min(5, Math.max(1, Number(patch.importance) || 1));
     if (patch.pinned != null) f.pinned = !!patch.pinned;
     f.ts = Date.now();
-    this._buildIndex();
-    this._persist();
-    return f;
+    return this._commitState({ facts }) ? f : null;
   }
 
   togglePin(factId) {
-    const f = this.facts.find((x) => x.id === factId);
+    const facts = this._cloneFacts();
+    const f = facts.find((item) => item.id === factId);
     if (!f) return null;
     f.pinned = !f.pinned;
-    this._persist();
-    return f;
+    return this._commitState({ facts }) ? f : null;
   }
 
   removeFact(factId) {
-    this.facts = this.facts.filter((f) => f.id !== factId);
-    this._buildIndex();
-    this._persist();
+    if (!this.facts.some((fact) => fact.id === factId)) return false;
+    const facts = this._cloneFacts().filter((fact) => fact.id !== factId);
+    return this._commitState({ facts });
   }
 
   /** Restore exact fact records without overwriting edits made since removal. */
   restoreFacts(records = []) {
     const result = { restored: 0, skipped: 0 };
+    const facts = this._cloneFacts();
     for (const raw of records) {
       const text = String(raw?.text || '').trim();
-      if (!text || !raw?.id || this.facts.some((fact) => fact.id === raw.id || fact.text === text)) {
+      if (!text || !raw?.id || facts.some((fact) => fact.id === raw.id || fact.text === text)) {
         result.skipped++;
         continue;
       }
-      this.facts.push({ ...raw, text, tokens: tokenize(text) });
+      facts.push({ ...raw, text, tokens: tokenize(text) });
       result.restored++;
     }
-    if (result.restored) {
-      this._buildIndex();
-      this._persist();
-    }
+    if (result.restored && !this._commitState({ facts })) return { restored: 0, skipped: result.skipped, failed: true };
     return result;
   }
 
@@ -244,8 +250,9 @@ export class MemoryStore {
   }
 
   logTurn(role, text, meta = {}) {
-    this.log.push({ role, text: String(text).slice(0, 2000), ts: Date.now(), ...meta });
-    this._persist();
+    const item = { role, text: String(text).slice(0, 2000), ts: Date.now(), ...meta };
+    const log = [...this.log, item];
+    return this._commitState({ log }) ? item : false;
   }
 
   recentLog(n = 20) { return this.log.slice(-n); }
@@ -268,7 +275,8 @@ export class MemoryStore {
   /** Importance decay for facts that were never used and are old. */
   decay({ now = Date.now(), staleDays = 45, floor = 1 } = {}) {
     let changed = 0;
-    for (const f of this.facts) {
+    const facts = this._cloneFacts();
+    for (const f of facts) {
       if (f.pinned) continue;
       const ageDays = (now - (f.ts || now)) / DAY;
       if (ageDays > staleDays && (f.used || 0) === 0 && f.importance > floor) {
@@ -277,13 +285,12 @@ export class MemoryStore {
         changed++;
       }
     }
-    if (changed) this._persist();
+    if (changed && !this._commitState({ facts })) return 0;
     return changed;
   }
 
   markConsolidated(now = Date.now()) {
-    this.meta.lastConsolidated = now;
-    this._persist();
+    return this._commitState({ meta: { ...this.meta, lastConsolidated: now } });
   }
 
   exportData() {
@@ -400,13 +407,12 @@ export class MemoryStore {
   }
 
   _persist() {
-    saveRaw(KEY, { version: 2, facts: this.facts, log: this.log, meta: this.meta });
+    return saveRaw(KEY, { version: 2, facts: this.facts, log: this.log, meta: this.meta });
   }
 
   clearAll() {
-    this.facts = []; this.log = []; this.meta = {};
-    this._buildIndex();
-    this._persist();
+    if (!this._commitState({ facts: [], log: [], meta: {} })) return false;
     try { localStorage.removeItem(LEGACY_FACTS); localStorage.removeItem(LEGACY_LOG); } catch {}
+    return true;
   }
 }

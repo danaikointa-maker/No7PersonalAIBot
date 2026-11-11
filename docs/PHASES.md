@@ -998,3 +998,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 100.1 version 2.26.0 + CHANGELOG
 - [x] 100.2 README + PHASES ปิดครบ
 - [x] 100.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
+
+# รอบที่ 32 (v2.27)
+
+เป้าหมาย: ทำให้การแก้ไข memory ปกติเป็น transactional เมื่อ storage เขียนไม่ได้ เพื่อไม่ให้ UI แสดงผลเปลี่ยนหรือข้อความว่าเสร็จทั้งที่ข้อมูลยังไม่ถูกบันทึก
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AU1 | เพิ่ม commit state แบบเขียนก่อนสลับ memory | 101.1–101.3 | ✅ |
+| AU2 | รักษาข้อมูลเมื่อ CRUD/log/reset บันทึกไม่ได้ | 102.1–102.3 | ✅ |
+| AU3 | Release 2.27 | 103.1–103.3 | ✅ |
+
+## AU1 — เพิ่ม commit state แบบเขียนก่อนสลับ memory
+
+- [x] 101.1 helper เขียน candidate facts/log/meta ก่อนสลับ instance
+- [x] 101.2 ใช้กับ add/edit/pin/delete/restore/log/decay/consolidate/clear
+- [x] 101.3 Unit tests สำหรับ failed write ไม่เปลี่ยน state และ storage
+
+## AU2 — รักษาข้อมูลเมื่อ CRUD/log/reset บันทึกไม่ได้
+
+- [x] 102.1 ลบ legacy storage keys หลัง clear สำเร็จเท่านั้น
+- [x] 102.2 UI เพิ่ม/แก้ memory ไม่แสดง success และไม่ล้าง input เมื่อ persist ล้มเหลว; reset ยกเลิกต่อ
+- [x] 102.3 Browser smoke ตรวจ failed fact save แล้ว input และ memory storage เดิมยังอยู่
+
+## AU3 — Release 2.27
+
+- [x] 103.1 version 2.27.0 + CHANGELOG
+- [x] 103.2 README + PHASES ปิดครบ
+- [x] 103.3 ตรวจรับรวม (check/test/browser/perf/build) + PR
