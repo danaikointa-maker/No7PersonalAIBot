@@ -32,7 +32,7 @@
 
 ตัวกรอง **7 วัน / 30 วัน** เปลี่ยนกราฟและรายการทันทีโดยไม่สแกนหรือเขียน storage; สรุปช่วงแสดงจำนวนวันมีข้อมูล, ค่าเฉลี่ย, สูงสุด/ต่ำสุด และ delta จากคะแนนแรกถึงล่าสุดในช่วงที่เลือก
 
-ผู้ใช้สามารถกด **⬇️ Markdown** หรือ **⬇️ CSV** เพื่อดาวน์โหลด snapshot สรุปด้วยตนเอง (CSV มี BOM และป้องกัน formula injection); หากดาวน์โหลดไม่ได้จะคัดลอกไป clipboard ตาม fallback เดิม ไม่มีการส่งข้อมูลอัตโนมัติ
+ผู้ใช้สามารถกด **⬇️ Markdown**, **⬇️ CSV** หรือ **⬇️ JSON** เพื่อดาวน์โหลด snapshot สรุปด้วยตนเอง (CSV มี BOM และป้องกัน formula injection); หากดาวน์โหลดไม่ได้จะคัดลอกไป clipboard ตาม fallback เดิม ไม่มีการส่งข้อมูลอัตโนมัติ
 
 ## API
 
@@ -42,7 +42,7 @@
 
 `recordHealthSnapshot(history, report, now)` เพิ่ม/แทนที่สรุปรายวันและตัดให้เหลือ 30 รายการ; `normalizeHealthHistory`, `readHealthHistory`, `writeHealthHistory`, `clearHealthHistory` จัดการข้อมูล versioned; `healthTrend` สรุปส่วนต่าง; `renderHealthHistory` สร้างกราฟ SVG พร้อมรายการข้อความที่อ่านได้
 
-`healthHistoryCsv(history, { lang })` และ `healthHistoryMarkdown(history, { lang, now })` ส่งออกเฉพาะ snapshot ที่ normalize แล้ว (ไม่รับรายละเอียดรายการส่วนตัว)
+`healthHistoryCsv(history, { lang })`, `healthHistoryMarkdown(history, { lang, now })` และ `healthHistoryJson(history, { now })` ส่งออกเฉพาะ snapshot ที่ normalize แล้ว (ไม่รับรายละเอียดรายการส่วนตัว) JSON ใช้ envelope `{ format: 'no7-health-history', schema: 1, exportedAt, snapshots }`
 
 ไฟล์: `web/src/core/health.js` · tests: `tests/health.test.js` · UI: `web/src/main.js`
 

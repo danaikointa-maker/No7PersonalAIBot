@@ -522,3 +522,31 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 - [x] 49.1 version 2.9.0 + CHANGELOG
 - [x] 49.2 README (32 docs, 433 unit / 159 checks) + PHASES ปิดครบ
 - [x] 49.3 ตรวจรับรวม: check 112 files · unit 433 · browser 159 · perf · build → PR
+
+# รอบที่ 15 (v2.10)
+
+เป้าหมาย: เพิ่มไฟล์ JSON สำหรับเก็บ/ส่งต่อประวัติสุขภาพอย่างเป็นโครงสร้าง โดยคงขอบเขตข้อมูลสรุป ไม่มีข้อความส่วนตัว
+
+| # | งาน | ช่วง | สถานะ |
+|---|---|---|---|
+| AD1 | JSON export schema | 50.1–50.3 | ✅ |
+| AD2 | UI ส่งออก JSON | 51.1–51.3 | ✅ |
+| AD3 | Release 2.10 | 52.1–52.3 | ✅ |
+
+## AD1 — JSON export schema
+
+- [x] 50.1 `healthHistoryJson`: schema versioned, exportedAt, snapshots ที่ normalize แล้วเท่านั้น
+- [x] 50.2 จำกัด 30 snapshots; ตัด field/ข้อความส่วนตัวและข้อมูล malformed
+- [x] 50.3 Tests สำหรับ schema, ข้อมูลว่าง, privacy และความทนทาน
+
+## AD2 — UI ส่งออก JSON
+
+- [x] 51.1 เพิ่มปุ่ม JSON ข้าง CSV/Markdown พร้อมวันที่ในชื่อไฟล์
+- [x] 51.2 ใช้เส้นทาง download/clipboard เดิม; ส่งออกเมื่อผู้ใช้กดเท่านั้น
+- [x] 51.3 Browser smoke + `docs/HEALTH.md`
+
+## AD3 — Release 2.10
+
+- [x] 52.1 version 2.10.0 + CHANGELOG
+- [x] 52.2 README (32 docs, 434 unit / 159 checks) + PHASES ปิดครบ
+- [x] 52.3 ตรวจรับรวม: check 112 files · unit 434 · browser 159 · perf · build → PR
