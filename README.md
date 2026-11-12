@@ -223,7 +223,7 @@ tray · hotkey ระดับระบบ (`Ctrl/Cmd+Shift+Space`) · overlay a
 
 ---
 
-## Architecture: ระบบทำงานอย่างไร
+## สถาปัตยกรรม: โครงสร้างระบบและการไหลของข้อมูล
 
 หลักการคือ **แอปและ business logic อยู่ใน `web/` ชุดเดียว** แล้วนำไปใช้ผ่าน host ที่เหมาะกับแต่ละอุปกรณ์ ไม่ทำสำเนา logic แยกในเว็บ, Electron และ Capacitor ส่วน companion server เป็นบริการเสริมที่ผู้ใช้โฮสต์เอง ไม่จำเป็นสำหรับการทดลองใช้หน้าเว็บ
 
@@ -251,6 +251,54 @@ flowchart TB
   SERVER --> FILES[(.no7/ บนเครื่อง server)]
   SERVER <-->|HMAC Phone-Link| DEV[PC / ESP32 clients]
 ```
+
+แผนภาพด้านบนแสดง **องค์ประกอบและการเชื่อมต่อระหว่างแอปกับบริการเสริม**; แผนภาพต่อไปแสดงลำดับการทำงานจริงเมื่อผู้ใช้ส่งคำถามและเมื่อมีการซิงก์/นำเข้าข้อมูล
+
+### Flowchart: การตอบคำถามและเรียกใช้เครื่องมือ
+
+```mermaid
+flowchart TD
+  USER[ผู้ใช้พิมพ์หรือพูด] --> CHAT[หน้าสนทนาใน web app]
+  CHAT --> AGENT[Agent ประกอบ prompt และเลือก AI provider]
+  AGENT --> DECIDE{AI ตอบเลยหรือขอเรียก tool?}
+  DECIDE -->|ตอบข้อความ| FINAL[แสดงคำตอบและพูดด้วย TTS หากเปิดใช้]
+  FINAL --> SAVE[เก็บบทสนทนา/ความจำตามการตั้งค่าในอุปกรณ์]
+  DECIDE -->|เรียก tool| GATE[ตรวจหมวดสิทธิ์และระดับความเสี่ยง]
+  GATE --> CATEGORY{หมวดสิทธิ์เปิดอยู่?}
+  CATEGORY -->|ไม่| BLOCK[บล็อกการเรียกและแจ้งเหตุผลให้ AI]
+  BLOCK --> AGENT
+  CATEGORY -->|เปิด| RISK{ต้องขออนุญาตผู้ใช้?}
+  RISK -->|ไม่ต้อง| RUN[เรียก tool ผ่าน host ที่เหมาะสม]
+  RISK -->|ต้องถาม| APPROVE{ผู้ใช้อนุญาตหรือไม่?}
+  APPROVE -->|ไม่อนุญาต| STOP[หยุดงานและไม่เรียก tool]
+  APPROVE -->|อนุญาต| RUN
+  RUN --> RESULT[ส่งผล tool กลับเข้า Agent]
+  RESULT --> AGENT
+  STOP --> FINAL
+  CHAT -. ปุ่มหยุดหรือ Esc .-> CANCEL[ยกเลิก agent loop และหยุดงานต่อเนื่อง]
+```
+
+### Flowchart: ซิงก์และนำเข้าข้อมูลโดยผู้ใช้เป็นผู้ควบคุม
+
+```mermaid
+flowchart LR
+  subgraph SYNC[ซิงก์ข้ามอุปกรณ์]
+    CLICK[ผู้ใช้กดซิงก์] --> COLLECT[รวบรวมเฉพาะชุดข้อมูลที่รองรับ]
+    COLLECT --> REDACT[ลบ API key, token และ credentials แบบ recursive]
+    REDACT --> SEND[ส่งไปยัง companion server ของผู้ใช้]
+    SEND --> MERGE[รวมตาม conflict strategy]
+    MERGE --> REPORT[แสดงรายงานผลและความขัดแย้ง]
+  end
+  subgraph RESTORE[นำเข้า backup หรือ health history]
+    FILE[ผู้ใช้เลือกไฟล์] --> VALIDATE[ตรวจรูปแบบ ขนาด และ checksum/schema]
+    VALIDATE --> PREVIEW[สร้าง preview โดยยังไม่เขียน storage]
+    PREVIEW --> CONFIRM{ผู้ใช้ยืนยันหรือไม่?}
+    CONFIRM -->|ยกเลิก| NO_WRITE[ยุติโดยไม่เปลี่ยนข้อมูล]
+    CONFIRM -->|ยืนยัน| COMMIT[บันทึกข้อมูลตามแผน และรักษา local credentials]
+  end
+```
+
+**ขอบเขตข้อมูล:** ซิงก์เริ่มจากการกระทำของผู้ใช้และมีการ redact secrets ก่อนส่ง; health history เก็บ/ส่งออกเฉพาะ summary metrics และไม่มี auto-upload ส่วนการนำเข้าไฟล์จะไม่เขียน storage ก่อนผู้ใช้ยืนยัน ดูรายละเอียด [docs/SYNC.md](docs/SYNC.md), [docs/BACKUP.md](docs/BACKUP.md) และ [docs/HEALTH.md](docs/HEALTH.md)
 
 ### เส้นทางคำขอและขอบเขตความปลอดภัย
 
