@@ -53,9 +53,9 @@ git tag v2.0.0 && git push origin v2.0.0
 |---|---|
 | `verify` | check + unit + smoke + build + **perf budget** (ถ้าไม่ผ่าน = ไม่ปล่อย) |
 | `desktop` | matrix `ubuntu / macos / windows` → `electron-builder --publish never` แล้วเก็บ artifact |
-| `publish` | รวม artifact → GitHub Release (draft) ให้ตรวจก่อนกด publish |
+| `publish` | รวม artifact → GitHub Release; การ trigger แบบ manual เลือก draft หรือเผยแพร่ได้ ส่วนการ push tag จะเผยแพร่ตามค่า workflow |
 
-ไฟล์ที่ได้: `*.exe` (nsis + portable), `*.dmg`/`*.zip`, `*.AppImage`/`*.deb` + `latest*.yml` (metadata ของ updater)
+ไฟล์ที่ workflow นี้สร้าง: `*.exe` (NSIS + portable) สำหรับ Windows, `*.zip` (แอป `.app` สำหรับ macOS) และ `*.deb` สำหรับ Linux พร้อม `latest*.yml` (metadata ของ updater) — macOS package เป็น unsigned และ Linux workflow ปัจจุบันเลือก `.deb` เป็น target
 
 ### Auto-update (opt-in, ปิดไว้เป็นค่าเริ่มต้น)
 
