@@ -93,7 +93,7 @@ iOS ต้องใช้ macOS + Xcode: รัน `npm run mobile:add:ios`, `np
 
 ```bash
 npm test              # 512 tests (unit + integration)
-npm run test:browser  # 205 browser-flow checks ใน jsdom
+npm run test:browser  # 206 browser-flow checks ใน jsdom
 npx playwright install chromium # ครั้งแรก: เตรียมเบราว์เซอร์สำหรับ E2E
 npm run test:e2e      # real Chromium E2E (แชทใช้ mock AI ไม่เรียกบริการจริง)
 npm run check         # syntax + structure check
@@ -206,7 +206,7 @@ npm run perf          # performance budget ของ source/bundle
 
 ### 📦 คุณภาพที่วัดได้
 - `npm run perf` = performance budget จริง (source + gzip bundle) ทำงานใน CI ทุก PR
-- jsdom browser smoke 205 checks ครอบเส้นทางหลัก; Playwright/Chromium จริงตรวจ boot/แชท, permission ปฏิเสธ/อนุญาต/จำสิทธิ์, capability report เมื่อ API เสียงไม่พร้อม/ปฏิเสธไมค์, คิวออฟไลน์ที่ลบได้เมื่อผู้ใช้ยืนยันและส่งอัตโนมัติเมื่อกลับมาออนไลน์ รวมถึง backup restore ที่ไม่เขียน storage เมื่อยกเลิกและเขียนหลังยืนยันเท่านั้น; CI ตรวจ capability report เพิ่มใน Chromium/Firefox/WebKit (mock AI; timer อยู่ใน test context)
+- jsdom browser smoke 206 checks ครอบเส้นทางหลัก รวม health-history JSON import ที่ยกเลิกแล้ว storage ต้องไม่เปลี่ยน; Playwright/Chromium จริงตรวจ boot/แชท, permission ปฏิเสธ/อนุญาต/จำสิทธิ์, capability report เมื่อ API เสียงไม่พร้อม/ปฏิเสธไมค์, คิวออฟไลน์ที่ลบได้เมื่อผู้ใช้ยืนยันและส่งอัตโนมัติเมื่อกลับมาออนไลน์ รวมถึง backup restore ที่ไม่เขียน storage เมื่อยกเลิกและเขียนหลังยืนยันเท่านั้น; CI ตรวจ capability report เพิ่มใน Chromium/Firefox/WebKit (mock AI; timer อยู่ใน test context)
 - ทุก PR build และตรวจเนื้อหา Linux `.deb` จริง พร้อม upload/download round-trip ตรวจ SHA-256; CI ยังมี synthetic action check ส่วน release workflow ตรวจ checksum installer จริงทั้ง 3 OS และความถูกต้องของ updater metadata ก่อนเผยแพร่ (ด่านสาม OS จะรันเมื่อออก release/tag ไม่ใช่ทุก PR)
 
 ### 🔄 อัปเดตเวอร์ชัน (opt-in)

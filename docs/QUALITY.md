@@ -45,13 +45,14 @@ npm run perf
 
 ## 2) E2E (jsdom)
 
-`tests/smoke.browser.mjs` build bundle จริงด้วย esbuild แล้วรันใน jsdom — ตรวจ **205 จุด** ครอบ:
+`tests/smoke.browser.mjs` build bundle จริงด้วย esbuild แล้วรันใน jsdom — ตรวจ **206 จุด** ครอบ:
 
 - บูตแอป, persona, โหมด, จำนวนเครื่องมือ (28), settings
 - แชท: ส่งข้อความ → mock AI → tool call (`gold`), streaming, mic (mock SpeechRecognition)
 - งาน: เพิ่ม/เสร็จ/ตัวกรอง/**งานซ้ำเลื่อนรอบ** (journey), แจ้งเตือนผ่าน server
 - ความจำ/ปฏิทิน/อุปกรณ์/เดสก์ท็อป (recipes + dry-run)/MCP (proxy + stdio + device flow)
 - i18n: สลับอังกฤษ ↔ ไทย, `<html lang>`
+- backup/health: restore ที่ยกเลิกไม่เขียน storage, health-history JSON import ที่ยกเลิกไม่เขียน storage และนำเข้าเฉพาะ summary fields หลังยืนยัน
 - ออฟไลน์: คิวข้อความ + flush, diagnostics ที่ปิดข้อมูลอ่อนไหว
 
 > หมายเหตุ: `crypto.subtle` และ `SpeechRecognition` ถูก stub เพราะ jsdom ไม่มี — การทดสอบของจริง

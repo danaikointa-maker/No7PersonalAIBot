@@ -638,6 +638,13 @@ const historyBackupFile = new window.File([JSON.stringify({
   ],
 })], 'health-history.json', { type: 'application/json' });
 Object.defineProperty($('#health-history-import'), 'files', { value: [historyBackupFile], configurable: true });
+const healthHistoryBeforeCancel = window.localStorage.getItem('no7.health.history.v1');
+let healthImportConfirmCalls = 0;
+window.confirm = () => { healthImportConfirmCalls++; return false; };
+$('#health-history-import').dispatchEvent(new window.Event('change'));
+await wait(50);
+check('health history: canceling JSON import leaves storage unchanged', healthImportConfirmCalls === 1 && window.localStorage.getItem('no7.health.history.v1') === healthHistoryBeforeCancel);
+window.confirm = () => true;
 $('#health-history-import').dispatchEvent(new window.Event('change'));
 await wait(50);
 const healthHistoryAfterImport = JSON.parse(window.localStorage.getItem('no7.health.history.v1'));
