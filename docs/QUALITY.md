@@ -22,9 +22,9 @@ npm run perf
 ```
 📦 Performance budget
 | รายการ | วัดได้ | เพดาน | ผล |
-| source: ไฟล์ใหญ่สุด | 140.5 KB | 150 KB | ✅ |
-| source: รวมทุกโมดูล | 405.8 KB | 800 KB | ✅ |
-| dist: bundle หลัก (gzip) | 76 KB | 160 KB | ✅ |
+| source: ไฟล์ใหญ่สุด | 151.8 KB | 152 KB | ✅ |
+| source: รวมทุกโมดูล | 610.2 KB | 800 KB | ✅ |
+| dist: bundle หลัก (gzip) | 115.3 KB | 160 KB | ✅ |
 ...
 ✅ อยู่ใน budget ทั้งหมด
 ```
@@ -86,4 +86,4 @@ CI ติดตั้ง Chromium และรัน test นี้ทุก PR;
 - Playwright ครอบเฉพาะ boot และแชทพื้นฐาน ยังไม่ครอบ tool approval, offline restore หรือ native APIs
 - ยังไม่มี performance timing (LCP/INP) — มีแค่ขนาดไฟล์; วัด runtime ผ่าน `core/metrics.js` แทน
 - budget ตั้งจากค่าจริง + margin ~30–100% — ต้องปรับเมื่อเพิ่มฟีเจอร์ใหญ่
-- ปรับรอบ 9: `maxFileKb` 140 → 150 เพราะ `main.js` เพิ่มปุ่มส่งออกรายงาน + หน้ารายงานความขัดแย้งของซิงก์ (140.5 KB)
+- ค่าตัวอย่างอ้างอิงจากการตรวจล่าสุด; ใช้ `npm run perf` เพื่อวัดค่าปัจจุบันจริงก่อนเปลี่ยน `perf-budget.json`

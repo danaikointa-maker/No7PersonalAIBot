@@ -365,7 +365,7 @@ web/
  server/          companion server, bots และ atomic file writes
  devices/esp32/   Phone-Link reference client
  build/           ไอคอนสำหรับ installer ของ macOS/Windows/Linux
- tests/           node:test, server integration และ browser smoke บน jsdom
+ tests/           node:test, server integration, jsdom smoke และ Playwright E2E (`tests/e2e/`)
  docs/             คู่มือฟีเจอร์/โปรโตคอล/การ build
  tools/            check และ performance-budget scripts
 ```
