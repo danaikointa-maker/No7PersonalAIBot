@@ -58,7 +58,7 @@
 
 ## v2.0 — คุณภาพและการกระจาย
 
-สถานะของรายการเดิม: TTS พรีเมียม (ElevenLabs), local models (Ollama/LM Studio), auto-update, CI build desktop ทั้งสามระบบ, performance budget และ UI ไทย/อังกฤษ ส่งมอบแล้ว ส่วน Edge TTS/Kokoro ในแอปและ Playwright บน browser จริงยังไม่ใช่สิ่งที่ส่งมอบ; Playwright แยกเป็น backlog ด้านล่าง (ปัจจุบันใช้ jsdom browser smoke):
+สถานะของรายการเดิม: TTS พรีเมียม (ElevenLabs), local models (Ollama/LM Studio), auto-update, CI build desktop ทั้งสามระบบ, performance budget และ UI ไทย/อังกฤษ ส่งมอบแล้ว ส่วน Edge TTS/Kokoro ในแอปยังไม่ใช่สิ่งที่ส่งมอบ; Playwright Chromium smoke สำหรับ boot/chat ทำงานใน CI แล้ว โดยการขยาย coverage เป็นงานต่อเนื่องด้านล่าง (jsdom ยังคงเป็นชั้นทดสอบเร็ว):
 
 - [x] เลือกเสียง TTS ระดับพรีเมียมเพิ่ม — ElevenLabs
 - [x] โมเดลในเครื่อง (Ollama / LM Studio) และ provider fallback
@@ -75,8 +75,9 @@
 | P0 | แก้ Critical/High ใน dependency runtime และ desktop tooling | ✅ v2.42.1 | pin tar รุ่นแก้ critical; อัปเดต Electron/electron-builder/electron-updater; CI packaging smoke และ release matrix Linux/macOS/Windows ผ่าน |
 | P1 | ทบทวน low severity advisories ใน dev tooling | กำลังดำเนินการ | สาย moderate/high/critical ถูกปิดด้วย overrides ที่ทดสอบแล้ว; เหลือ 4 low ผ่าน deepmerge/workbox chain ซึ่งไม่มีการแก้แบบ semver-safe ใน lockfile ปัจจุบัน; ตรวจ upstream โดยไม่ downgrade tooling |
 | P1 | ย้าย Capacitor 6 → 8.6 | เกือบเสร็จ | v2.42.2 เผยแพร่แล้ว; CI generate/sync Android+iOS ผ่าน; ยังต้องทดสอบ microphone, navigation และ permissions บนอุปกรณ์จริงก่อนประกาศรองรับเต็มรูปแบบ |
-| P1 | ขยาย CI ให้เห็นความเสี่ยงของ desktop/mobile ก่อน release | กำลังดำเนินการ | Linux `.deb` smoke, release matrix 3 OS, audit gate และ Android/iOS generation + sync ผ่าน; เพิ่ม Playwright Chromium smoke ใน PR นี้; real-device checks ยังเป็น backlog |
-| P1 | เพิ่ม real-browser E2E | กำลังดำเนินการ | เพิ่ม Playwright/Chromium smoke สำหรับ boot และ chat ใน PR นี้; ต่อไปเพิ่ม tool approval, offline/restore และ browser capability tests โดยคง jsdom เป็นชั้นเร็ว |
+| P1 | ขยาย CI ให้เห็นความเสี่ยงของ desktop/mobile ก่อน release | เกือบเสร็จ | Linux `.deb` smoke, release matrix 3 OS, audit gate, Android/iOS generation + sync และ Chromium E2E ผ่าน; ต้องทดสอบ real-device behavior ก่อนรับรอง native เต็มรูปแบบ |
+| P1 | ขยาย real-browser E2E | ทำต่อเนื่อง | Playwright/Chromium boot + chat smoke ผ่าน CI แล้ว; เพิ่ม tool approval, offline/restore และ browser capability tests โดยคง jsdom เป็นชั้นเร็ว |
+| P2 | ปรับปรุง GitHub Actions runtime | กำลังดำเนินการ | อัปเดต checkout/setup-node/setup-java เป็น major ที่รองรับ Node 24 ใน CI และ release workflows; PR CI ตรวจทุก job รวม Android ส่วน release pipeline จะยืนยันอีกครั้งเมื่อมีการออก release ครั้งถัดไป |
 | P2 | ตรวจความสามารถเสียงบนอุปกรณ์จริง | รอการทดสอบอุปกรณ์ | ยืนยันข้อจำกัด SpeechRecognition/wake word บน iOS Safari และ Android WebView รุ่นต่าง ๆ; พิจารณา native speech plugin หลังทบทวนสิทธิ์, offline behavior และ privacy |
 | P2 | รักษาความถูกต้องของเอกสาร/ประวัติงาน | ทำต่อเนื่อง | ให้ README, BUILD, CHANGELOG, release metadata และสถานะใน PHASES ตรงกันทุกครั้งที่ส่ง release |
 
