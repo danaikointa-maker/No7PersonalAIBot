@@ -51,7 +51,7 @@ jobs:
           - os: ubuntu-22.04
             target: '--linux deb'
           - os: macos-15-intel
-            target: '--mac dmg zip'
+            target: '--mac zip'
           - os: windows-latest
             target: '--win nsis portable'
     runs-on: ${{ matrix.os }}
