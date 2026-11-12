@@ -1,11 +1,12 @@
 # 🧪 คุณภาพ — Performance budget + E2E
 
-No7 ใช้ด่านตรวจ 4 ชั้นใน CI (ทุก PR):
+No7 ใช้ด่านตรวจอัตโนมัติใน CI (ทุก PR):
 
 ```
 npm run check        → syntax + โครงสร้างไฟล์/เอกสาร
 npm test             → unit + integration (node --test)
-npm run test:browser → E2E ใน jsdom (รัน bundle จริง)
+npm run test:browser → flow tests ใน jsdom (รัน bundle จริง)
+npm run test:e2e     → Chromium E2E บน browser จริง
 npm run build        → ต้อง build ผ่าน + PWA manifest
 npm run perf         → performance budget (ต้องอยู่ในเพดาน)
 ```
@@ -44,7 +45,7 @@ npm run perf
 
 ## 2) E2E (jsdom)
 
-`tests/smoke.browser.mjs` build bundle จริงด้วย esbuild แล้วรันใน jsdom — ตรวจ **97 จุด** ครอบ:
+`tests/smoke.browser.mjs` build bundle จริงด้วย esbuild แล้วรันใน jsdom — ตรวจ **205 จุด** ครอบ:
 
 - บูตแอป, persona, โหมด, จำนวนเครื่องมือ (28), settings
 - แชท: ส่งข้อความ → mock AI → tool call (`gold`), streaming, mic (mock SpeechRecognition)
@@ -56,7 +57,18 @@ npm run perf
 > หมายเหตุ: `crypto.subtle` และ `SpeechRecognition` ถูก stub เพราะ jsdom ไม่มี — การทดสอบของจริง
 > (เสียง, คลิปบอร์ด, Electron bridge) ต้องรันในเบราว์เซอร์/เดสก์ท็อปแอป
 
-## 3) Integration tests ที่ spawn server จริง
+## 3) Real-browser E2E (Playwright + Chromium)
+
+`tests/e2e/chat.spec.js` เปิดแอปผ่าน Vite ใน Chromium จริง, ตรวจ boot/navigation และส่งข้อความผ่าน UI จนเห็นคำตอบจาก mock provider โดยไม่เรียกบริการคลาวด์จริง:
+
+```bash
+npx playwright install chromium # ครั้งแรก
+npm run test:e2e
+```
+
+CI ติดตั้ง Chromium และรัน test นี้ทุก PR; ส่วน microphone, wake word และการอนุญาต native ยังต้องทดสอบบนอุปกรณ์จริง
+
+## 4) Integration tests ที่ spawn server จริง
 
 | ไฟล์ | ทดสอบ |
 |---|---|
@@ -69,9 +81,9 @@ npm run perf
 
 ทุกตัวใช้ `NO7_DATA_DIR` ชี้ไป tmpdir → ไม่ทับข้อมูลจริง
 
-## 4) ข้อจำกัด
+## 5) ข้อจำกัด
 
-- ยังไม่มี Playwright/เบราว์เซอร์จริงใน CI (ต้องโหลด browser binary) — ใช้ jsdom แทน
+- Playwright ครอบเฉพาะ boot และแชทพื้นฐาน ยังไม่ครอบ tool approval, offline restore หรือ native APIs
 - ยังไม่มี performance timing (LCP/INP) — มีแค่ขนาดไฟล์; วัด runtime ผ่าน `core/metrics.js` แทน
 - budget ตั้งจากค่าจริง + margin ~30–100% — ต้องปรับเมื่อเพิ่มฟีเจอร์ใหญ่
 - ปรับรอบ 9: `maxFileKb` 140 → 150 เพราะ `main.js` เพิ่มปุ่มส่งออกรายงาน + หน้ารายงานความขัดแย้งของซิงก์ (140.5 KB)
