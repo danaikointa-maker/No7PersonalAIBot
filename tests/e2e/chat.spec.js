@@ -63,7 +63,9 @@ test('real Chromium boots No7 and completes a user-initiated chat turn', async (
 test('real Chromium permission dialog defaults to denial and blocks the requested action', async ({ page }) => {
   const pageErrors = [];
   const chatRequests = [];
+  const popups = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('popup', (popup) => popups.push(popup.url()));
   await configureTestPage(page, (payload) => {
     chatRequests.push(payload);
     if (chatRequests.length === 1) {
@@ -85,7 +87,8 @@ test('real Chromium permission dialog defaults to denial and blocks the requeste
   await page.locator('#confirm-no').click();
   await expect(dialog).toBeHidden();
   await expect(page.locator('#messages .msg.bot').last())
-    .toContainText('ฉันจะไม่เปิดหรือส่งข้อความ');
-  expect(chatRequests).toHaveLength(2);
+    .toContainText('ไม่ได้ทำอะไรต่อ');
+  expect(chatRequests).toHaveLength(1);
+  expect(popups).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
