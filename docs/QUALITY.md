@@ -3,7 +3,7 @@
 No7 ใช้ด่านตรวจอัตโนมัติใน CI (ทุก PR):
 
 ```
-npm run check        → syntax + โครงสร้างไฟล์/เอกสาร
+npm run check        → syntax + required files + relative Markdown links
 npm test             → unit + integration (node --test)
 npm run test:browser → flow tests ใน jsdom (รัน bundle จริง)
 npm run test:e2e     → Chromium E2E บน browser จริง

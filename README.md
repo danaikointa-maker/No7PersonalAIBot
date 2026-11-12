@@ -108,7 +108,7 @@ npm test              # 512 tests (unit + integration)
 npm run test:browser  # 206 browser-flow checks ใน jsdom
 npx playwright install chromium # ครั้งแรก: เตรียมเบราว์เซอร์สำหรับ E2E
 npm run test:e2e      # real Chromium E2E (แชทใช้ mock AI ไม่เรียกบริการจริง)
-npm run check         # syntax + structure check
+npm run check         # syntax, required files และ relative Markdown links
 npm run build         # production build
 npm run perf          # performance budget ของ source/bundle
 ```
