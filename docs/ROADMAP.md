@@ -74,8 +74,8 @@
 |---|---|---|---|
 | P0 | แก้ Critical/High ใน dependency runtime และ desktop tooling | ✅ v2.42.1 | pin tar รุ่นแก้ critical; อัปเดต Electron/electron-builder/electron-updater; CI packaging smoke และ release matrix Linux/macOS/Windows ผ่าน |
 | P1 | ทบทวน low severity advisories ใน dev tooling | กำลังดำเนินการ | สาย moderate/high/critical ถูกปิดด้วย overrides ที่ทดสอบแล้ว; เหลือ 4 low ผ่าน deepmerge/workbox chain ซึ่งไม่มีการแก้แบบ semver-safe ใน lockfile ปัจจุบัน; ตรวจ upstream โดยไม่ downgrade tooling |
-| P1 | ย้าย Capacitor 6 → 8.6 | กำลังดำเนินการ | CLI/core/android/ios รุ่น 8.6 ตรงกัน; CI generate/sync Android+iOS ผ่าน; v2.42.2 release packaging ยังรอ CI; ยังต้องทดสอบ microphone, navigation และ permissions บนอุปกรณ์จริงก่อนประกาศรองรับเต็มรูปแบบ |
-| P1 | ขยาย CI ให้เห็นความเสี่ยงของ desktop/mobile ก่อน release | กำลังดำเนินการ | Linux `.deb` smoke, release matrix 3 OS, audit gate และ Android/iOS project generation + sync ผ่านแล้ว; ยังไม่มี device/simulator E2E |
+| P1 | ย้าย Capacitor 6 → 8.6 | เกือบเสร็จ | v2.42.2 เผยแพร่แล้ว; CI generate/sync Android+iOS ผ่าน; ยังต้องทดสอบ microphone, navigation และ permissions บนอุปกรณ์จริงก่อนประกาศรองรับเต็มรูปแบบ |
+| P1 | ขยาย CI ให้เห็นความเสี่ยงของ desktop/mobile ก่อน release | เกือบเสร็จ | Linux `.deb` smoke, release matrix 3 OS, audit gate และ Android/iOS project generation + sync ผ่านแล้ว; คงการทดสอบอุปกรณ์จริงเป็น backlog |
 | P1 | เพิ่ม real-browser E2E | วางแผน | ประเมิน Playwright บน Chromium ใน CI เพื่อทดสอบ flow สำคัญจริง; คง jsdom tests เป็นชั้นที่เร็วกว่าและไม่อ้างว่าแทนอุปกรณ์จริง |
 | P2 | ตรวจความสามารถเสียงบนอุปกรณ์จริง | รอการทดสอบอุปกรณ์ | ยืนยันข้อจำกัด SpeechRecognition/wake word บน iOS Safari และ Android WebView รุ่นต่าง ๆ; พิจารณา native speech plugin หลังทบทวนสิทธิ์, offline behavior และ privacy |
 | P2 | รักษาความถูกต้องของเอกสาร/ประวัติงาน | ทำต่อเนื่อง | ให้ README, BUILD, CHANGELOG, release metadata และสถานะใน PHASES ตรงกันทุกครั้งที่ส่ง release |
@@ -87,7 +87,7 @@
 - Electron 45.3.0, electron-builder 26.18.x และ electron-updater 6.8.11 ผ่าน Linux packaging smoke และ release matrix; หลังจากนั้น pin patched glob/minimatch ตาม package subtree ลด audit จาก 12 เหลือ 4 low (ไม่มี moderate/high/critical)
 - เพิ่ม `npm audit --audit-level=moderate` เป็น CI/release gate; `npm audit fix --force` ไม่ใช้ เพราะเสนอ downgrade electron-builder หรือยก Capacitor เป็น major โดยไม่มี native validation
 - PR #74 อัปเดต Capacitor CLI/core/Android/iOS จาก 6.2 ไป 8.6; CI สร้าง/sync Android (JDK 21) และ iOS (macOS) ผ่าน โดยไม่เก็บ generated native project เข้า Git
-- รอบนี้เตรียมรุ่น v2.42.2, ปรับ README/BUILD/mobile docs เรื่อง Node.js และการสำรอง native project เดิม; release matrix จะตรวจแพ็กเกจหลัง merge
+- PR #75 รวมและเผยแพร่ [v2.42.2](https://github.com/danaikointa-maker/No7PersonalAIBot/releases/tag/v2.42.2) แล้ว; run 43169027271 ผ่าน verify และ build installer ครบทุกระบบ พร้อม updater metadata; README/BUILD/mobile docs ระบุ Node.js และคำเตือนสำรอง native project เดิม
 - ยังต้องทดสอบบนอุปกรณ์จริงก่อนรับรองไมโครโฟน/เสียง; ตรวจ upstream สำหรับ deepmerge low advisory ต่อไปโดยไม่ downgrade tooling
 
 ### วิธีตรวจรับก่อนปิดงานแต่ละชุด
