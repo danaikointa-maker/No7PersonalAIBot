@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { createBackup } from '../../web/src/core/backup.js';
 
 test.afterEach(async ({}, testInfo) => {
   if (testInfo.status === testInfo.expectedStatus || !testInfo.error) return;
@@ -6,16 +7,17 @@ test.afterEach(async ({}, testInfo) => {
   process.stdout.write(`::error title=Playwright failure: ${testInfo.title}::${message}\n`);
 });
 
-async function configureTestPage(page, onChatRequest) {
-  await page.addInitScript(() => {
+async function configureTestPage(page, onChatRequest, settingsOverrides = {}) {
+  await page.addInitScript((overrides) => {
     localStorage.setItem('no7.settings.v1', JSON.stringify({
       provider: 'pollinations',
       model: 'openai',
       costMode: 'free',
       streaming: false,
       tts: false,
+      ...overrides,
     }));
-  });
+  }, settingsOverrides);
 
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url());
@@ -133,6 +135,92 @@ test('real Chromium preserves an offline message until the user confirms removal
   expect(await page.evaluate(() => localStorage.getItem('no7.outbox.v1'))).toBeNull();
   expect(prompts).toHaveLength(2);
   expect(prompts[0]).toContain('ลบข้อความนี้');
+  expect(pageErrors).toEqual([]);
+});
+
+test('real Chromium flushes queued messages once after connectivity returns', async ({ page }) => {
+  const pageErrors = [];
+  const chatRequests = [];
+  await page.on('pageerror', (error) => pageErrors.push(error.message));
+  await configureTestPage(page, (payload) => {
+    chatRequests.push(payload);
+    return 'ตอบกลับหลังกลับมาออนไลน์';
+  });
+
+  await page.goto('/');
+  await page.context().setOffline(true);
+  await page.locator('#input').fill('ส่งข้อความนี้เมื่อกลับมาออนไลน์');
+  await page.locator('#send-btn').click();
+  await expect(page.locator('#outbox-panel')).toBeVisible();
+  expect(chatRequests).toHaveLength(0);
+
+  await page.context().setOffline(false);
+  await expect(page.locator('#messages .msg.bot').filter({ hasText: 'ตอบกลับหลังกลับมาออนไลน์' })).toHaveCount(1);
+  await expect(page.locator('#outbox-panel')).toBeHidden();
+  expect(chatRequests).toHaveLength(1);
+  expect(chatRequests[0].messages.some((message) => message.content.includes('ส่งข้อความนี้เมื่อกลับมาออนไลน์'))).toBe(true);
+  expect(await page.evaluate(() => localStorage.getItem('no7.outbox.v1'))).toBeNull();
+  expect(pageErrors).toEqual([]);
+});
+
+test('real Chromium previews backup restore and writes only after explicit confirmation', async ({ page }) => {
+  const pageErrors = [];
+  await page.on('pageerror', (error) => pageErrors.push(error.message));
+  await configureTestPage(page, () => 'ไม่ควรมีการเรียก AI ระหว่าง restore', { apiKey: 'device-local-secret' });
+  await page.goto('/');
+  await page.locator('#nav button[data-view="settings"]').click();
+
+  const timestamp = Date.now();
+  const backup = createBackup({
+    settings: { provider: 'pollinations', model: 'openai', uiLang: 'th', apiKey: '' },
+    facts: [{ id: 'e2e-restore-fact', text: 'ความจำจาก E2E restore', ts: timestamp, importance: 2 }],
+    log: [{ role: 'user', text: 'บทสนทนาจากไฟล์สำรอง E2E', ts: timestamp }],
+    notes: [{ text: 'โน้ตจากไฟล์สำรอง E2E', ts: timestamp }],
+    healthHistory: [{
+      date: new Date(timestamp).toISOString().slice(0, 10), score: 72, grade: 'B',
+      issues: { high: 0, medium: 1, low: 2 }, privateNote: 'ต้องไม่ถูกนำเข้า',
+    }],
+  }, { now: timestamp, version: 'e2e' });
+  const backupFile = {
+    name: 'no7-e2e-backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(backup)),
+  };
+  const beforeRestore = await page.evaluate(() => Object.fromEntries(
+    Object.keys(localStorage).filter((key) => key.startsWith('no7.')).sort()
+      .map((key) => [key, localStorage.getItem(key)]),
+  ));
+
+  const deniedDialog = page.waitForEvent('dialog');
+  await page.locator('#import-file').setInputFiles(backupFile);
+  const denied = await deniedDialog;
+  expect(denied.type()).toBe('confirm');
+  expect(denied.message()).toContain('พบข้อมูลสำรอง');
+  await denied.dismiss();
+  await expect(page.locator('#backup-status')).toContainText('ยกเลิกการนำเข้าแล้ว');
+  expect(await page.evaluate(() => Object.fromEntries(
+    Object.keys(localStorage).filter((key) => key.startsWith('no7.')).sort()
+      .map((key) => [key, localStorage.getItem(key)]),
+  ))).toEqual(beforeRestore);
+
+  const acceptedDialog = page.waitForEvent('dialog');
+  await page.locator('#import-file').setInputFiles(backupFile);
+  const accepted = await acceptedDialog;
+  expect(accepted.type()).toBe('confirm');
+  await accepted.accept();
+  await expect(page.locator('#backup-status')).toContainText('นำเข้าแล้ว');
+
+  const restored = await page.evaluate(() => ({
+    memory: JSON.parse(localStorage.getItem('no7.memory.v2') || '{}'),
+    notes: JSON.parse(localStorage.getItem('no7.notes.v1') || '[]'),
+    settings: JSON.parse(localStorage.getItem('no7.settings.v1') || '{}'),
+    health: JSON.parse(localStorage.getItem('no7.health.history.v1') || '{}'),
+  }));
+  expect(restored.memory.facts.some((fact) => fact.text === 'ความจำจาก E2E restore')).toBe(true);
+  expect(restored.memory.log.some((entry) => entry.text === 'บทสนทนาจากไฟล์สำรอง E2E')).toBe(true);
+  expect(restored.notes.some((note) => note.text === 'โน้ตจากไฟล์สำรอง E2E')).toBe(true);
+  expect(restored.settings.apiKey).toBe('device-local-secret');
+  expect(JSON.stringify(restored.health)).not.toContain('ต้องไม่ถูกนำเข้า');
   expect(pageErrors).toEqual([]);
 });
 
