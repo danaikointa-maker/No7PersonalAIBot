@@ -206,7 +206,7 @@ npm run perf          # performance budget ของ source/bundle
 
 ### 📦 คุณภาพที่วัดได้
 - `npm run perf` = performance budget จริง (source + gzip bundle) ทำงานใน CI ทุก PR
-- Browser smoke 205 checks ครอบเส้นทางหลัก: แชท → เครื่องมือ → งานซ้ำ → เดสก์ท็อป → MCP → i18n → ออฟไลน์
+- jsdom browser smoke 205 checks ครอบเส้นทางหลัก; Playwright/Chromium จริงตรวจ boot, แชท และยืนยันว่าการปฏิเสธ tool ไม่เรียกงานต่อ (mock AI; ไม่ส่งข้อมูลออก)
 
 ### 🔄 อัปเดตเวอร์ชัน (opt-in)
 - เดสก์ท็อปแอปเช็คอัปเดตเองเมื่อเปิด `NO7_AUTO_UPDATE=1` (แจ้งเตือนเมื่อมีใหม่, ติดตั้งตอนปิดแอป)
