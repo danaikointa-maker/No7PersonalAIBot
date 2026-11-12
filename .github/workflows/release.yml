@@ -82,11 +82,16 @@ jobs:
           # Keep enough sanitized tail context to show the actual failing command,
           # even when electron-builder's final diagnostic misses known keywords.
           selected = lines[-30:]
+          sanitized = []
           for line in selected:
               line = re.sub(r"https?://[^\s\"']+", '[URL redacted]', line)
               line = re.sub(r'(?i)(api[_-]?key|token|secret|password|authorization)(\s*[:=]\s*)[^,\s]+', r'\1\2[REDACTED]', line)
-              line = line[:500]
-              print(f'::error title=Sanitized packaging log::{line.replace(chr(37), "%25").replace(chr(13), "%0D").replace(chr(10), "%0A")}')
+              sanitized.append(line[:500])
+          # GitHub limits workflow-command annotations per step; combine the full tail
+          # into a single annotation so the final error cannot be dropped.
+          message = "\n".join(sanitized)
+          message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print(f'::error title=Sanitized packaging log::{message}')
           PY
             exit "$build_status"
           fi
