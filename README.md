@@ -10,6 +10,7 @@
 
 - [รุ่นล่าสุด](#รุ่นล่าสุด-v2422)
 - [เริ่มต้นใช้งาน](#เริ่มต้นใช้งาน)
+- [เลือกวิธีติดตั้ง](#เลือกวิธีติดตั้ง)
 - [ฟีเจอร์หลัก](#ทำอะไรได้-v242)
 - [แก้ปัญหาเบื้องต้นและดูแลข้อมูล](#แก้ปัญหาเบื้องต้นและดูแลข้อมูล)
 - [สถาปัตยกรรมและ Flowcharts](#สถาปัตยกรรม-โครงสร้างระบบและการไหลของข้อมูล)
@@ -32,6 +33,27 @@
 - Node.js **20 ขึ้นไป** และ npm (แนะนำ Node.js 22); Capacitor 8 ต้องใช้ Node.js 22 ขึ้นไป และการพัฒนา/แพ็ก Electron ต้องใช้ Node.js **22.12 ขึ้นไป**
 - Git สำหรับ clone repository
 - ใช้เว็บ/PWA ได้โดยไม่ต้องติดตั้งเครื่องมืออื่น; สร้างเดสก์ท็อปต้องใช้ Electron; Android ต้องมี Android Studio/SDK; iOS ต้องใช้ macOS และ Xcode
+
+### เลือกวิธีติดตั้ง
+
+```mermaid
+flowchart TD
+  START[เริ่มต้น: เลือกอุปกรณ์และวิธีใช้] --> PREBUILT{ต้องการแอปสำเร็จรูป?}
+  PREBUILT -->|ใช่| RELEASE[ดาวน์โหลดจาก GitHub Releases<br/>ไม่ต้องติดตั้ง Node.js]
+  PREBUILT -->|ไม่ ใช้ source code| RUNTIME{ต้องการรันแบบใด?}
+  RUNTIME -->|เว็บหรือ PWA| WEB[Node.js 20+<br/>npm ci แล้ว npm run dev/build]
+  RUNTIME -->|เดสก์ท็อป Electron| DESKTOP[Node.js 22.12+<br/>npm ci แล้ว npm run desktop:dist]
+  RUNTIME -->|Android| ANDROID[Node.js 22+ และ Android Studio/SDK<br/>mobile:add:android แล้ว mobile:sync]
+  RUNTIME -->|iOS| IOS[macOS, Xcode และ Node.js 22+<br/>mobile:add:ios แล้ว mobile:sync]
+  WEB --> OPEN[เปิดแอปและเลือก AI provider]
+  RELEASE --> OPEN
+  DESKTOP --> OPEN
+  ANDROID --> OPEN
+  IOS --> OPEN
+  OPEN --> PRIVACY[ตั้งค่าสิทธิ์เสียงตามต้องการ<br/>สำรอง/นำเข้าต้องสั่งและยืนยันเอง]
+```
+
+แผนภาพนี้ช่วยเลือกช่องทางเริ่มต้นเท่านั้น: การสร้าง native project เป็นขั้นตอนของนักพัฒนา และ CI ที่สร้าง/sync โปรเจกต์ไม่ได้แทนการทดสอบบนอุปกรณ์จริง
 
 ### ติดตั้งแอปสำเร็จรูป (ไม่ต้องใช้ Node.js)
 
@@ -272,6 +294,10 @@ tray · hotkey ระดับระบบ (`Ctrl/Cmd+Shift+Space`) · overlay a
 
 ```mermaid
 flowchart TB
+  subgraph BUILD[Build ครั้งเดียว]
+    SRC[web/ source code] --> VITE[Vite: npm run build]
+    VITE --> DIST[(dist/ web bundle)]
+  end
   subgraph CLIENT[แอป No7 — web/ ชุดเดียว]
     UI[UI: แชท · ตั้งค่า · timeline · cards]
     CORE[Core: agent loop · AI providers · memory · tools]
@@ -286,6 +312,9 @@ flowchart TB
     ELECTRON[Electron desktop<br/>main process + preload bridge]
     CAP[Capacitor Android / iOS]
   end
+  DIST --> PWA
+  DIST --> ELECTRON
+  DIST --> CAP
   PWA -->|แสดง web bundle| UI
   ELECTRON -->|ห่อ web bundle + IPC ที่จำกัด| UI
   CAP -->|แสดง web bundle + native plugins| UI
