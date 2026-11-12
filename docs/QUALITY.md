@@ -59,7 +59,7 @@ npm run perf
 
 ## 3) Real-browser E2E (Playwright + Chromium)
 
-`tests/e2e/chat.spec.js` เปิดแอปผ่าน Vite ใน Chromium จริง ตรวจ boot/navigation และส่งข้อความผ่าน UI ด้วย mock provider; กรณี permission ตรวจทั้งการปฏิเสธที่ไม่เรียกเครื่องมือ และการอนุญาตพร้อม “อนุญาตตลอด session” ที่เรียก timer ใน browser context ทดสอบได้ โดยไม่มีการส่งข้อมูลออก
+`tests/e2e/chat.spec.js` เปิดแอปผ่าน Vite ใน Chromium จริง ตรวจ boot/navigation และแชทด้วย mock provider; ครอบ permission ทั้งปฏิเสธและอนุญาต/จำสิทธิ์ตลอด session (timer อยู่ใน browser context ทดสอบ) และ outbox offline ที่เก็บข้อความไว้จนผู้ใช้ยืนยันการลบ โดยไม่มีการส่งข้อมูลออก
 
 ```bash
 npx playwright install chromium # ครั้งแรก
@@ -83,7 +83,7 @@ CI ติดตั้ง Chromium และรัน test นี้ทุก PR;
 
 ## 5) ข้อจำกัด
 
-- Playwright ครอบ boot, แชท, ปฏิเสธ, อนุญาต และจำสิทธิ์ตลอด session; ยังไม่ครอบ offline restore หรือ native APIs
+- Playwright ครอบ boot, แชท, permission denial/approval/session และ offline enqueue/ลบแบบยืนยัน; ยังไม่ครอบการ flush เมื่อกลับออนไลน์, backup restore หรือ native APIs
 - ยังไม่มี performance timing (LCP/INP) — มีแค่ขนาดไฟล์; วัด runtime ผ่าน `core/metrics.js` แทน
 - budget ตั้งจากค่าจริง + margin ~30–100% — ต้องปรับเมื่อเพิ่มฟีเจอร์ใหญ่
 - ค่าตัวอย่างอ้างอิงจากการตรวจล่าสุด; ใช้ `npm run perf` เพื่อวัดค่าปัจจุบันจริงก่อนเปลี่ยน `perf-budget.json`

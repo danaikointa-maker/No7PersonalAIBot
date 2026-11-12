@@ -94,6 +94,48 @@ test('real Chromium can approve a tool and remember approval for the session', a
   expect(pageErrors).toEqual([]);
 });
 
+test('real Chromium preserves an offline message until the user confirms removal', async ({ page }) => {
+  const pageErrors = [];
+  const chatRequests = [];
+  const prompts = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await configureTestPage(page, (payload) => {
+    chatRequests.push(payload);
+    return 'คำตอบจำลอง';
+  });
+
+  await page.goto('/');
+  await page.context().setOffline(true);
+  await page.locator('#input').fill('เก็บข้อความไว้ในคิวออฟไลน์');
+  await page.locator('#send-btn').click();
+
+  const panel = page.locator('#outbox-panel');
+  await expect(panel).toBeVisible();
+  await expect(page.locator('#outbox-badge')).toContainText('1');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('no7.outbox.v1') || '[]').map((item) => item.text)))
+    .toEqual(['เก็บข้อความไว้ในคิวออฟไลน์']);
+  expect(chatRequests).toHaveLength(0);
+
+  page.once('dialog', async (dialog) => {
+    prompts.push(dialog.message());
+    await dialog.dismiss();
+  });
+  await page.locator('#outbox-list button').click();
+  await expect(panel).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('no7.outbox.v1') || '[]'))).toHaveLength(1);
+
+  page.once('dialog', async (dialog) => {
+    prompts.push(dialog.message());
+    await dialog.accept();
+  });
+  await page.locator('#outbox-list button').click();
+  await expect(panel).toBeHidden();
+  expect(await page.evaluate(() => localStorage.getItem('no7.outbox.v1'))).toBeNull();
+  expect(prompts).toHaveLength(2);
+  expect(prompts[0]).toContain('ลบข้อความนี้');
+  expect(pageErrors).toEqual([]);
+});
+
 test('real Chromium permission dialog defaults to denial and blocks the requested action', async ({ page }) => {
   const pageErrors = [];
   const chatRequests = [];
