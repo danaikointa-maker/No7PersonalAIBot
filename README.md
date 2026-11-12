@@ -370,6 +370,7 @@ web/
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | โครงสร้าง, state machine, permission gate, data flow |
 | [docs/PRINCIPLES.md](docs/PRINCIPLES.md) | หลักการจาก repo เดิม → อยู่ตรงไหนในโค้ดนี้ |
 | [docs/PHASES.md](docs/PHASES.md) | แผนเฟสและสถานะการปิดงาน |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | ลำดับงานที่เหลือและเงื่อนไขตรวจรับ |
 | [docs/MEMORY.md](docs/MEMORY.md) | ความจำ BM25 + consolidation |
 | [docs/VOICE.md](docs/VOICE.md) | สตรีมมิ่ง, พูดก่อนจบ, wake word |
 | [docs/PERSONA.md](docs/PERSONA.md) | Persona Studio |

@@ -1383,9 +1383,9 @@ Phone-Link ครบวงจร (hello/eyes/voice), และ MCP OAuth ที�
 |---|---|---|
 | CC1 | ใช้ redaction กลางและ scrub secrets ใน MCP settings ซ้อน | ✅ |
 | CC2 | ทดสอบ secret variants และคง public preferences | ✅ |
-| CC3 | Release 2.42 + ตรวจรับ + PR | ⏳ |
+| CC3 | Release 2.42 + ตรวจรับ + PR | ✅ |
 
 - [x] CC1: bundle ไม่ส่ง API keys, tokens, client secrets หรือ Authorization headers จาก settings/MCP
 - [x] CC2: tests ตรวจทุกตำแหน่ง secret, คง preferences และ preserve credentials ในเครื่องเมื่อยืนยัน restore
 - [x] CC3: test/browser/check/build/perf ผ่าน
-- [ ] CC3: commit, push, PR, CI และ merge v2.42.0
+- [x] CC3: commit, push, PR, CI และ merge v2.42.0

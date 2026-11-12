@@ -58,8 +58,37 @@
 
 ## v2.0 — คุณภาพและการกระจาย
 
-- [ ] เลือกเสียง TTS ระดับพรีเมียมเพิ่ม (Edge TTS / Kokoro in-app / ElevenLabs)
-- [ ] โมเดลในเครื่องเต็มรูปแบบ (Ollama/Llama.cpp) สำหรับโหมดออฟไลน์
-- [ ] Auto-update (electron-updater), CI build ทั้ง 3 แพลตฟอร์ม
-- [ ] E2E test (Playwright) + performance budget
-- [ ] i18n: ไทย/อังกฤษ สลับได้ทั้ง UI
+สถานะของรายการเดิม: TTS พรีเมียม (ElevenLabs), local models (Ollama/LM Studio), auto-update, CI build desktop ทั้งสามระบบ, performance budget และ UI ไทย/อังกฤษ ส่งมอบแล้ว ส่วน Edge TTS/Kokoro ในแอปและ Playwright บน browser จริงยังไม่ใช่สิ่งที่ส่งมอบ; Playwright แยกเป็น backlog ด้านล่าง (ปัจจุบันใช้ jsdom browser smoke):
+
+- [x] เลือกเสียง TTS ระดับพรีเมียมเพิ่ม — ElevenLabs
+- [x] โมเดลในเครื่อง (Ollama / LM Studio) และ provider fallback
+- [x] Auto-update (electron-updater), CI build ทั้ง 3 แพลตฟอร์ม
+- [x] Performance budget และ browser smoke/integration checks บน jsdom
+- [x] i18n: ไทย/อังกฤษ สลับได้ทั้ง UI
+
+## งานคงค้างและลำดับถัดไป (ตรวจสถานะ 2026-11-10)
+
+เอกสารนี้สรุปงานต่อเนื่องจากสถานะ repository และผลตรวจ dependency ปัจจุบัน ไม่ใช่คำรับรองกำหนดส่ง; ปิดรายการเมื่อมีหลักฐานทดสอบและส่งงานครบเท่านั้น อย่าลบหรือย้ายข้อมูลผู้ใช้โดยอัตโนมัติ งาน backup/import/sync ต้องคงการเริ่มโดยผู้ใช้, การยืนยันก่อนเขียน storage และข้อจำกัดข้อมูลสุขภาพเป็น summary metrics เท่านั้น
+
+| ลำดับ | งาน | สถานะ | เงื่อนไขปิดงาน |
+|---|---|---|---|
+| P0 | ปิดช่องโหว่ dependency ที่เหลือ | กำลังดำเนินการ | อัปเดต Electron และ electron-builder ไปยังรุ่นที่แก้ advisory โดยทดสอบ desktop packaging/updater; แยก Capacitor major migration เพื่อไม่ให้ CLI และ native projects เปลี่ยนโดยไม่ตรวจ |
+| P1 | ย้าย Capacitor 6 ไปสายที่ได้รับ security fixes | วางแผน | ปรับ CLI/core/android/ios ให้รุ่นเข้ากัน, อัปเดตข้อกำหนด Node/Android Gradle/Xcode และทดสอบสร้าง/sync native project บน Android/iOS; ไม่เปลี่ยน native project ที่ผู้ใช้มีอยู่แบบทำลายข้อมูล |
+| P1 | ขยาย CI ให้เห็นความเสี่ยงของ desktop/mobile ก่อน release | วางแผน | เพิ่ม audit policy ที่ผ่านได้โดยไม่ซ่อน advisories, ตรวจ package/auto-update และให้ release workflow เป็นตัวสร้าง artifacts จริงบนแต่ละ OS |
+| P1 | เพิ่ม real-browser E2E | วางแผน | ประเมิน Playwright บน Chromium ใน CI เพื่อทดสอบ flow สำคัญจริง; คง jsdom tests เป็นชั้นที่เร็วกว่าและไม่อ้างว่าแทนอุปกรณ์จริง |
+| P2 | ตรวจความสามารถเสียงบนอุปกรณ์จริง | รอการทดสอบอุปกรณ์ | ยืนยันข้อจำกัด SpeechRecognition/wake word บน iOS Safari และ Android WebView รุ่นต่าง ๆ; พิจารณา native speech plugin หลังทบทวนสิทธิ์, offline behavior และ privacy |
+| P2 | รักษาความถูกต้องของเอกสาร/ประวัติงาน | ทำต่อเนื่อง | ให้ README, BUILD, CHANGELOG, release metadata และสถานะใน PHASES ตรงกันทุกครั้งที่ส่ง release |
+
+### งานเริ่มต้นในรอบนี้
+
+- ตรวจพบ `npm audit` ใน lockfile ก่อนแก้มี 23 รายการ (รวม critical 1); pin `tar@7.5.23` ผ่าน npm override แบบทั่ว dependency tree ซึ่งเป็นรุ่นที่แก้ advisory ในช่วงรุ่นปัจจุบัน และลดรายการที่ audit รายงานเป็น 18 โดยไม่มี critical
+- ขั้นต่อไปคือย้าย Electron และ electron-builder ซึ่งต้องอัปเกรด major และตรวจเส้นทาง build/update จริง; ไม่ใช้ `npm audit fix --force` แบบเหมารวม เพราะอาจกระโดด Capacitor major พร้อมกันโดยไม่ผ่าน native validation
+- Capacitor 8 ต้องการ Node 22; วางเป็น migration แยก พร้อมกำหนด runtime/build matrix ให้ชัดก่อนเปลี่ยน dependency กลุ่มนี้
+
+### วิธีตรวจรับก่อนปิดงานแต่ละชุด
+
+1. ติดตั้งแบบ clean จาก lockfile (`npm ci`) และตรวจ `npm audit` แยกตาม dependency direct/transitive; บันทึกข้อยกเว้นพร้อมเหตุผลและวันทบทวน ห้ามปิด audit ด้วยการซ่อนหรือปิดคำเตือน
+2. รัน `npm run check`, `npm test`, `npm run test:browser`, `npm run build`, `npm run perf` และ `git diff --check`
+3. สำหรับ Electron/electron-builder: ทดสอบแพ็กเกจบน OS ที่เกี่ยวข้อง, เปิด/ตรวจอัปเดตโดยไม่ติดตั้งเองแบบเงียบ และยืนยันไฟล์ release ตรงกับ workflow
+4. สำหรับ Capacitor: สร้าง/sync โปรเจกต์ทดลองบน Android และ iOS ตามเอกสาร platform; ตรวจ permission prompts, microphone, navigation และ backup/restore บนอุปกรณ์จริง ก่อนประกาศรองรับ
+5. หลัง merge ตรวจ PR, CI, release metadata และสถานะ repository; ไม่ออก release ใหม่เพียงเพราะมีการเปลี่ยนเอกสารหรือ lockfile โดยไม่มีเหตุผลด้านเวอร์ชัน/ผู้ใช้

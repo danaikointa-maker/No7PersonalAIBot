@@ -88,5 +88,8 @@
   },
   "dependencies": {
     "electron-updater": "^6.3.9"
+  },
+  "overrides": {
+    "tar": "^7.5.23"
   }
 }
