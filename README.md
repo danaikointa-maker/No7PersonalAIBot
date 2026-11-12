@@ -260,7 +260,11 @@ flowchart TB
 flowchart TD
   USER[ผู้ใช้พิมพ์หรือพูด] --> CHAT[หน้าสนทนาใน web app]
   CHAT --> AGENT[Agent ประกอบ prompt และเลือก AI provider]
-  AGENT --> DECIDE{AI ตอบเลยหรือขอเรียก tool?}
+  AGENT --> MODE{ผู้ใช้ตั้ง AI แบบใด?}
+  MODE -->|คลาวด์| CLOUD[ส่ง prompt ที่จำเป็นไปยัง provider ที่เลือก]
+  MODE -->|โมเดลในเครื่อง| LOCAL[ส่งคำขอไป Ollama หรือ LM Studio ที่ผู้ใช้กำหนด]
+  CLOUD --> DECIDE{AI ตอบเลยหรือขอเรียก tool?}
+  LOCAL --> DECIDE
   DECIDE -->|ตอบข้อความ| FINAL[แสดงคำตอบและพูดด้วย TTS หากเปิดใช้]
   FINAL --> SAVE[เก็บบทสนทนา/ความจำตามการตั้งค่าในอุปกรณ์]
   DECIDE -->|เรียก tool| GATE[ตรวจหมวดสิทธิ์และระดับความเสี่ยง]
