@@ -10,6 +10,7 @@
 
 - [เริ่มต้นใช้งาน](#เริ่มต้นใช้งาน)
 - [ฟีเจอร์หลัก](#ทำอะไรได้-v242)
+- [แก้ปัญหาเบื้องต้นและดูแลข้อมูล](#แก้ปัญหาเบื้องต้นและดูแลข้อมูล)
 - [สถาปัตยกรรมและ Flowcharts](#สถาปัตยกรรม-โครงสร้างระบบและการไหลของข้อมูล)
 - [เอกสารรายฟีเจอร์](#เอกสาร)
 - [ความเป็นส่วนตัว](#ความเป็นส่วนตัว)
@@ -90,6 +91,17 @@ npm run check         # syntax + structure check
 npm run build         # production build
 npm run perf          # performance budget ของ source/bundle
 ```
+
+### แก้ปัญหาเบื้องต้นและดูแลข้อมูล
+
+| อาการ | วิธีตรวจสอบ/แก้ไข |
+|---|---|
+| เปิดไมค์ไม่ได้ | ใช้ `localhost` หรือ HTTPS, อนุญาตไมโครโฟนทั้งใน browser และระบบปฏิบัติการ; การเปิด IP ใน LAN ผ่าน HTTP อาจไม่ใช่ secure context |
+| AI ไม่ตอบหรือแจ้งคีย์ผิด | ตรวจ provider, model และ API key ใน ⚙️ ตั้งค่า; ถ้าใช้ Ollama ให้ตรวจว่า service และ model ที่เลือกทำงานอยู่ หากใช้คีย์จาก companion server ให้ตรวจ environment variable แล้วเริ่ม server ใหม่ |
+| ซิงก์ไม่ถึง server | ตรวจว่า client เข้าถึง host/port ได้ และ `NO7_SYNC_TOKEN` ที่ตั้งในแอปตรงกับ server; ห้ามเปิด server สู่สาธารณะโดยไม่มี token และ HTTPS/firewall |
+| หน้าเว็บไม่อัปเดตหลัง deploy | ลอง reload แบบไม่ใช้ cache หรือปิด/เปิดแอปใหม่; อย่าล้าง site data/local storage หากยังไม่ได้ export backup เพราะข้อมูลในเครื่องอาจถูกลบ |
+| ย้ายเครื่องหรือจะล้างข้อมูล | สร้างและตรวจไฟล์ backup จากหน้าแอปก่อน; backup เป็นไฟล์ที่ผู้ใช้ดาวน์โหลดเอง ส่วน sync จะส่งข้อมูลหลังผู้ใช้กดเท่านั้นและ redact secrets ก่อนส่ง; ประวัติสุขภาพส่งออกเฉพาะ summary metrics |
+| แอปเดสก์ท็อปเปิดไม่ได้ | ติดตั้ง dependencies ด้วย `npm ci` ปกติ (อย่าใช้ `--ignore-scripts` เมื่อต้องรัน Electron) แล้วลอง `npm run desktop`; ดูรายละเอียด installer และระบบที่รองรับใน [docs/BUILD.md](docs/BUILD.md) |
 
 ---
 
