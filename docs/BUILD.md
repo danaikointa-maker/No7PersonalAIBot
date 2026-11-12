@@ -57,6 +57,8 @@ git tag v2.0.0 && git push origin v2.0.0
 
 ไฟล์ที่ workflow นี้สร้าง: `*.exe` (NSIS + portable) สำหรับ Windows, `*.zip` (แอป `.app` สำหรับ macOS) และ `*.deb` สำหรับ Linux พร้อม `latest*.yml` (metadata ของ updater) — macOS package เป็น unsigned และ Linux workflow ปัจจุบันเลือก `.deb` เป็น target
 
+CI มี synthetic artifact round-trip ตรวจ `upload-artifact@v7` → `download-artifact@v8` แบบ `merge-multiple`; เป็นการตรวจ action compatibility ไม่ได้แทนการปล่อย release จริงหรือการตรวจไฟล์ installer ของแต่ละ OS
+
 ### Auto-update (opt-in, ปิดไว้เป็นค่าเริ่มต้น)
 
 `desktop/updater.js` ต่อ `electron-updater` เฉพาะเมื่อ **ติดตั้งแล้ว (packaged)** และผู้ใช้เปิดเอง:

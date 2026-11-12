@@ -94,6 +94,36 @@ jobs:
       - name: Generate and sync iOS project
         run: npm run mobile:add:ios && npx cap sync ios
 
+  artifact-roundtrip:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Create two synthetic release artifacts
+        run: |
+          mkdir -p "$RUNNER_TEMP/no7-artifact-a" "$RUNNER_TEMP/no7-artifact-b"
+          printf 'linux-installer\n' > "$RUNNER_TEMP/no7-artifact-a/linux.txt"
+          printf 'windows-installer\n' > "$RUNNER_TEMP/no7-artifact-b/windows.txt"
+      - name: Upload first artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: no7-artifact-a
+          path: ${{ runner.temp }}/no7-artifact-a/linux.txt
+      - name: Upload second artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: no7-artifact-b
+          path: ${{ runner.temp }}/no7-artifact-b/windows.txt
+      - name: Download and merge artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/no7-artifact-roundtrip
+          merge-multiple: true
+      - name: Verify artifact contents
+        env:
+          ROUNDTRIP_DIR: ${{ runner.temp }}/no7-artifact-roundtrip
+        run: |
+          test "$(cat "$ROUNDTRIP_DIR/linux.txt")" = 'linux-installer'
+          test "$(cat "$ROUNDTRIP_DIR/windows.txt")" = 'windows-installer'
+
   browser-e2e:
     runs-on: ubuntu-22.04
     env:
