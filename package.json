@@ -1,6 +1,6 @@
 {
   "name": "no7-personal-ai-bot",
-  "version": "2.42.0",
+  "version": "2.42.1",
   "description": "No7 Personal AI Bot — one codebase for Mobile + PC (PWA + Electron + Capacitor), Thai-first voice AI companion with role modes, multi-step agent and permission gate",
   "type": "module",
   "private": true,
@@ -36,8 +36,8 @@
     "@capacitor/cli": "^6.2.0",
     "@capacitor/core": "^6.2.0",
     "@capacitor/ios": "^6.2.0",
-    "electron": "^33.2.0",
-    "electron-builder": "^25.1.8",
+    "electron": "^45.3.0",
+    "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
     "jsdom": "^31.0.0",
     "vite": "^6.0.7",
@@ -87,7 +87,7 @@
     ]
   },
   "dependencies": {
-    "electron-updater": "^6.3.9"
+    "electron-updater": "^6.8.11"
   },
   "overrides": {
     "tar": "^7.5.23"

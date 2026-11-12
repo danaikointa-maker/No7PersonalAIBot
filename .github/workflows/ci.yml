@@ -40,3 +40,20 @@ jobs:
           name: no7-dist
           path: dist/
           retention-days: 7
+
+  desktop-smoke:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install desktop dependencies
+        run: npm ci
+      - name: Verify Electron runtime
+        run: npx electron --version
+      - name: Build web bundle
+        run: npm run build
+      - name: Package Linux desktop installer
+        run: npx electron-builder --linux deb --publish never
