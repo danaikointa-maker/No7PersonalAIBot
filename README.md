@@ -70,7 +70,7 @@ npm run mobile:sync         # build และ sync ไปยังโปรเ�
 npm run mobile:open:android # เปิด Android Studio
 ```
 
-iOS ต้องใช้ macOS + Xcode: รัน `npm run mobile:add:ios`, `npm run mobile:sync`, แล้ว `npx cap open ios` การสร้าง native project เป็นขั้นตอนครั้งแรก; Android/iOS project อาจต้องตั้ง signing และสิทธิ์ไมโครโฟนตามคู่มือแพลตฟอร์ม
+iOS ต้องใช้ macOS + Xcode: รัน `npm run mobile:add:ios`, `npm run mobile:sync`, แล้ว `npx cap open ios` การสร้าง native project เป็นขั้นตอนครั้งแรก; Android/iOS project อาจต้องตั้ง signing และสิทธิ์ไมโครโฟนตามคู่มือแพลตฟอร์ม ตัวติดตั้ง macOS จาก CI เป็น unsigned build; macOS อาจต้องให้ผู้ใช้ยืนยันการเปิดแอปจากผู้พัฒนาที่ไม่รู้จัก
 
 ### ตรวจสอบโค้ด
 

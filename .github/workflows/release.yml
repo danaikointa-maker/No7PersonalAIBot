@@ -72,7 +72,7 @@ jobs:
           npx electron-builder ${{ matrix.target }} --publish never 2>&1 | tee "$RUNNER_TEMP/electron-builder.log"
           build_status=${PIPESTATUS[0]}
           if [ "$build_status" -ne 0 ]; then
-            echo "### Sanitized packaging log (last 40 lines)" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Sanitized packaging log (last 30 lines)" >> "$GITHUB_STEP_SUMMARY"
             python3 - "$RUNNER_TEMP/electron-builder.log" <<'PY'
           import re
           import sys
@@ -85,8 +85,10 @@ jobs:
           sanitized = []
           for line in selected:
               line = re.sub(r"https?://[^\s\"']+", '[URL redacted]', line)
-              line = re.sub(r'(?i)(api[_-]?key|token|secret|password|authorization)(\s*[:=]\s*)[^,\s]+', r'\1\2[REDACTED]', line)
-              sanitized.append(line[:500])
+              line = re.sub(r'(?i)(api[_-]?key|token|secret|password|passphrase|authorization)(\s*[:=]\s*)[^,\s]+', r'\1\2[REDACTED]', line)
+              line = re.sub(r'(?i)(--password|--passphrase|-p)(\s+)([^\s]+)', r'\1\2[REDACTED]', line)
+              line = re.sub(r'(?i)\bgh[pousr]_[A-Za-z0-9_]{20,}\b', '[TOKEN REDACTED]', line)
+              sanitized.append(line[:2000])
           # GitHub limits workflow-command annotations per step; combine the full tail
           # into a single annotation so the final error cannot be dropped.
           message = "\n".join(sanitized)
@@ -98,12 +100,6 @@ jobs:
         env:
           DEBUG: electron-builder
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS signing (ไม่ตั้ง = unsigned build, ใช้ได้แต่ผู้ใช้ต้องอนุญาตเอง)
-          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
-          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.MAC_CERT_P12 != '' }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:

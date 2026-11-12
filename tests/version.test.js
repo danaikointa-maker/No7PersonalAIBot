@@ -54,6 +54,7 @@ test('desktop packaging icons exist in the formats referenced by the build confi
   const macPng = fs.readFileSync(iconPath('mac'));
   assert.equal(macPng.toString('hex', 0, 8), '89504e470d0a1a0a');
   assert.ok(macPng.readUInt32BE(16) >= 512 && macPng.readUInt32BE(20) >= 512, 'macOS PNG ต้องมีความละเอียดอย่างน้อย 512×512');
+  assert.equal(build.mac.identity, null, 'CI build เป็น unsigned ได้โดยไม่เรียก keychain สำหรับ signing');
   assert.equal(fs.readFileSync(iconPath('win')).readUInt16LE(2), 1);
   assert.equal(fs.readFileSync(iconPath('linux')).toString('ascii', 1, 4), 'PNG');
 });
@@ -70,5 +71,6 @@ test('release workflow triggers on version tags and builds all 3 platforms', () 
   assert.match(rel, /tag_name: \$\{\{ inputs\.release_tag \|\| github\.ref_name \}\}/);
   assert.match(rel, /Sanitized packaging log/);
   assert.match(rel, /--linux deb/);
-  assert.match(rel, /CSC_IDENTITY_AUTO_DISCOVERY/);
+  assert.match(rel, /target: '--mac zip'/);
+  assert.equal(JSON.parse(read('package.json')).build.mac.identity, null);
 });

@@ -72,8 +72,8 @@ git tag v2.0.0 && git push origin v2.0.0
 พฤติกรรม: เช็คครั้งแรกหลังเปิดแอป → แจ้งเตือนผ่าน OS notification ทุกขั้น (มีใหม่/ดาวน์โหลด %/พร้อมติดตั้ง)
 → ติดตั้งเมื่อปิดแอป (`autoInstallOnAppQuit`) — **ไม่รีสตาร์ตเอง** และ tray มีเมนู "ตรวจอัปเดต"
 
-> signing: ไม่ตั้ง `MAC_CERT_P12`/`APPLE_ID` ก็ build ได้ แต่ macOS จะเตือน "unidentified developer"
-> Windows ไม่ต้องมี certificate สำหรับการใช้งานส่วนตัว (SmartScreen จะเตือนครั้งแรก)
+> macOS release นี้ตั้งใจ build แบบ unsigned (`mac.identity: null`) เพื่อไม่เรียก keychain signing ใน CI — ผู้ใช้อาจต้องอนุญาตแอปจากผู้พัฒนาที่ไม่รู้จักตามการตั้งค่าความปลอดภัยของ macOS
+> Windows ไม่ต้องมี certificate สำหรับการใช้งานส่วนตัว (SmartScreen อาจเตือนครั้งแรก)
 
 ## 3) มือถือ (Capacitor)
 
