@@ -57,7 +57,7 @@ git tag v2.0.0 && git push origin v2.0.0
 
 ไฟล์ที่ workflow นี้สร้าง: `*.exe` (NSIS + portable) สำหรับ Windows, `*.zip` (แอป `.app` สำหรับ macOS) และ `*.deb` สำหรับ Linux พร้อม `latest*.yml` (metadata ของ updater) — macOS package เป็น unsigned และ Linux workflow ปัจจุบันเลือก `.deb` เป็น target
 
-CI มี synthetic artifact round-trip ตรวจ `upload-artifact@v7` → `download-artifact@v8` แบบ `merge-multiple` สำหรับทุก PR; ใน release workflow แต่ละ OS จะสร้าง SHA-256 manifest คู่กับ installer/metadata แล้ว job `publish` ดาวน์โหลดรวมกลับมาและตรวจ checksum, รูปแบบ installer ของ Linux/macOS/Windows และไฟล์ที่ updater metadata อ้างถึงก่อนสร้าง GitHub Release หากไฟล์ขาดหรือไม่ตรง workflow จะหยุดก่อนเผยแพร่ การตรวจ installer จริงนี้จะรันเมื่อมี release tag/manual release ไม่ได้รันทุก PR และยังไม่ใช่การติดตั้ง/เปิดแอปบนทุก OS
+CI ทุก PR สร้าง Linux `.deb` จริง ตรวจ version และไฟล์ `app.asar`/desktop entry หลัง extract แล้ว upload/download กลับมาตรวจ SHA-256; ยังมี synthetic artifact round-trip ตรวจ `upload-artifact@v7` → `download-artifact@v8` แบบ `merge-multiple` เพื่อเช็ก action compatibility ด้วย ส่วน release workflow สร้าง SHA-256 manifest ต่อ OS แล้ว job `publish` ดาวน์โหลดรวม installer/metadata ของทั้งสามระบบ ตรวจ checksum, รูปแบบแพ็กเกจ และไฟล์ที่ updater metadata อ้างถึงก่อนสร้าง GitHub Release หากขาดหรือไม่ตรงจะหยุดก่อนเผยแพร่; การตรวจสาม OS รันเฉพาะ release tag/manual release และไม่ใช่การติดตั้ง/เปิดแอปบนทุกระบบ
 
 ### Auto-update (opt-in, ปิดไว้เป็นค่าเริ่มต้น)
 
@@ -103,7 +103,7 @@ npx cap open ios
 ## 4) ทดสอบ
 
 ```bash
-npm test              # 511 unit + integration tests
+npm test              # 512 unit + integration tests
 npm run test:browser  # 205 browser-flow checks ที่รัน bundle จริงบน jsdom
 npx playwright install chromium # ครั้งแรก: เตรียม Chromium สำหรับ E2E จริง
 npm run test:e2e      # real-browser E2E ผ่าน Chromium

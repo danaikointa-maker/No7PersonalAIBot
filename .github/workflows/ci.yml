@@ -59,6 +59,44 @@ jobs:
         run: npm run build
       - name: Package Linux desktop installer
         run: npx electron-builder --linux deb --publish never
+      - name: Verify packaged DEB contents and version
+        shell: bash
+        env:
+          DEB_HASH_FILE: ${{ runner.temp }}/no7-linux-deb.sha256
+          DEB_EXTRACT_DIR: ${{ runner.temp }}/no7-linux-deb-extracted
+        run: |
+          set -euo pipefail
+          mapfile -t debs < <(find release -maxdepth 1 -type f -name '*.deb' -print)
+          test "${#debs[@]}" -eq 1
+          expected_version=$(node -p "require('./package.json').version")
+          test "$(dpkg-deb --field "${debs[0]}" Version)" = "$expected_version"
+          dpkg-deb --info "${debs[0]}"
+          mkdir -p "$DEB_EXTRACT_DIR"
+          dpkg-deb --extract "${debs[0]}" "$DEB_EXTRACT_DIR"
+          test -n "$(find "$DEB_EXTRACT_DIR" -type f -path '*/resources/app.asar' -print -quit)"
+          test -n "$(find "$DEB_EXTRACT_DIR" -type f -name '*.desktop' -print -quit)"
+          sha256sum "${debs[0]}" | awk '{print $1}' > "$DEB_HASH_FILE"
+      - name: Upload real Linux installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: no7-linux-deb-real
+          path: release/*.deb
+          if-no-files-found: error
+      - name: Download real Linux installer
+        uses: actions/download-artifact@v8
+        with:
+          name: no7-linux-deb-real
+          path: ${{ runner.temp }}/no7-linux-deb-roundtrip
+      - name: Verify downloaded Linux installer checksum
+        shell: bash
+        env:
+          DEB_HASH_FILE: ${{ runner.temp }}/no7-linux-deb.sha256
+          DEB_ROUNDTRIP_DIR: ${{ runner.temp }}/no7-linux-deb-roundtrip
+        run: |
+          set -euo pipefail
+          mapfile -t debs < <(find "$DEB_ROUNDTRIP_DIR" -maxdepth 1 -type f -name '*.deb' -print)
+          test "${#debs[@]}" -eq 1
+          test "$(sha256sum "${debs[0]}" | awk '{print $1}')" = "$(cat "$DEB_HASH_FILE")"
 
   mobile-android-smoke:
     runs-on: ubuntu-22.04
