@@ -1,10 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('real Chromium boots No7 and completes a user-initiated chat turn', async ({ page }) => {
-  const pageErrors = [];
-  let chatPayload;
-  page.on('pageerror', (error) => pageErrors.push(error.message));
-
+async function configureTestPage(page, onChatRequest) {
   await page.addInitScript(() => {
     localStorage.setItem('no7.settings.v1', JSON.stringify({
       provider: 'pollinations',
@@ -18,13 +14,11 @@ test('real Chromium boots No7 and completes a user-initiated chat turn', async (
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url());
     if (url.hostname === 'text.pollinations.ai' && url.pathname === '/openai') {
-      chatPayload = route.request().postDataJSON();
+      const responseText = onChatRequest(route.request().postDataJSON());
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          choices: [{ message: { content: 'สวัสดีจากการทดสอบ Chromium จริง' } }],
-        }),
+        body: JSON.stringify({ choices: [{ message: { content: responseText } }] }),
       });
       return;
     }
@@ -33,6 +27,16 @@ test('real Chromium boots No7 and completes a user-initiated chat turn', async (
       return;
     }
     await route.abort();
+  });
+}
+
+test('real Chromium boots No7 and completes a user-initiated chat turn', async ({ page }) => {
+  const pageErrors = [];
+  let chatPayload;
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await configureTestPage(page, (payload) => {
+    chatPayload = payload;
+    return 'สวัสดีจากการทดสอบ Chromium จริง';
   });
 
   await page.goto('/');
@@ -47,5 +51,35 @@ test('real Chromium boots No7 and completes a user-initiated chat turn', async (
   await expect(page.locator('#messages .msg.bot').last())
     .toContainText('สวัสดีจากการทดสอบ Chromium จริง');
   expect(chatPayload.messages.some((message) => message.content.includes('ทดสอบแชทในเบราว์เซอร์จริง'))).toBe(true);
+  expect(pageErrors).toEqual([]);
+});
+
+test('real Chromium permission dialog defaults to denial and blocks the requested action', async ({ page }) => {
+  const pageErrors = [];
+  const chatRequests = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await configureTestPage(page, (payload) => {
+    chatRequests.push(payload);
+    if (chatRequests.length === 1) {
+      return '```tool\n{"tool":"compose_message","args":{"to":"friend@example.com","subject":"สวัสดี","body":"ช่วยนัดพบกันพรุ่งนี้"}}\n```';
+    }
+    return 'รับทราบ ฉันจะไม่เปิดหรือส่งข้อความ เพราะคุณไม่อนุญาต';
+  });
+
+  await page.goto('/');
+  await page.locator('#input').fill('ร่างข้อความถึงเพื่อน');
+  await page.locator('#send-btn').click();
+
+  const dialog = page.locator('#confirm-modal');
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('#confirm-title')).toContainText('ร่างข้อความ');
+  await expect(page.locator('#confirm-args')).toContainText('friend@example.com');
+  await expect(page.locator('#confirm-no')).toBeFocused();
+
+  await page.locator('#confirm-no').click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('#messages .msg.bot').last())
+    .toContainText('ฉันจะไม่เปิดหรือส่งข้อความ');
+  expect(chatRequests).toHaveLength(2);
   expect(pageErrors).toEqual([]);
 });
