@@ -60,6 +60,40 @@ test('real Chromium boots No7 and completes a user-initiated chat turn', async (
   expect(pageErrors).toEqual([]);
 });
 
+test('real Chromium can approve a tool and remember approval for the session', async ({ page }) => {
+  const pageErrors = [];
+  let chatCount = 0;
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await configureTestPage(page, () => {
+    chatCount++;
+    if (chatCount % 2 === 1) {
+      return '```tool\n{"tool":"timer","args":{"seconds":3600,"label":"Playwright approval test"}}\n```';
+    }
+    return 'ตั้งเวลา Playwright เรียบร้อยแล้ว';
+  });
+
+  await page.goto('/');
+  const dialog = page.locator('#confirm-modal');
+  const submit = async (text) => {
+    await page.locator('#input').fill(text);
+    await page.locator('#send-btn').click();
+  };
+
+  await submit('ตั้งเวลา Playwright');
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('#confirm-title')).toContainText('ตั้งเวลา');
+  await page.locator('#confirm-always').click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('#messages .msg.bot').last()).toContainText('ตั้งเวลา Playwright เรียบร้อยแล้ว');
+
+  await submit('ตั้งเวลา Playwright อีกครั้งใน session เดียวกัน');
+  await expect(page.locator('#messages .msg.bot').last()).toContainText('ตั้งเวลา Playwright เรียบร้อยแล้ว');
+  await expect(dialog).toBeHidden();
+  expect(chatCount).toBe(4);
+  expect(page.locator('#messages .msg-cards').filter({ hasText: 'Playwright approval test' })).toHaveCount(2);
+  expect(pageErrors).toEqual([]);
+});
+
 test('real Chromium permission dialog defaults to denial and blocks the requested action', async ({ page }) => {
   const pageErrors = [];
   const chatRequests = [];
