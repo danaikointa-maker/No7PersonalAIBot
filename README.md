@@ -22,7 +22,7 @@
 
 ### ข้อกำหนดก่อนติดตั้ง
 
-- Node.js **20 ขึ้นไป** และ npm (แนะนำ Node.js 22 ซึ่งใช้ใน CI)
+- Node.js **20 ขึ้นไป** และ npm (แนะนำ Node.js 22); การพัฒนา/แพ็ก Electron ต้องใช้ Node.js **22.12 ขึ้นไป**
 - Git สำหรับ clone repository
 - ใช้เว็บ/PWA ได้โดยไม่ต้องติดตั้งเครื่องมืออื่น; สร้างเดสก์ท็อปต้องใช้ Electron; Android ต้องมี Android Studio/SDK; iOS ต้องใช้ macOS และ Xcode
 

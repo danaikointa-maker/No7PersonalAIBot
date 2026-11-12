@@ -2,6 +2,11 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.42.1] — 2026-11-10
+
+- อัปเดต Electron, electron-builder และ electron-updater เพื่อแก้ security advisories ใน desktop runtime/update path; บังคับใช้ tar รุ่นที่แก้ critical advisory ใน dependency tree
+- เพิ่ม Linux `.deb` packaging smoke ใน CI; การพัฒนา/แพ็ก Electron ต้องใช้ Node.js 22.12 ขึ้นไป
+
 ## [2.42.0] — 2026-11-10
 
 - Sync bundles now reuse recursive settings redaction: API keys, tokens, OAuth client secrets, credentials in authorization headers, and sensitive URL credentials/query parameters are blanked before upload. Public preferences remain intact, and confirmed backup restore preserves matching credentials already stored locally.
