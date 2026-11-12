@@ -224,6 +224,34 @@ test('real Chromium previews backup restore and writes only after explicit confi
   expect(pageErrors).toEqual([]);
 });
 
+test('real Chromium capability report reflects unsupported and denied microphone APIs', async ({ page }) => {
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await configureTestPage(page, () => 'ไม่ควรเรียก AI ในการทดสอบ capability');
+  await page.addInitScript(() => {
+    for (const name of ['SpeechRecognition', 'webkitSpeechRecognition', 'speechSynthesis']) {
+      Object.defineProperty(window, name, { configurable: true, value: undefined });
+    }
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: undefined });
+  });
+  await page.goto('/');
+  await page.locator('#nav button[data-view="settings"]').click();
+  await expect(page.locator('#caps-list .cap')).toHaveCount(15);
+  await expect(page.locator('#caps-list .cap').filter({ hasText: 'ไมโครโฟน' })).toHaveClass(/\bno\b/);
+  await expect(page.locator('#caps-list .cap').filter({ hasText: 'แปลงเสียงเป็นข้อความ' })).toHaveClass(/\bno\b/);
+  await expect(page.locator('#caps-list .cap').filter({ hasText: 'อ่านออกเสียง' })).toHaveClass(/\bno\b/);
+
+  await page.evaluate(() => Object.defineProperty(navigator, 'mediaDevices', {
+    configurable: true,
+    value: { getUserMedia: async () => { throw new DOMException('Permission denied', 'NotAllowedError'); } },
+  }));
+  await page.locator('#caps-refresh').click();
+  await expect(page.locator('#caps-list .cap').filter({ hasText: 'ไมโครโฟน' })).toHaveClass(/\bok\b/);
+  await page.locator('#caps-mic').click();
+  await expect(page.locator('#caps-status')).toContainText('Permission denied');
+  expect(pageErrors).toEqual([]);
+});
+
 test('real Chromium permission dialog defaults to denial and blocks the requested action', async ({ page }) => {
   const pageErrors = [];
   const chatRequests = [];
