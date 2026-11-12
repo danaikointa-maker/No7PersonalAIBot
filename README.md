@@ -92,7 +92,7 @@ iOS ต้องใช้ macOS + Xcode: รัน `npm run mobile:add:ios`, `np
 ### ตรวจสอบโค้ด
 
 ```bash
-npm test              # 507 tests (unit + integration)
+npm test              # 511 tests (unit + integration)
 npm run test:browser  # 205 browser-flow checks ใน jsdom
 npx playwright install chromium # ครั้งแรก: เตรียมเบราว์เซอร์สำหรับ E2E
 npm run test:e2e      # real Chromium E2E (แชทใช้ mock AI ไม่เรียกบริการจริง)
@@ -207,7 +207,7 @@ npm run perf          # performance budget ของ source/bundle
 ### 📦 คุณภาพที่วัดได้
 - `npm run perf` = performance budget จริง (source + gzip bundle) ทำงานใน CI ทุก PR
 - jsdom browser smoke 205 checks ครอบเส้นทางหลัก; Playwright/Chromium จริงตรวจ boot/แชท, permission ปฏิเสธ/อนุญาต/จำสิทธิ์, capability report เมื่อ API เสียงไม่พร้อม/ปฏิเสธไมค์, คิวออฟไลน์ที่ลบได้เมื่อผู้ใช้ยืนยันและส่งอัตโนมัติเมื่อกลับมาออนไลน์ รวมถึง backup restore ที่ไม่เขียน storage เมื่อยกเลิกและเขียนหลังยืนยันเท่านั้น; CI ตรวจ capability report เพิ่มใน Chromium/Firefox/WebKit (mock AI; timer อยู่ใน test context)
-- CI ทดสอบ artifact round-trip แบบไฟล์จำลองระหว่าง upload-artifact v7 และ download-artifact v8; แยกจากการทดสอบ release จริง
+- CI ทดสอบ artifact round-trip แบบไฟล์จำลองระหว่าง upload-artifact v7 และ download-artifact v8; workflow release จะตรวจ checksum ของ installer จริงทั้ง 3 OS และตรวจว่า updater metadata ชี้ไปยังไฟล์ที่โหลดกลับมาได้ ก่อนสร้าง GitHub Release (รันเมื่อออก release/tag ไม่ใช่ทุก PR)
 
 ### 🔄 อัปเดตเวอร์ชัน (opt-in)
 - เดสก์ท็อปแอปเช็คอัปเดตเองเมื่อเปิด `NO7_AUTO_UPDATE=1` (แจ้งเตือนเมื่อมีใหม่, ติดตั้งตอนปิดแอป)

@@ -102,7 +102,9 @@ jobs:
         env:
           DEBUG: electron-builder
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload installers
+      - name: Create checksum manifest for release files
+        run: node tools/release-artifacts.js create release "${{ matrix.os }}"
+      - name: Upload installers and checksum manifest
         uses: actions/upload-artifact@v7
         with:
           name: no7-desktop-${{ matrix.os }}
@@ -112,18 +114,26 @@ jobs:
             release/*.zip
             release/*.AppImage
             release/*.deb
+            release/*.blockmap
             release/latest*.yml
-          if-no-files-found: warn
+            release/checksums-${{ matrix.os }}.json
+          if-no-files-found: error
 
   publish:
     needs: desktop
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
       - uses: actions/download-artifact@v8
         with:
           path: artifacts
           merge-multiple: true
+      - name: Verify installer artifact round-trip
+        run: node tools/release-artifacts.js verify artifacts
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
@@ -137,4 +147,5 @@ jobs:
             artifacts/**/*.zip
             artifacts/**/*.AppImage
             artifacts/**/*.deb
+            artifacts/**/*.blockmap
             artifacts/latest*.yml

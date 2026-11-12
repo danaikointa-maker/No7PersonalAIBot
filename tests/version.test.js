@@ -59,6 +59,16 @@ test('desktop packaging icons exist in the formats referenced by the build confi
   assert.equal(fs.readFileSync(iconPath('linux')).toString('ascii', 1, 4), 'PNG');
 });
 
+test('release workflow round-trips real installer artifacts and validates update metadata before publish', () => {
+  const release = read('.github/workflows/release.yml');
+  assert.match(release, /Create checksum manifest for release files/);
+  assert.match(release, /merge-multiple: true/);
+  assert.match(release, /Verify installer artifact round-trip/);
+  assert.match(release, /node tools\/release-artifacts\.js verify artifacts/);
+  assert.match(release, /release\/checksums-\$\{\{ matrix\.os \}\}\.json/);
+  assert.match(release, /artifacts\/\*\*\/\*\.blockmap/);
+});
+
 test('release workflow triggers on version tags and builds all 3 platforms', () => {
   const rel = read('.github/workflows/release.yml');
   assert.match(rel, /tags: \['v\*'\]/);
