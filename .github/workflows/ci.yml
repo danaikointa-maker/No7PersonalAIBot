@@ -140,8 +140,8 @@ jobs:
         run: npm audit --audit-level=moderate
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-      - name: Real-browser E2E
-        run: npm run test:e2e
+      - name: Core real-browser E2E (Chromium)
+        run: npx playwright test tests/e2e/chat.spec.js
 
   browser-capability-e2e:
     runs-on: ubuntu-22.04
