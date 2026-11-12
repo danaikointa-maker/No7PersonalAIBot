@@ -1,6 +1,6 @@
 # Build & แพ็กเกจ
 
-เว็บและ server ใช้ Node ≥ 20; การพัฒนา/แพ็ก Electron รุ่นปัจจุบันต้องใช้ Node ≥ 22.12 (CI release ใช้ Node 22)
+เว็บและ server ใช้ Node ≥ 20; Capacitor 8 CLI ต้องใช้ Node ≥ 22; การพัฒนา/แพ็ก Electron ต้องใช้ Node ≥ 22.12 (CI release ใช้ Node 22)
 
 ## 1) เว็บ / PWA (ใช้ได้ทันทีทั้งมือถือและ PC)
 

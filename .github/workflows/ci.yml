@@ -59,3 +59,37 @@ jobs:
         run: npm run build
       - name: Package Linux desktop installer
         run: npx electron-builder --linux deb --publish never
+
+  mobile-android-smoke:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install mobile dependencies
+        run: npm ci
+      - name: Build web bundle
+        run: npm run build
+      - name: Generate and sync Android project
+        run: npm run mobile:add:android && npx cap sync android
+
+  mobile-ios-smoke:
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install mobile dependencies
+        run: npm ci
+      - name: Build web bundle
+        run: npm run build
+      - name: Generate and sync iOS project
+        run: npm run mobile:add:ios && npx cap sync ios

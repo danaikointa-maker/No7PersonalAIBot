@@ -23,13 +23,13 @@
 
 รุ่น [v2.42.1](https://github.com/danaikointa-maker/No7PersonalAIBot/releases/tag/v2.42.1) เป็น security/maintenance release สำหรับแอปเดสก์ท็อป: อัปเดต Electron, electron-builder และ electron-updater พร้อมแก้ critical tar advisory ใน dependency tree; CI สร้าง Linux DEB, macOS ZIP และ Windows installer ครบ
 
-เว็บและ companion server ใช้ Node.js 20 ขึ้นไป; การพัฒนา/แพ็ก Electron ต้องใช้ Node.js 22.12 ขึ้นไป ส่วนผู้ใช้ติดตั้งแอปสำเร็จรูปไม่ต้องติดตั้ง Node.js
+เว็บและ companion server ใช้ Node.js 20 ขึ้นไป; Capacitor 8 ใช้ Node.js 22 ขึ้นไป และการพัฒนา/แพ็ก Electron ต้องใช้ Node.js 22.12 ขึ้นไป ส่วนผู้ใช้ติดตั้งแอปสำเร็จรูปไม่ต้องติดตั้ง Node.js
 
 ## เริ่มต้นใช้งาน
 
 ### ข้อกำหนดก่อนติดตั้ง
 
-- Node.js **20 ขึ้นไป** และ npm (แนะนำ Node.js 22); การพัฒนา/แพ็ก Electron ต้องใช้ Node.js **22.12 ขึ้นไป**
+- Node.js **20 ขึ้นไป** และ npm (แนะนำ Node.js 22); Capacitor 8 ต้องใช้ Node.js 22 ขึ้นไป และการพัฒนา/แพ็ก Electron ต้องใช้ Node.js **22.12 ขึ้นไป**
 - Git สำหรับ clone repository
 - ใช้เว็บ/PWA ได้โดยไม่ต้องติดตั้งเครื่องมืออื่น; สร้างเดสก์ท็อปต้องใช้ Electron; Android ต้องมี Android Studio/SDK; iOS ต้องใช้ macOS และ Xcode
 

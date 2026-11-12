@@ -32,10 +32,10 @@
     "perf": "node tools/perf.js"
   },
   "devDependencies": {
-    "@capacitor/android": "^6.2.0",
-    "@capacitor/cli": "^6.2.0",
-    "@capacitor/core": "^6.2.0",
-    "@capacitor/ios": "^6.2.0",
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "^8.6.0",
     "electron": "^45.3.0",
     "electron-builder": "^26.18.0",
     "esbuild": "^0.28.2",
