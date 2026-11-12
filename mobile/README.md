@@ -3,8 +3,10 @@
 โฟลเดอร์ `android/` และ `ios/` ถูก **generate** ด้วย Capacitor (ไม่ commit ลง git)
 ไฟล์ที่แพ็กเข้าแอปคือ `dist/` จาก `npm run build` — ชุดเดียวกับเว็บและ Electron
 
+ใช้ Node.js 22 ขึ้นไปสำหรับ Capacitor 8 CLI; โฟลเดอร์ native ถูกสร้างจากเวอร์ชันแพ็กเกจปัจจุบัน อย่านำ native project เก่ามาเขียนทับโดยไม่สำรองก่อน
+
 ```bash
-npm install
+npm ci
 npm run mobile:add:android   # ครั้งแรก (สร้าง ./android)
 npm run mobile:sync          # build + copy dist → android/app/src/main/assets/public
 npm run mobile:open:android  # เปิด Android Studio
