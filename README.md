@@ -33,6 +33,18 @@
 - Git สำหรับ clone repository
 - ใช้เว็บ/PWA ได้โดยไม่ต้องติดตั้งเครื่องมืออื่น; สร้างเดสก์ท็อปต้องใช้ Electron; Android ต้องมี Android Studio/SDK; iOS ต้องใช้ macOS และ Xcode
 
+### ติดตั้งแอปสำเร็จรูป (ไม่ต้องใช้ Node.js)
+
+ดาวน์โหลดจากหน้า [GitHub Releases](https://github.com/danaikointa-maker/No7PersonalAIBot/releases) โดยเลือกไฟล์ตามระบบปฏิบัติการ รุ่นล่าสุดที่ระบุใน README นี้คือ [v2.42.2](https://github.com/danaikointa-maker/No7PersonalAIBot/releases/tag/v2.42.2):
+
+| ระบบ | ไฟล์ | วิธีติดตั้ง/เปิด |
+|---|---|---|
+| Windows | `No7.AI.Setup.2.42.2.exe` (ติดตั้ง) หรือ `No7.AI.2.42.2.exe` (portable) | เปิด Setup แล้วทำตามตัวช่วยติดตั้ง หรือเปิด portable โดยตรง |
+| macOS | `No7.AI-2.42.2-mac.zip` | แตก ZIP แล้วเปิด `No7 AI.app`; build ปัจจุบัน unsigned จึงอาจต้องอนุญาตเปิดแอปจากผู้พัฒนาที่ไม่รู้จักในการตั้งค่าความปลอดภัย |
+| Debian/Ubuntu Linux (amd64) | `no7-personal-ai-bot_2.42.2_amd64.deb` | ดาวน์โหลดแล้วติดตั้งด้วย `sudo apt install ./no7-personal-ai-bot_2.42.2_amd64.deb` |
+
+ตรวจหน้า Releases ก่อนดาวน์โหลดเพื่อใช้เวอร์ชันล่าสุดและอ่านหมายเหตุของรุ่นนั้น; ตัวติดตั้งสำเร็จรูปไม่ต้องติดตั้ง Node.js ส่วนการเปิดผ่านเว็บ/PWA หรือการพัฒนาต่อ ให้ทำตามขั้นตอนด้านล่าง
+
 ### ติดตั้งและเปิดเว็บ/PWA
 
 ```bash
@@ -265,18 +277,19 @@ flowchart TB
     CORE[Core: agent loop · AI providers · memory · tools]
     GATE[Permission gate · risk · user confirmation]
     STORE[(Storage ในอุปกรณ์: localStorage)]
-    UI --> CORE --> GATE
+    UI --> CORE
     CORE <--> STORE
+    CORE -->|เฉพาะคำขอเรียก tool| GATE
   end
   subgraph HOSTS[วิธีเปิดแอป]
     PWA[Browser / PWA]
     ELECTRON[Electron desktop<br/>main process + preload bridge]
     CAP[Capacitor Android / iOS]
   end
-  UI --> PWA
-  UI --> ELECTRON
-  UI --> CAP
-  GATE -->|เฉพาะ tool ที่ผ่านนโยบาย/การยืนยัน| HOSTAPI[Platform APIs / local tools]
+  PWA -->|แสดง web bundle| UI
+  ELECTRON -->|ห่อ web bundle + IPC ที่จำกัด| UI
+  CAP -->|แสดง web bundle + native plugins| UI
+  GATE -->|หลังผ่านนโยบาย/การยืนยัน| HOSTAPI[Platform APIs / local tools]
   CORE -->|ตาม provider ที่ผู้ใช้เลือก| AI[Cloud AI หรือ Ollama / LM Studio]
   CLIENT <-->|ผู้ใช้สั่ง sync / API request| SERVER[companion server<br/>static · proxy · sync · bots · MCP · reminders]
   SERVER --> FILES[(.no7/ บนเครื่อง server)]
