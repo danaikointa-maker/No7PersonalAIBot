@@ -108,7 +108,7 @@ npm run build         # production/PWA build
 npm run perf          # performance budget
 ```
 
-`test:browser` ใช้ `jsdom` + `esbuild` — ไม่ต้องเปิดเบราว์เซอร์จริง และยังไม่ใช่ Playwright E2E; Linux desktop packaging มี smoke test ใน CI ส่วน release workflow สร้าง installer จริงบน Linux/macOS/Windows
+`test:browser` ใช้ `jsdom` + `esbuild` — ไม่ต้องเปิดเบราว์เซอร์จริง และยังไม่ใช่ Playwright E2E; CI มี Linux desktop packaging smoke และ jobs สร้าง/sync native project แยกสำหรับ Android (JDK 21) กับ iOS (macOS) แต่ไม่ได้ทดสอบบนอุปกรณ์จริง; release workflow สร้าง installer desktop บน Linux/macOS/Windows
 
 ## ตัวแปรสภาพแวดล้อม (สำหรับ server)
 
