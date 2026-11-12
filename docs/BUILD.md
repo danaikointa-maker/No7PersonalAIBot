@@ -104,7 +104,7 @@ npx cap open ios
 
 ```bash
 npm test              # 512 unit + integration tests
-npm run test:browser  # 205 browser-flow checks ที่รัน bundle จริงบน jsdom
+npm run test:browser  # 206 browser-flow checks ที่รัน bundle จริงบน jsdom
 npx playwright install chromium # ครั้งแรก: เตรียม Chromium สำหรับ E2E จริง
 npm run test:e2e      # real-browser E2E ผ่าน Chromium
 npm run check         # syntax + structure check
