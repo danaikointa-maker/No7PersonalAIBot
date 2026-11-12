@@ -4,6 +4,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { inspectMarkdownFiles } from './markdown-check.js';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SKIP = new Set(['node_modules', 'dist', 'release', '.git', 'android', 'ios']);
@@ -60,40 +61,9 @@ for (const r of required) {
   }
 }
 
-for (const f of markdownFiles) {
-  const lines = fs.readFileSync(f, 'utf8').split(/\r?\n/);
-  let fence = null;
-  for (let i = 0; i < lines.length; i++) {
-    if (fence) {
-      const close = lines[i].match(/^\s*(`+|~+)\s*$/);
-      if (close && close[1][0] === fence.char && close[1].length >= fence.length) fence = null;
-      continue;
-    }
-    const fenceMatch = lines[i].match(/^\s*(?:(?:[-+*]|\d+[.)])\s+)*(?:>\s*)*(`{3,}|~{3,})/);
-    if (fenceMatch) {
-      fence = { char: fenceMatch[1][0], length: fenceMatch[1].length, line: i + 1 };
-      continue;
-    }
-
-    const plainLine = lines[i].replace(/`+[^`]*`+/g, '');
-    for (const match of plainLine.matchAll(/!?(?:\[[^\]]*\])\(([^)]*)\)/g)) {
-      const body = match[1].trim();
-      const angle = body.match(/^<([^>]*)>/);
-      const destination = angle ? angle[1] : body.match(/^[^\s]+/)?.[0];
-      if (!destination || /^(?:[a-z][a-z\d+.-]*:|\/\/|#)/i.test(destination)) continue;
-      const localPath = decodeURIComponent(destination.split(/[?#]/, 1)[0]);
-      if (!localPath) continue;
-      const target = path.resolve(path.dirname(f), localPath);
-      if (!fs.existsSync(target)) {
-        failed++;
-        console.error(`✗ broken Markdown link: ${path.relative(ROOT, f)}:${i + 1} → ${destination}`);
-      }
-    }
-  }
-  if (fence) {
-    failed++;
-    console.error(`✗ unclosed Markdown code fence: ${path.relative(ROOT, f)}:${fence.line}`);
-  }
+for (const issue of inspectMarkdownFiles(ROOT, markdownFiles)) {
+  failed++;
+  console.error(`✗ ${issue.message}: ${issue.file}:${issue.line}`);
 }
 
 console.log(`\nchecked ${files.length} JS files and ${markdownFiles.length} Markdown files · ${failed ? `${failed} problem(s)` : 'all good ✅'}`);
