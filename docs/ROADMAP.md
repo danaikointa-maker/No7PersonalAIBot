@@ -72,9 +72,10 @@
 
 | ลำดับ | งาน | สถานะ | เงื่อนไขปิดงาน |
 |---|---|---|---|
-| P0 | ปิดช่องโหว่ dependency ที่เหลือ | กำลังดำเนินการ | อัปเดต Electron และ electron-builder ไปยังรุ่นที่แก้ advisory โดยทดสอบ desktop packaging/updater; แยก Capacitor major migration เพื่อไม่ให้ CLI และ native projects เปลี่ยนโดยไม่ตรวจ |
+| P0 | แก้ Critical/High ใน dependency runtime และ desktop tooling | ✅ v2.42.1 | pin tar รุ่นแก้ critical; อัปเดต Electron/electron-builder/electron-updater; CI packaging smoke และ release matrix Linux/macOS/Windows ผ่าน |
+| P1 | ลด moderate dependency advisories ที่ยังเหลือ | วางแผน | ตรวจและอัปเดต Capacitor CLI, glob/minimatch และ transitive chain ทีละชุด โดยไม่ลดรุ่น Electron tooling และไม่ซ่อนผล audit; เป้าหมายคือ audit clean หรือข้อยกเว้นที่อธิบาย/กำหนดวันทบทวน |
 | P1 | ย้าย Capacitor 6 ไปสายที่ได้รับ security fixes | วางแผน | ปรับ CLI/core/android/ios ให้รุ่นเข้ากัน, อัปเดตข้อกำหนด Node/Android Gradle/Xcode และทดสอบสร้าง/sync native project บน Android/iOS; ไม่เปลี่ยน native project ที่ผู้ใช้มีอยู่แบบทำลายข้อมูล |
-| P1 | ขยาย CI ให้เห็นความเสี่ยงของ desktop/mobile ก่อน release | กำลังดำเนินการ | PR นี้เพิ่ม Linux `.deb` packaging smoke; ยังต้องประเมิน audit policy และตรวจแพ็กเกจ/auto-update บน OS อื่นผ่าน release workflow |
+| P1 | ขยาย CI ให้เห็นความเสี่ยงของ desktop/mobile ก่อน release | กำลังดำเนินการ | Linux `.deb` smoke และ release matrix 3 OS ผ่านแล้ว; ยังต้องกำหนด audit policy และพิจารณา native mobile checks |
 | P1 | เพิ่ม real-browser E2E | วางแผน | ประเมิน Playwright บน Chromium ใน CI เพื่อทดสอบ flow สำคัญจริง; คง jsdom tests เป็นชั้นที่เร็วกว่าและไม่อ้างว่าแทนอุปกรณ์จริง |
 | P2 | ตรวจความสามารถเสียงบนอุปกรณ์จริง | รอการทดสอบอุปกรณ์ | ยืนยันข้อจำกัด SpeechRecognition/wake word บน iOS Safari และ Android WebView รุ่นต่าง ๆ; พิจารณา native speech plugin หลังทบทวนสิทธิ์, offline behavior และ privacy |
 | P2 | รักษาความถูกต้องของเอกสาร/ประวัติงาน | ทำต่อเนื่อง | ให้ README, BUILD, CHANGELOG, release metadata และสถานะใน PHASES ตรงกันทุกครั้งที่ส่ง release |
@@ -82,8 +83,9 @@
 ### งานเริ่มต้นในรอบนี้
 
 - `npm audit` ก่อนเริ่มงานพบ 23 รายการ (รวม critical 1); pin `tar@7.5.23` ผ่าน npm override ลดเหลือ 18 และตัด critical ออก
-- รอบนี้อัปเดต Electron เป็น 45.3.0, electron-builder เป็น 26.18.0 และ electron-updater เป็น 6.8.11; audit ของ lockfile ใหม่เหลือ 12 (low 2, moderate 10, high/critical 0) โดยยังต้องทดสอบ desktop packaging/updater บน CI
-- งานถัดไปคือ Capacitor 8 ซึ่งต้องใช้ Node 22 และ migration native แยก; ไม่ใช้ `npm audit fix --force` แบบเหมารวม เพราะอาจอัปเกรด native tooling หลายชุดพร้อมกันโดยไม่มี validation
+- PR #70 รวมและเผยแพร่ [v2.42.1](https://github.com/danaikointa-maker/No7PersonalAIBot/releases/tag/v2.42.1) แล้ว; release run สร้าง Linux DEB, macOS ZIP, Windows NSIS/portable และ updater metadata ครบ
+- Electron 45.3.0, electron-builder 26.18.x และ electron-updater 6.8.11 ผ่าน Linux packaging smoke และ release matrix; audit lockfile ปัจจุบันเหลือ 12 (low 2, moderate 10, high/critical 0)
+- งานถัดไปคือจัดการ moderate advisories และ Capacitor 8 ซึ่งต้องใช้ Node 22 พร้อม migration native แยก; ไม่ใช้ `npm audit fix --force` แบบเหมารวม เพราะอาจอัปเกรด native tooling หลายชุดพร้อมกันโดยไม่มี validation
 
 ### วิธีตรวจรับก่อนปิดงานแต่ละชุด
 
