@@ -206,7 +206,7 @@ npm run perf          # performance budget ของ source/bundle
 
 ### 📦 คุณภาพที่วัดได้
 - `npm run perf` = performance budget จริง (source + gzip bundle) ทำงานใน CI ทุก PR
-- jsdom browser smoke 205 checks ครอบเส้นทางหลัก; Playwright/Chromium จริงตรวจ boot/แชท, permission ปฏิเสธ/อนุญาต/จำสิทธิ์, capability report เมื่อ API เสียงไม่พร้อม/ปฏิเสธไมค์, คิวออฟไลน์ที่ลบได้เมื่อผู้ใช้ยืนยันและส่งอัตโนมัติเมื่อกลับมาออนไลน์ รวมถึง backup restore ที่ไม่เขียน storage เมื่อยกเลิกและเขียนหลังยืนยันเท่านั้น (mock AI; timer อยู่ใน test context)
+- jsdom browser smoke 205 checks ครอบเส้นทางหลัก; Playwright/Chromium จริงตรวจ boot/แชท, permission ปฏิเสธ/อนุญาต/จำสิทธิ์, capability report เมื่อ API เสียงไม่พร้อม/ปฏิเสธไมค์, คิวออฟไลน์ที่ลบได้เมื่อผู้ใช้ยืนยันและส่งอัตโนมัติเมื่อกลับมาออนไลน์ รวมถึง backup restore ที่ไม่เขียน storage เมื่อยกเลิกและเขียนหลังยืนยันเท่านั้น; CI ตรวจ capability report เพิ่มใน Chromium/Firefox/WebKit (mock AI; timer อยู่ใน test context)
 - CI ทดสอบ artifact round-trip แบบไฟล์จำลองระหว่าง upload-artifact v7 และ download-artifact v8; แยกจากการทดสอบ release จริง
 
 ### 🔄 อัปเดตเวอร์ชัน (opt-in)
