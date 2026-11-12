@@ -2,6 +2,10 @@
 
 รูปแบบ: [Keep a Changelog](https://keepachangelog.com/) · เวอร์ชัน: SemVer
 
+## [2.42.2] — 2026-11-10
+
+- อัปเกรด Capacitor CLI/core/Android/iOS เป็น 8.6.0 และเพิ่ม CI ตรวจสร้าง/sync โปรเจกต์ native แยกสำหรับ Android และ iOS; ไม่ได้แนบ APK/IPA ใน release นี้ ต้องใช้ Node.js 22+ สำหรับ CLI และสำรอง native project เดิมก่อนย้าย
+
 ## [2.42.1] — 2026-11-10
 
 - อัปเดต Electron, electron-builder และ electron-updater เพื่อแก้ security advisories ใน desktop runtime/update path; บังคับใช้ tar รุ่นที่แก้ critical advisory ใน dependency tree
