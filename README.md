@@ -8,6 +8,7 @@
 
 ## สารบัญ
 
+- [รุ่นล่าสุด](#รุ่นล่าสุด-v2421)
 - [เริ่มต้นใช้งาน](#เริ่มต้นใช้งาน)
 - [ฟีเจอร์หลัก](#ทำอะไรได้-v242)
 - [แก้ปัญหาเบื้องต้นและดูแลข้อมูล](#แก้ปัญหาเบื้องต้นและดูแลข้อมูล)
@@ -17,6 +18,12 @@
 - [สัญญาอนุญาต](#license)
 
 ---
+
+## รุ่นล่าสุด v2.42.1
+
+รุ่น [v2.42.1](https://github.com/danaikointa-maker/No7PersonalAIBot/releases/tag/v2.42.1) เป็น security/maintenance release สำหรับแอปเดสก์ท็อป: อัปเดต Electron, electron-builder และ electron-updater พร้อมแก้ critical tar advisory ใน dependency tree; CI สร้าง Linux DEB, macOS ZIP และ Windows installer ครบ
+
+เว็บและ companion server ใช้ Node.js 20 ขึ้นไป; การพัฒนา/แพ็ก Electron ต้องใช้ Node.js 22.12 ขึ้นไป ส่วนผู้ใช้ติดตั้งแอปสำเร็จรูปไม่ต้องติดตั้ง Node.js
 
 ## เริ่มต้นใช้งาน
 
