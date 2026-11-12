@@ -69,6 +69,16 @@ test('release workflow round-trips real installer artifacts and validates update
   assert.match(release, /artifacts\/\*\*\/\*\.blockmap/);
 });
 
+test('CI packages, inspects, and round-trips the real Linux DEB installer', () => {
+  const ci = read('.github/workflows/ci.yml');
+  assert.match(ci, /Package Linux desktop installer/);
+  assert.match(ci, /dpkg-deb --extract/);
+  assert.match(ci, /resources\/app\.asar/);
+  assert.match(ci, /Upload real Linux installer[\s\S]*upload-artifact@v7/);
+  assert.match(ci, /Download real Linux installer[\s\S]*download-artifact@v8/);
+  assert.match(ci, /Verify downloaded Linux installer checksum[\s\S]*sha256sum/);
+});
+
 test('release workflow triggers on version tags and builds all 3 platforms', () => {
   const rel = read('.github/workflows/release.yml');
   assert.match(rel, /tags: \['v\*'\]/);
