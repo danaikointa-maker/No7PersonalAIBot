@@ -103,12 +103,14 @@ npx cap open ios
 ```bash
 npm test              # 507 unit + integration tests
 npm run test:browser  # 205 browser-flow checks ที่รัน bundle จริงบน jsdom
-npm run check         # syntax + structure check (126 JS files)
+npx playwright install chromium # ครั้งแรก: เตรียม Chromium สำหรับ E2E จริง
+npm run test:e2e      # real-browser E2E ผ่าน Chromium
+npm run check         # syntax + structure check
 npm run build         # production/PWA build
 npm run perf          # performance budget
 ```
 
-`test:browser` ใช้ `jsdom` + `esbuild` — ไม่ต้องเปิดเบราว์เซอร์จริง และยังไม่ใช่ Playwright E2E; CI มี Linux desktop packaging smoke และ jobs สร้าง/sync native project แยกสำหรับ Android (JDK 21) กับ iOS (macOS) แต่ไม่ได้ทดสอบบนอุปกรณ์จริง; release workflow สร้าง installer desktop บน Linux/macOS/Windows
+`test:browser` ใช้ `jsdom` + `esbuild` ส่วน `test:e2e` เปิด Chromium จริงและ mock คำตอบ Pollinations; CI รันทั้งสองชั้น พร้อม Linux desktop packaging smoke และ jobs สร้าง/sync native project แยกสำหรับ Android (JDK 21) กับ iOS (macOS) ซึ่งยังไม่ใช่การทดสอบบนอุปกรณ์จริง; release workflow สร้าง installer desktop บน Linux/macOS/Windows
 
 ## ตัวแปรสภาพแวดล้อม (สำหรับ server)
 

@@ -94,6 +94,8 @@ iOS ต้องใช้ macOS + Xcode: รัน `npm run mobile:add:ios`, `np
 ```bash
 npm test              # 507 tests (unit + integration)
 npm run test:browser  # 205 browser-flow checks ใน jsdom
+npx playwright install chromium # ครั้งแรก: เตรียมเบราว์เซอร์สำหรับ E2E
+npm run test:e2e      # real Chromium E2E (แชทใช้ mock AI ไม่เรียกบริการจริง)
 npm run check         # syntax + structure check
 npm run build         # production build
 npm run perf          # performance budget ของ source/bundle
