@@ -90,6 +90,18 @@
     "electron-updater": "^6.8.11"
   },
   "overrides": {
-    "tar": "^7.5.23"
+    "tar": "^7.5.23",
+    "app-builder-lib": {
+      "minimatch": "^11.0.1"
+    },
+    "@electron/universal": {
+      "minimatch": "^11.0.1"
+    },
+    "rimraf@4": {
+      "glob": "^14.0.5"
+    },
+    "workbox-build": {
+      "glob": "^14.0.5"
+    }
   }
 }

@@ -23,6 +23,8 @@ jobs:
           cache: npm
       - name: Install
         run: npm ci
+      - name: Dependency audit gate
+        run: npm audit --audit-level=moderate
       - name: Syntax + structure check
         run: npm run check
       - name: Unit tests

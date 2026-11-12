@@ -73,9 +73,9 @@
 | ลำดับ | งาน | สถานะ | เงื่อนไขปิดงาน |
 |---|---|---|---|
 | P0 | แก้ Critical/High ใน dependency runtime และ desktop tooling | ✅ v2.42.1 | pin tar รุ่นแก้ critical; อัปเดต Electron/electron-builder/electron-updater; CI packaging smoke และ release matrix Linux/macOS/Windows ผ่าน |
-| P1 | ลด moderate dependency advisories ที่ยังเหลือ | วางแผน | ตรวจและอัปเดต Capacitor CLI, glob/minimatch และ transitive chain ทีละชุด โดยไม่ลดรุ่น Electron tooling และไม่ซ่อนผล audit; เป้าหมายคือ audit clean หรือข้อยกเว้นที่อธิบาย/กำหนดวันทบทวน |
-| P1 | ย้าย Capacitor 6 ไปสายที่ได้รับ security fixes | วางแผน | ปรับ CLI/core/android/ios ให้รุ่นเข้ากัน, อัปเดตข้อกำหนด Node/Android Gradle/Xcode และทดสอบสร้าง/sync native project บน Android/iOS; ไม่เปลี่ยน native project ที่ผู้ใช้มีอยู่แบบทำลายข้อมูล |
-| P1 | ขยาย CI ให้เห็นความเสี่ยงของ desktop/mobile ก่อน release | กำลังดำเนินการ | Linux `.deb` smoke และ release matrix 3 OS ผ่านแล้ว; ยังต้องกำหนด audit policy และพิจารณา native mobile checks |
+| P1 | ทบทวน low severity advisories ใน dev tooling | กำลังดำเนินการ | สาย moderate/high/critical ถูกปิดด้วย overrides ที่ทดสอบแล้ว; เหลือ 4 low ผ่าน deepmerge/workbox chain ซึ่งไม่มีการแก้แบบ semver-safe ใน lockfile ปัจจุบัน; ตรวจ upstream โดยไม่ downgrade tooling |
+| P1 | ประเมิน Capacitor 6 → รุ่นหลักที่ดูแลอยู่ | วางแผน | ปรับ CLI/core/android/ios ให้รุ่นเข้ากัน, อัปเดตข้อกำหนด Node/Android Gradle/Xcode และทดสอบสร้าง/sync native project บน Android/iOS; ไม่เปลี่ยน native project ที่ผู้ใช้มีอยู่แบบทำลายข้อมูล |
+| P1 | ขยาย CI ให้เห็นความเสี่ยงของ desktop/mobile ก่อน release | กำลังดำเนินการ | Linux `.deb` smoke และ release matrix 3 OS ผ่านแล้ว; เพิ่ม audit gate ระดับ moderate ใน PR/release; ยังต้องพิจารณา native mobile checks |
 | P1 | เพิ่ม real-browser E2E | วางแผน | ประเมิน Playwright บน Chromium ใน CI เพื่อทดสอบ flow สำคัญจริง; คง jsdom tests เป็นชั้นที่เร็วกว่าและไม่อ้างว่าแทนอุปกรณ์จริง |
 | P2 | ตรวจความสามารถเสียงบนอุปกรณ์จริง | รอการทดสอบอุปกรณ์ | ยืนยันข้อจำกัด SpeechRecognition/wake word บน iOS Safari และ Android WebView รุ่นต่าง ๆ; พิจารณา native speech plugin หลังทบทวนสิทธิ์, offline behavior และ privacy |
 | P2 | รักษาความถูกต้องของเอกสาร/ประวัติงาน | ทำต่อเนื่อง | ให้ README, BUILD, CHANGELOG, release metadata และสถานะใน PHASES ตรงกันทุกครั้งที่ส่ง release |
@@ -84,8 +84,9 @@
 
 - `npm audit` ก่อนเริ่มงานพบ 23 รายการ (รวม critical 1); pin `tar@7.5.23` ผ่าน npm override ลดเหลือ 18 และตัด critical ออก
 - PR #70 รวมและเผยแพร่ [v2.42.1](https://github.com/danaikointa-maker/No7PersonalAIBot/releases/tag/v2.42.1) แล้ว; release run สร้าง Linux DEB, macOS ZIP, Windows NSIS/portable และ updater metadata ครบ
-- Electron 45.3.0, electron-builder 26.18.x และ electron-updater 6.8.11 ผ่าน Linux packaging smoke และ release matrix; audit lockfile ปัจจุบันเหลือ 12 (low 2, moderate 10, high/critical 0)
-- งานถัดไปคือจัดการ moderate advisories และ Capacitor 8 ซึ่งต้องใช้ Node 22 พร้อม migration native แยก; ไม่ใช้ `npm audit fix --force` แบบเหมารวม เพราะอาจอัปเกรด native tooling หลายชุดพร้อมกันโดยไม่มี validation
+- Electron 45.3.0, electron-builder 26.18.x และ electron-updater 6.8.11 ผ่าน Linux packaging smoke และ release matrix; หลังจากนั้น pin patched glob/minimatch ตาม package subtree ลด audit จาก 12 เหลือ 4 low (ไม่มี moderate/high/critical)
+- เพิ่ม `npm audit --audit-level=moderate` เป็น CI/release gate; `npm audit fix --force` ไม่ใช้ เพราะเสนอ downgrade electron-builder หรือยก Capacitor เป็น major โดยไม่มี native validation
+- งานถัดไปคือประเมิน Capacitor major migration บนอุปกรณ์/CI และตรวจ upstream สำหรับ deepmerge low advisory; ไม่ยอมให้ workaround ลดความปลอดภัยหรือทำ native projects ของผู้ใช้เสียหาย
 
 ### วิธีตรวจรับก่อนปิดงานแต่ละชุด
 
