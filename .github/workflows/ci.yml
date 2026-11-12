@@ -142,3 +142,25 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Real-browser E2E
         run: npm run test:e2e
+
+  browser-capability-e2e:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      PLAYWRIGHT_BROWSER: ${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install test dependencies
+        run: npm ci
+      - name: Install browser and system dependencies
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Cross-browser capability E2E
+        run: npx playwright test tests/e2e/capabilities.spec.js

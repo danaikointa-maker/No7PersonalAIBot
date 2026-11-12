@@ -9,7 +9,7 @@ export default defineConfig({
   outputDir: '/tmp/no7-playwright-results',
   use: {
     baseURL: 'http://127.0.0.1:5173',
-    browserName: 'chromium',
+    browserName: process.env.PLAYWRIGHT_BROWSER || 'chromium',
     headless: true,
   },
   webServer: {

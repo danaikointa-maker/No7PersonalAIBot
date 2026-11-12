@@ -61,12 +61,17 @@ npm run perf
 
 `tests/e2e/chat.spec.js` เปิดแอปผ่าน Vite ใน Chromium จริง ตรวจ boot/navigation และแชทด้วย mock provider; ครอบ permission ทั้งปฏิเสธและอนุญาต/จำสิทธิ์ตลอด session (timer อยู่ใน browser context ทดสอบ), capability report เมื่อ API เสียงไม่มีและเมื่อการขอไมค์ถูกปฏิเสธ, outbox offline ที่ลบได้เมื่อยืนยันและ flush เพียงครั้งเดียวเมื่อกลับมาออนไลน์ รวมถึง backup restore ที่ยกเลิกแล้ว storage ต้องไม่เปลี่ยน และกู้คืนได้หลังผู้ใช้ยืนยัน พร้อมตรวจว่า credentials ในเครื่องยังอยู่และ health history มีเฉพาะ summary metrics ไม่มีการส่งข้อมูลออก
 
+`tests/e2e/capabilities.spec.js` ตรวจ capability report ใน Chromium, Firefox และ WebKit ว่าตรงกับ Web APIs ที่เบราว์เซอร์เปิดเผยจริง และแสดงเหตุผลเมื่อจำลองสภาพแวดล้อมที่ไม่มี API ไมโครโฟน/STT/TTS; เป็นการทดสอบ compatibility ของ browser APIs ไม่ใช่การทดสอบสิทธิ์หรือ hardware จริง ซึ่งยังต้องตรวจบนอุปกรณ์
+
 ```bash
 npx playwright install chromium # ครั้งแรก
 npm run test:e2e
+npx playwright install firefox webkit # ครั้งแรก หากจะรัน cross-browser suite
+PLAYWRIGHT_BROWSER=firefox npx playwright test tests/e2e/capabilities.spec.js
+PLAYWRIGHT_BROWSER=webkit npx playwright test tests/e2e/capabilities.spec.js
 ```
 
-CI ติดตั้ง Chromium และรัน test นี้ทุก PR; ส่วน microphone, wake word และการอนุญาต native ยังต้องทดสอบบนอุปกรณ์จริง
+CI ติดตั้ง Chromium และรัน test ชุดเต็มทุก PR; capability report เพิ่มเติมทดสอบ Chromium/Firefox/WebKit ด้วย ส่วน microphone, wake word และการอนุญาต native ยังต้องทดสอบบนอุปกรณ์จริง
 
 ## 4) Integration tests ที่ spawn server จริง
 
@@ -83,7 +88,7 @@ CI ติดตั้ง Chromium และรัน test นี้ทุก PR;
 
 ## 5) ข้อจำกัด
 
-- Playwright/Chromium ครอบ boot/chat, permission denial/approval/session, capability report เมื่อ API เสียงไม่รองรับ/ปฏิเสธ, offline enqueue/remove/online flush และ backup restore แบบยืนยัน; ยังไม่ครอบ capability matrix หลาย engine/อุปกรณ์ หรือ native APIs จริง
+- Playwright ครอบ Chromium boot/chat, permission denial/approval/session, offline enqueue/remove/online flush และ backup restore; capability report เทียบ API จริงและกรณีไม่มี API ใน Chromium/Firefox/WebKit; ยังไม่ครอบการจับไมค์/wake word หรือ native APIs บนอุปกรณ์จริง
 - ยังไม่มี performance timing (LCP/INP) — มีแค่ขนาดไฟล์; วัด runtime ผ่าน `core/metrics.js` แทน
 - budget ตั้งจากค่าจริง + margin ~30–100% — ต้องปรับเมื่อเพิ่มฟีเจอร์ใหญ่
 - ค่าตัวอย่างอ้างอิงจากการตรวจล่าสุด; ใช้ `npm run perf` เพื่อวัดค่าปัจจุบันจริงก่อนเปลี่ยน `perf-budget.json`
