@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
 
+test.afterEach(async ({}, testInfo) => {
+  if (testInfo.status === testInfo.expectedStatus || !testInfo.error) return;
+  const message = testInfo.error.message.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  process.stdout.write(`::error title=Playwright failure: ${testInfo.title}::${message}\n`);
+});
+
 async function configureTestPage(page, onChatRequest) {
   await page.addInitScript(() => {
     localStorage.setItem('no7.settings.v1', JSON.stringify({
