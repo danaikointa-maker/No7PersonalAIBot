@@ -5,7 +5,7 @@
 ## 1) เว็บ / PWA (ใช้ได้ทันทีทั้งมือถือและ PC)
 
 ```bash
-npm install
+npm ci             # ติดตั้ง dependency ให้ตรงกับ package-lock.json
 npm run dev        # dev server (HMR) — เปิดจากมือถือใน Wi-Fi เดียวกันได้: http://<ip>:5173
 npm run build      # → dist/  (index.html + overlay.html + sw.js + icon.svg)
 npm run preview    # ดู production build
@@ -78,7 +78,7 @@ git tag v2.0.0 && git push origin v2.0.0
 ## 3) มือถือ (Capacitor)
 
 ```bash
-npm install
+npm ci
 npm run mobile:add:android   # สร้างโฟลเดอร์ android/ ครั้งแรกครั้งเดียว (ต้องมี Android Studio)
 npm run mobile:sync          # build dist/ แล้ว sync เข้า native project
 npm run mobile:open:android  # เปิด Android Studio → Run
@@ -101,12 +101,14 @@ npx cap open ios
 ## 4) ทดสอบ
 
 ```bash
-npm test           # 34 unit tests (memory BM25, state, tools, prompt, agent, permissions)
-npm run test:browser  # 26 end-to-end checks: รัน bundle จริงใน jsdom (boot → แชท → tool → ไมค์ → pairing)
-npm run check      # syntax check ทุกไฟล์ .js + ตรวจไฟล์สำคัญ
+npm test              # 507 unit + integration tests
+npm run test:browser  # 205 browser-flow checks ที่รัน bundle จริงบน jsdom
+npm run check         # syntax + structure check (126 JS files)
+npm run build         # production/PWA build
+npm run perf          # performance budget
 ```
 
-`test:browser` ใช้ `jsdom` + `esbuild` (ติดตั้งมาเป็น devDependency แล้ว) — ไม่ต้องเปิดเบราว์เซอร์จริง
+`test:browser` ใช้ `jsdom` + `esbuild` — ไม่ต้องเปิดเบราว์เซอร์จริง และยังไม่ใช่ Playwright E2E; Linux desktop packaging มี smoke test ใน CI ส่วน release workflow สร้าง installer จริงบน Linux/macOS/Windows
 
 ## ตัวแปรสภาพแวดล้อม (สำหรับ server)
 
