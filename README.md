@@ -180,7 +180,7 @@ npm run perf          # performance budget ของ source/bundle
 
 ### 🔄 อัปเดตเวอร์ชัน (opt-in)
 - เดสก์ท็อปแอปเช็คอัปเดตเองเมื่อเปิด `NO7_AUTO_UPDATE=1` (แจ้งเตือนเมื่อมีใหม่, ติดตั้งตอนปิดแอป)
-- `git tag v2.0.0` → GitHub Actions build win/mac/linux + draft release พร้อม `latest*.yml`
+- `git tag v2.0.0` → GitHub Actions build Windows (`.exe`), macOS (แอป `.zip`) และ Linux (`.deb`) พร้อม metadata `latest*.yml`; การสร้าง release เป็น draft หรือเผยแพร่ทันทีขึ้นกับวิธี trigger
 
 ### 🧯 ความเสถียรและความเร็ว
 - Retry แบบ exponential + jitter เฉพาะ error ชั่วคราว (429/5xx/network) และไม่ลองซ้ำถ้าเริ่มพูดไปแล้ว
